@@ -107,11 +107,12 @@ export default function ProjectDetailLayout({
   children: React.ReactNode;
   params: { projectId: string };
 }) {
+  const { projectId } = params;
 
   return (
-    <ViewsProvider projectId={params.projectId}>
+    <ViewsProvider projectId={projectId}>
       <div className="bg-[#313131] text-foreground min-h-screen flex">
-        <ProjectSidebar projectId={params.projectId} />
+        <ProjectSidebar projectId={projectId} />
         <main className="flex-1 flex flex-col">
           {children}
         </main>
