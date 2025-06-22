@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AdminProjectsPage() {
     return (
@@ -16,7 +17,9 @@ export default function AdminProjectsPage() {
                 </CardContent>
                 <CardFooter className="flex justify-end gap-4">
                     <Button variant="ghost" className="text-neutral-400 hover:text-white p-0 h-auto text-xs font-semibold tracking-wider">EXPORT</Button>
-                    <Button variant="ghost" className="text-yellow-500 hover:text-yellow-400 p-0 h-auto text-xs font-semibold tracking-wider">EXPLORE</Button>
+                    <Button asChild variant="ghost" className="text-yellow-500 hover:text-yellow-400 p-0 h-auto text-xs font-semibold tracking-wider">
+                        <Link href="/admin/projects/porto-montenegro">EXPLORE</Link>
+                    </Button>
                 </CardFooter>
             </Card>
 
