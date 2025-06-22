@@ -14,7 +14,7 @@ export default function Home() {
     switch (activeView) {
       case 'home':
         return <Hero />;
-      case 'apartments':
+      case 'explore':
         return <PropertyViewer />;
       case 'features':
         return <Features />;
