@@ -50,18 +50,57 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) { // 3MB limit
-        alert("File size exceeds 3MB. Please choose a smaller image.");
+      // 10MB limit as a safeguard against very large files crashing the browser.
+      if (file.size > 10 * 1024 * 1024) { 
+        alert("File size exceeds 10MB. Please choose a smaller image.");
         if(fileInputRef.current) {
-          fileInputRef.current.value = ""; // Reset file input
+          fileInputRef.current.value = "";
         }
         return;
       }
+
       const reader = new FileReader();
       reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setImageToEdit(result);
-        updateViewImage(viewId, result);
+        const imageUrl = e.target?.result as string;
+        
+        const img = document.createElement('img');
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1920;
+          const MAX_HEIGHT = 1080;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+             alert('Could not process image.');
+             return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Use JPEG with quality 0.9 for efficient compression.
+          const resizedImageUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+          setImageToEdit(resizedImageUrl);
+          updateViewImage(viewId, resizedImageUrl);
+        };
+        img.onerror = () => {
+            alert("Failed to load the image file. It may be corrupt or in an unsupported format.");
+        };
+        img.src = imageUrl;
       };
       reader.readAsDataURL(file);
     }
@@ -120,7 +159,7 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
                     <Upload className="w-8 h-8 mb-4 text-neutral-400" />
                     <p className="mb-2 text-sm text-neutral-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
 
-                    <p className="text-xs text-neutral-500">PNG, JPG, or WEBP (MAX. 3MB)</p>
+                    <p className="text-xs text-neutral-500">PNG, JPG, or WEBP (MAX. 10MB)</p>
                   </div>
                 </label>
               </div>

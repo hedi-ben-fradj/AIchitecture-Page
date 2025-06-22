@@ -106,7 +106,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       console.error(`Failed to save image for view ${viewId}:`, error);
       // If saving fails, inform the user but don't revert the UI state.
       // This provides a better user experience as their selected image remains visible.
-      alert("Error: Could not save image. It's likely too large (limit is ~3MB). Your changes will be visible now but won't be saved permanently.");
+      alert("Error: Could not save image due to browser storage limits. Your changes are visible now but won't be saved. Please try a smaller image or clear some space by removing other views.");
     }
   }, [getStorageKey]);
   
