@@ -57,6 +57,11 @@ export default function PropertyViewer() {
     const panel = panelRef.current;
     if (!panel) return;
 
+    // aget('role') === 'button'
+    if ((e.target as HTMLElement).closest('button')) {
+        return;
+    }
+    
     setIsDragging(true);
     setOffset({
       x: e.clientX - panel.offsetLeft,
@@ -133,7 +138,7 @@ export default function PropertyViewer() {
       {/* Info Panel */}
       <div
         ref={panelRef}
-        className={`absolute z-30 p-6 bg-[rgba(190,142,64,0.4)] backdrop-blur-md rounded-lg border border-[rgba(255,255,255,0.2)] text-white w-[500px] transition-opacity duration-300 ${isInitialized ? 'opacity-100' : 'opacity-0'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`absolute z-30 p-4 bg-[rgba(190,142,64,0.4)] backdrop-blur-md rounded-lg border border-[rgba(255,255,255,0.2)] text-white w-[400px] transition-opacity duration-300 ${isInitialized ? 'opacity-100' : 'opacity-0'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         style={{
           top: `${position.y}px`,
           left: `${position.x}px`,
