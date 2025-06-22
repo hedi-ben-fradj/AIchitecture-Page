@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, type MouseEvent } from 'react';
+import { useState, useRef, type MouseEvent, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
@@ -19,6 +19,7 @@ interface DragInfo {
   polygonId: number;
   vertexIndex?: number;
   offset: Point;
+  initialPoints: Point[];
 }
 
 // Helper function to calculate the squared distance from a point to a line segment
@@ -34,8 +35,42 @@ function distToSegmentSquared(p: Point, v: Point, w: Point): number {
 
 export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
   const [polygons, setPolygons] = useState<Polygon[]>([]);
+  const [history, setHistory] = useState<Polygon[][]>([[]]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  const saveToHistory = (newState: Polygon[]) => {
+    // If we undo and then make a new change, we should discard the old "future"
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newState);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setPolygons(history[newIndex]);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [history, historyIndex]);
+
 
   const handleAddPolygon = () => {
     const newPolygon: Polygon = {
@@ -47,7 +82,9 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
         { x: 20, y: 80 },
       ],
     };
-    setPolygons([...polygons, newPolygon]);
+    const newPolygons = [...polygons, newPolygon];
+    setPolygons(newPolygons);
+    saveToHistory(newPolygons);
   };
 
   const getMousePosition = (e: MouseEvent): Point => {
@@ -71,18 +108,21 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
         x: mousePos.x - polygon.points[0].x,
         y: mousePos.y - polygon.points[0].y,
     };
-    setDragInfo({ type: 'polygon', polygonId, offset });
+    setDragInfo({ type: 'polygon', polygonId, offset, initialPoints: polygon.points });
   };
 
   const handleMouseDownOnVertex = (e: MouseEvent, polygonId: number, vertexIndex: number) => {
     e.stopPropagation(); // Prevent polygon drag from firing
     const mousePos = getMousePosition(e);
-    const point = polygons.find(p => p.id === polygonId)!.points[vertexIndex];
+    const polygon = polygons.find(p => p.id === polygonId);
+    if (!polygon) return;
+    const point = polygon.points[vertexIndex];
     setDragInfo({
       type: 'vertex',
       polygonId,
       vertexIndex,
       offset: { x: mousePos.x - point.x, y: mousePos.y - point.y },
+      initialPoints: polygon.points,
     });
   };
 
@@ -105,11 +145,11 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
           return { ...p, points: newPoints };
         } else if (dragInfo.type === 'polygon') {
           // Move the whole polygon
-          const firstPointOriginal = polygons.find(poly => poly.id === dragInfo.polygonId)!.points[0];
+          const firstPointOriginal = dragInfo.initialPoints[0];
           const dx = (mousePos.x - dragInfo.offset.x) - firstPointOriginal.x;
           const dy = (mousePos.y - dragInfo.offset.y) - firstPointOriginal.y;
           
-          const newPoints = p.points.map(pt => ({
+          const newPoints = dragInfo.initialPoints.map(pt => ({
             x: pt.x + dx,
             y: pt.y + dy,
           }));
@@ -121,6 +161,9 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
   };
 
   const handleMouseUp = () => {
+    if (dragInfo) {
+      saveToHistory(polygons);
+    }
     setDragInfo(null);
   };
 
@@ -129,35 +172,32 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
     const mousePos = getMousePosition(e);
     const thresholdSquared = 100; // 10px threshold, squared for performance
 
-    setPolygons(polys => {
-        const polyIndex = polys.findIndex(p => p.id === polygonId);
-        if (polyIndex === -1) return polys;
+    let newPolygons = [...polygons];
+    const polyIndex = newPolygons.findIndex(p => p.id === polygonId);
+    if (polyIndex === -1) return;
 
-        const polygon = polys[polyIndex];
-        let closestEdgeIndex = -1;
-        let minDistanceSquared = Infinity;
+    const polygon = newPolygons[polyIndex];
+    let closestEdgeIndex = -1;
+    let minDistanceSquared = Infinity;
 
-        for (let i = 0; i < polygon.points.length; i++) {
-            const p1 = polygon.points[i];
-            const p2 = polygon.points[(i + 1) % polygon.points.length];
-            const distance = distToSegmentSquared(mousePos, p1, p2);
+    for (let i = 0; i < polygon.points.length; i++) {
+        const p1 = polygon.points[i];
+        const p2 = polygon.points[(i + 1) % polygon.points.length];
+        const distance = distToSegmentSquared(mousePos, p1, p2);
 
-            if (distance < minDistanceSquared) {
-                minDistanceSquared = distance;
-                closestEdgeIndex = i;
-            }
+        if (distance < minDistanceSquared) {
+            minDistanceSquared = distance;
+            closestEdgeIndex = i;
         }
-        
-        if (closestEdgeIndex !== -1 && minDistanceSquared < thresholdSquared) {
-            const newPolygons = [...polys];
-            const newPoints = [...polygon.points];
-            newPoints.splice(closestEdgeIndex + 1, 0, mousePos);
-            newPolygons[polyIndex] = { ...polygon, points: newPoints };
-            return newPolygons;
-        }
-
-        return polys;
-    });
+    }
+    
+    if (closestEdgeIndex !== -1 && minDistanceSquared < thresholdSquared) {
+        const newPoints = [...polygon.points];
+        newPoints.splice(closestEdgeIndex + 1, 0, mousePos);
+        newPolygons[polyIndex] = { ...polygon, points: newPoints };
+        setPolygons(newPolygons);
+        saveToHistory(newPolygons);
+    }
   };
 
   return (
