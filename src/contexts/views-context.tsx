@@ -38,7 +38,12 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       const item = window.localStorage.getItem(getStorageKey());
       if (item) {
         const data = JSON.parse(item);
-        setViews(data.views || []);
+        // Re-hydrate the icon component, as it cannot be stringified.
+        const hydratedViews = (data.views || []).map((view: Omit<View, 'icon'>) => ({
+          ...view,
+          icon: Eye,
+        }));
+        setViews(hydratedViews);
         setLandingPageViewIdState(data.landingPageViewId || null);
       }
     } catch (error) {
@@ -50,7 +55,9 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   useEffect(() => {
     if (!isLoaded) return;
     try {
-      const data = JSON.stringify({ views, landingPageViewId });
+      // Create a version of views without the icon for serialization
+      const viewsToStore = views.map(({ icon, ...rest }) => rest);
+      const data = JSON.stringify({ views: viewsToStore, landingPageViewId });
       window.localStorage.setItem(getStorageKey(), data);
     } catch (error) {
       console.error("Failed to save data to storage", error);
