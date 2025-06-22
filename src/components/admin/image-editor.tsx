@@ -2,7 +2,8 @@
 
 import { useState, useRef, type MouseEvent, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Save, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Point {
   x: number;
@@ -40,9 +41,9 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
 
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [selectedPolygonId, setSelectedPolygonId] = useState<number | null>(null);
 
   const saveToHistory = (newState: Polygon[]) => {
-    // If we undo and then make a new change, we should discard the old "future"
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newState);
     setHistory(newHistory);
@@ -85,7 +86,21 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
     const newPolygons = [...polygons, newPolygon];
     setPolygons(newPolygons);
     saveToHistory(newPolygons);
+    setSelectedPolygonId(newPolygon.id);
   };
+  
+  const handleDeleteSelection = () => {
+    if (!selectedPolygonId) return;
+    const newPolygons = polygons.filter(p => p.id !== selectedPolygonId);
+    setPolygons(newPolygons);
+    setSelectedPolygonId(null);
+    saveToHistory(newPolygons);
+  }
+
+  const handleSaveSelections = () => {
+    console.log("Saving selections:", JSON.stringify(polygons, null, 2));
+    alert(`${polygons.length} selection(s) saved to the console.`);
+  }
 
   const getMousePosition = (e: MouseEvent): Point => {
     const svg = svgRef.current;
@@ -99,11 +114,11 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
   };
 
   const handleMouseDownOnPolygon = (e: MouseEvent, polygonId: number) => {
+    setSelectedPolygonId(polygonId);
     const mousePos = getMousePosition(e);
     const polygon = polygons.find(p => p.id === polygonId);
     if (!polygon) return;
     
-    // For simplicity, we use the first point to calculate offset
     const offset = {
         x: mousePos.x - polygon.points[0].x,
         y: mousePos.y - polygon.points[0].y,
@@ -112,7 +127,8 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
   };
 
   const handleMouseDownOnVertex = (e: MouseEvent, polygonId: number, vertexIndex: number) => {
-    e.stopPropagation(); // Prevent polygon drag from firing
+    e.stopPropagation();
+    setSelectedPolygonId(polygonId);
     const mousePos = getMousePosition(e);
     const polygon = polygons.find(p => p.id === polygonId);
     if (!polygon) return;
@@ -136,7 +152,6 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
         if (p.id !== dragInfo.polygonId) return p;
 
         if (dragInfo.type === 'vertex' && dragInfo.vertexIndex !== undefined) {
-          // Move a single vertex
           const newPoints = [...p.points];
           newPoints[dragInfo.vertexIndex] = {
             x: mousePos.x - dragInfo.offset.x,
@@ -144,7 +159,6 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
           };
           return { ...p, points: newPoints };
         } else if (dragInfo.type === 'polygon') {
-          // Move the whole polygon
           const firstPointOriginal = dragInfo.initialPoints[0];
           const dx = (mousePos.x - dragInfo.offset.x) - firstPointOriginal.x;
           const dy = (mousePos.y - dragInfo.offset.y) - firstPointOriginal.y;
@@ -169,8 +183,9 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
 
   const handlePolygonDoubleClick = (e: MouseEvent, polygonId: number) => {
     e.preventDefault();
+    setSelectedPolygonId(polygonId);
     const mousePos = getMousePosition(e);
-    const thresholdSquared = 100; // 10px threshold, squared for performance
+    const thresholdSquared = 100;
 
     let newPolygons = [...polygons];
     const polyIndex = newPolygons.findIndex(p => p.id === polygonId);
@@ -211,12 +226,15 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
         </Button>
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600">
         <img src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
-        <svg ref={svgRef} className="absolute top-0 left-0 w-full h-full z-10">
+        <svg ref={svgRef} className="absolute top-0 left-0 w-full h-full z-10" onClick={() => setSelectedPolygonId(null)}>
           {polygons.map(polygon => (
-            <g key={polygon.id}>
+            <g key={polygon.id} onClick={(e) => e.stopPropagation()}>
               <polygon
                 points={polygon.points.map(p => `${p.x},${p.y}`).join(' ')}
-                className="fill-white/30 stroke-blue-500 stroke-2 cursor-move"
+                className={cn(
+                    "fill-white/30 stroke-2 cursor-move transition-colors",
+                    selectedPolygonId === polygon.id ? "stroke-yellow-500" : "stroke-blue-500 hover:stroke-yellow-400"
+                )}
                 onMouseDown={(e) => handleMouseDownOnPolygon(e, polygon.id)}
                 onDoubleClick={(e) => handlePolygonDoubleClick(e, polygon.id)}
               />
@@ -226,13 +244,35 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
                   cx={point.x}
                   cy={point.y}
                   r="5"
-                  className="fill-blue-500 stroke-white stroke-1 cursor-grab"
+                  className={cn(
+                    "stroke-white stroke-1 cursor-grab transition-colors",
+                    selectedPolygonId === polygon.id ? "fill-yellow-500" : "fill-blue-500"
+                  )}
                   onMouseDown={(e) => handleMouseDownOnVertex(e, polygon.id, index)}
                 />
               ))}
             </g>
           ))}
         </svg>
+      </div>
+       <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
+        <Button 
+            variant="destructive" 
+            onClick={handleDeleteSelection} 
+            disabled={!selectedPolygonId}
+            className="bg-red-600 hover:bg-red-700 text-white"
+        >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+        </Button>
+        <Button 
+            onClick={handleSaveSelections}
+            disabled={polygons.length === 0}
+            className="bg-green-600 hover:bg-green-700 text-white"
+        >
+            <Save className="mr-2 h-4 w-4" />
+            Save Selections
+        </Button>
       </div>
     </div>
   );
