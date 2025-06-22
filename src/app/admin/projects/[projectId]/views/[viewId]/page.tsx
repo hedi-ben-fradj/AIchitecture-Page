@@ -7,22 +7,39 @@ import { Input } from '@/components/ui/input';
 import { Upload } from 'lucide-react';
 import ImageEditor from '@/components/admin/image-editor';
 import { useViews } from '@/contexts/views-context';
+import { useRouter } from 'next/navigation';
 
 export default function ViewEditorPage({ params }: { params: { projectId: string; viewId: string } }) {
   const { getView, updateViewImage, addView } = useViews();
+  const router = useRouter();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const view = getView(params.viewId);
-  const viewName = view?.name || params.viewId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
   useEffect(() => {
-    if (view?.imageUrl) {
+    // If the view doesn't exist (e.g., after deletion or bad URL), redirect.
+    if (!view) {
+      router.replace(`/admin/projects/${params.projectId}`);
+      return;
+    }
+    if (view.imageUrl) {
       setImageToEdit(view.imageUrl);
     } else {
       setImageToEdit(null); // Reset if navigating to a view without an image
     }
-  }, [view]);
+  }, [view, router, params.projectId]);
+
+  // If view is not found yet, show a loading state or return null to avoid errors.
+  if (!view) {
+    return (
+        <div className="flex flex-col h-full bg-[#313131] items-center justify-center text-white">
+            <p>Loading view...</p>
+        </div>
+    );
+  }
+
+  const viewName = view.name;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -38,7 +55,8 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
   };
 
   const handleMakeView = (newViewName: string) => {
-    addView(newViewName);
+    const newHref = addView(newViewName);
+    router.push(newHref); // Navigate to new view after creation
   };
 
   const triggerFileInput = () => {

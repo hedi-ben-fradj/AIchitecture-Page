@@ -15,19 +15,14 @@ interface ViewsContextType {
   views: View[];
   getView: (viewId: string) => View | undefined;
   addView: (viewName: string) => string;
+  deleteView: (viewId: string) => void;
   updateViewImage: (viewId: string, imageUrl: string) => void;
 }
 
 const ViewsContext = createContext<ViewsContextType | undefined>(undefined);
 
 export function ViewsProvider({ children, projectId }: { children: ReactNode; projectId: string }) {
-  const initialViews: View[] = [
-    { id: 'birds-eye-view', name: "Bird's Eye View", icon: Eye, href: `/admin/projects/${projectId}/views/birds-eye-view` },
-    { id: 'building-view', name: 'Building View', icon: Building2, href: `/admin/projects/${projectId}/views/building-view` },
-    { id: 'apartment-view', name: 'Apartment View', icon: Home, href: `/admin/projects/${projectId}/views/apartment-view` },
-  ];
-
-  const [views, setViews] = useState<View[]>(initialViews);
+  const [views, setViews] = useState<View[]>([]);
 
   const getView = useCallback((viewId: string) => {
     return views.find(v => v.id === viewId);
@@ -46,13 +41,14 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     const newView: View = {
       id: slug,
       name: viewName,
-      icon: Home, // Default icon for new views
+      icon: Eye, // Default icon for new views
       href: `/admin/projects/${projectId}/views/${slug}`,
     };
     
     setViews(prevViews => {
         // Prevent adding duplicate views
         if (prevViews.some(v => v.id === slug)) {
+            // Maybe show a toast message here in the future
             return prevViews;
         }
         return [...prevViews, newView];
@@ -61,8 +57,12 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     return newView.href;
   }, [projectId]);
 
+  const deleteView = useCallback((viewId: string) => {
+    setViews(prevViews => prevViews.filter(view => view.id !== viewId));
+  }, []);
+
   return (
-    <ViewsContext.Provider value={{ views, getView, addView, updateViewImage }}>
+    <ViewsContext.Provider value={{ views, getView, addView, deleteView, updateViewImage }}>
       {children}
     </ViewsContext.Provider>
   );
