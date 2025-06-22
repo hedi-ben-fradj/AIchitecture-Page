@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -6,22 +6,20 @@ import Link from 'next/link';
 export default function AdminProjectsPage() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg">
-                <CardHeader>
-                    <CardTitle className="text-lg font-medium">Porto Montenegro</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-2 pb-10">
-                    <p className="text-sm text-neutral-400">
-                        description placeholder
-                    </p>
-                </CardContent>
-                <CardFooter className="flex justify-end gap-4">
-                    <Button variant="ghost" className="text-neutral-400 hover:text-white p-0 h-auto text-xs font-semibold tracking-wider">EXPORT</Button>
-                    <Button asChild variant="ghost" className="text-yellow-500 hover:text-yellow-400 p-0 h-auto text-xs font-semibold tracking-wider">
-                        <Link href="/admin/projects/porto-montenegro">EXPLORE</Link>
-                    </Button>
-                </CardFooter>
-            </Card>
+            <Link href="/admin/projects/porto-montenegro">
+                <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors flex flex-col justify-between min-h-[240px]">
+                    <div>
+                        <CardHeader>
+                            <CardTitle className="text-lg font-medium">Porto Montenegro</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-2">
+                            <p className="text-sm text-neutral-400">
+                                description placeholder
+                            </p>
+                        </CardContent>
+                    </div>
+                </Card>
+            </Link>
 
             <Card className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg">
                 <CardHeader className="items-center text-center p-4">
