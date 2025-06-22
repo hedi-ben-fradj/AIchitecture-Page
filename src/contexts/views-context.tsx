@@ -8,11 +8,14 @@ export interface View {
   name: string;
   icon: LucideIcon;
   href: string;
+  imageUrl?: string;
 }
 
 interface ViewsContextType {
   views: View[];
+  getView: (viewId: string) => View | undefined;
   addView: (viewName: string) => string;
+  updateViewImage: (viewId: string, imageUrl: string) => void;
 }
 
 const ViewsContext = createContext<ViewsContextType | undefined>(undefined);
@@ -25,6 +28,18 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   ];
 
   const [views, setViews] = useState<View[]>(initialViews);
+
+  const getView = useCallback((viewId: string) => {
+    return views.find(v => v.id === viewId);
+  }, [views]);
+
+  const updateViewImage = useCallback((viewId: string, imageUrl: string) => {
+    setViews(prevViews =>
+      prevViews.map(view =>
+        view.id === viewId ? { ...view, imageUrl } : view
+      )
+    );
+  }, []);
 
   const addView = useCallback((viewName: string): string => {
     const slug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -47,7 +62,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, [projectId]);
 
   return (
-    <ViewsContext.Provider value={{ views, addView }}>
+    <ViewsContext.Provider value={{ views, getView, addView, updateViewImage }}>
       {children}
     </ViewsContext.Provider>
   );
