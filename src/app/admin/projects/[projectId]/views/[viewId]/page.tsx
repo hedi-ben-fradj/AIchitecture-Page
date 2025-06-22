@@ -55,8 +55,8 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
   };
 
   const handleMakeView = (newViewName: string) => {
-    const newHref = addView(newViewName);
-    router.push(newHref); // Navigate to new view after creation
+    addView(newViewName);
+    // No longer navigating, so the user stays on the editor page.
   };
 
   const triggerFileInput = () => {
