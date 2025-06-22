@@ -1,3 +1,6 @@
+'use client';
+
+import { useState, useRef, useEffect, type MouseEvent } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,10 +35,59 @@ const stats = {
 
 
 export default function PropertyViewer() {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (panel) {
+      const headerHeight = 80; // h-20 from header
+      const rightOffset = 32; // right-8
+      const initialX = window.innerWidth - panel.offsetWidth - rightOffset;
+      const initialY = headerHeight + 16;
+      setPosition({ x: initialX, y: initialY });
+      setIsInitialized(true);
+    }
+  }, []);
+
+  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    setIsDragging(true);
+    setOffset({
+      x: e.clientX - panel.offsetLeft,
+      y: e.clientY - panel.offsetTop,
+    });
+    e.preventDefault();
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      setPosition({
+        x: e.clientX - offset.x,
+        y: e.clientY - offset.y,
+      });
+    }
+  };
+
   return (
-    <section id="apartments" className="relative h-screen w-full text-white overflow-hidden">
+    <section
+      id="apartments"
+      className="relative h-screen w-full text-white overflow-hidden"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       <Image
-        src="https://placehold.co/1920x1080.png"
+        src="/assets/building.png"
         alt="Modern house exterior with wooden panels"
         layout="fill"
         objectFit="cover"
@@ -79,7 +131,16 @@ export default function PropertyViewer() {
       </aside>
 
       {/* Info Panel */}
-      <div className="absolute top-1/4 left-1/3 z-20 p-6 bg-[rgba(190,142,64,0.4)] backdrop-blur-md rounded-lg border border-[rgba(255,255,255,0.2)] text-white w-[500px]">
+      <div
+        ref={panelRef}
+        className={`absolute z-30 p-6 bg-[rgba(190,142,64,0.4)] backdrop-blur-md rounded-lg border border-[rgba(255,255,255,0.2)] text-white w-[500px] transition-opacity duration-300 ${isInitialized ? 'opacity-100' : 'opacity-0'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        style={{
+          top: `${position.y}px`,
+          left: `${position.x}px`,
+          userSelect: isDragging ? 'none' : 'auto',
+        }}
+        onMouseDown={handleMouseDown}
+      >
         <div className="grid grid-cols-3 gap-4 border-b border-white/20 pb-4 mb-4">
             <div>
                 <p className="text-xs text-white/70 uppercase">Działka</p>
