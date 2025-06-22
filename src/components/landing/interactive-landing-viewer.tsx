@@ -2,7 +2,9 @@
 
 import { useState, useEffect, type MouseEvent, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Navigation, X } from 'lucide-react';
 import type { View, Polygon } from '@/contexts/views-context';
 
 interface RenderedImageRect {
@@ -13,8 +15,8 @@ interface RenderedImageRect {
 }
 
 export default function InteractiveLandingViewer({ projectId }: { projectId: string }) {
-    const [view, setView] = useState<View | null>(null);
-    const [hoveredSelection, setHoveredSelection] = useState<Polygon | null>(null);
+    const [currentView, setCurrentView] = useState<View | null>(null);
+    const [clickedSelection, setClickedSelection] = useState<Polygon | null>(null);
     const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
     const [isLoaded, setIsLoaded] = useState(false);
     const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
@@ -22,49 +24,54 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
 
+    const getStorageKey = useCallback((key: string) => `project-${projectId}-${key}`, [projectId]);
+
+    const loadView = useCallback((viewId: string): View | null => {
+        if (typeof window === 'undefined') return null;
+        try {
+            const projectDataStr = localStorage.getItem(getStorageKey('data'));
+            if (!projectDataStr) return null;
+
+            const projectData = JSON.parse(projectDataStr);
+            const viewMetadata = projectData.views.find((v: any) => v.id === viewId);
+
+            if (!viewMetadata) {
+                console.warn(`View metadata for ID "${viewId}" not found.`);
+                return null;
+            }
+            
+            const imageUrl = localStorage.getItem(getStorageKey(`view-image-${viewId}`)) || undefined;
+             if (!imageUrl) {
+                console.warn(`Image for view ID "${viewId}" not found.`);
+                return null;
+            }
+
+            const selectionsStr = localStorage.getItem(getStorageKey(`view-selections-${viewId}`));
+            const selections = selectionsStr ? JSON.parse(selectionsStr) : [];
+
+            return { ...viewMetadata, imageUrl, selections };
+        } catch (error) {
+            console.error(`Failed to load view ${viewId} from storage`, error);
+            return null;
+        }
+    }, [getStorageKey]);
+
     useEffect(() => {
-        const getStorageKey = (key: string) => `project-${projectId}-${key}`;
-        
         if (typeof window !== 'undefined') {
             setIsLoaded(false);
-            try {
-                const projectDataStr = window.localStorage.getItem(getStorageKey('data'));
-                if (projectDataStr) {
-                    const projectData = JSON.parse(projectDataStr);
-                    const landingViewId = projectData.landingPageViewId;
-
-                    if (landingViewId) {
-                        const viewMetadata = projectData.views.find((v: any) => v.id === landingViewId);
-                        if (viewMetadata) {
-                            const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${landingViewId}`)) || undefined;
-                            const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${landingViewId}`));
-                            const selections = selectionsStr ? JSON.parse(selectionsStr) : [];
-                            
-                            const landingView: Partial<View> = {
-                                ...viewMetadata,
-                                imageUrl,
-                                selections,
-                            };
-
-                            if (landingView.imageUrl) {
-                                setView(landingView as View);
-                            } else {
-                                setView(null);
-                            }
-                        } else {
-                           setView(null);
-                        }
-                    } else {
-                        setView(null);
-                    }
+            const projectDataStr = localStorage.getItem(getStorageKey('data'));
+            if (projectDataStr) {
+                const projectData = JSON.parse(projectDataStr);
+                const landingViewId = projectData.landingPageViewId;
+                if (landingViewId) {
+                    const view = loadView(landingViewId);
+                    setCurrentView(view);
                 }
-            } catch (error) {
-                console.error("Failed to load view for landing page", error);
-                setView(null);
             }
             setIsLoaded(true);
         }
-    }, [projectId]);
+    }, [projectId, getStorageKey, loadView]);
+    
 
     const calculateRect = useCallback(() => {
         if (!imageRef.current || !containerRef.current) return;
@@ -99,7 +106,6 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     }, []);
 
     useEffect(() => {
-        // Recalculate on window resize
         const resizeObserver = new ResizeObserver(calculateRect);
         const container = containerRef.current;
         if (container) {
@@ -113,9 +119,23 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         };
     }, [calculateRect]);
 
+    const handlePolygonClick = (e: MouseEvent, selection: Polygon) => {
+        e.stopPropagation();
+        if (selection.details) {
+            setClickedSelection(selection);
+            setCardPosition({ x: e.clientX, y: e.clientY });
+        }
+    };
 
-    const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-        setCardPosition({ x: e.clientX, y: e.clientY });
+    const handleNavigate = (viewName: string) => {
+        const viewId = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const newView = loadView(viewId);
+        if (newView) {
+            setCurrentView(newView);
+        } else {
+            alert(`The view "${viewName}" could not be found. It may have been deleted or not yet configured.`);
+        }
+        setClickedSelection(null);
     };
 
     if (!isLoaded) {
@@ -126,7 +146,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         )
     }
 
-    if (!view || !view.imageUrl) {
+    if (!currentView || !currentView.imageUrl) {
         return (
             <div className="h-full w-full flex items-center justify-center bg-muted">
                 <p className="text-muted-foreground">No interactive view has been configured.</p>
@@ -135,17 +155,18 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     }
     
     return (
-        <div ref={containerRef} className="relative h-full w-full" onMouseMove={handleMouseMove}>
+        <div ref={containerRef} className="relative h-full w-full">
             <Image
                 ref={imageRef}
-                src={view.imageUrl}
-                alt={view.name}
+                src={currentView.imageUrl}
+                alt={currentView.name}
                 layout="fill"
                 objectFit="contain"
                 onLoad={calculateRect}
+                key={currentView.id}
             />
             
-            {renderedImageRect && view.selections && view.selections.length > 0 && (
+            {renderedImageRect && currentView.selections && currentView.selections.length > 0 && (
                  <svg 
                     className="absolute top-0 left-0 w-full h-full"
                     style={{
@@ -153,40 +174,51 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                         width: renderedImageRect.width,
                         height: renderedImageRect.height,
                     }}
+                    onClick={() => setClickedSelection(null)}
                 >
-                    {view.selections.map(selection => (
+                    {currentView.selections.map(selection => (
                         <polygon
                             key={selection.id}
                             points={selection.points.map(p => `${p.x * renderedImageRect.width},${p.y * renderedImageRect.height}`).join(' ')}
                             className="fill-yellow-400/20 hover:fill-yellow-400/40 stroke-yellow-500 stroke-2 transition-all cursor-pointer"
-                            onMouseEnter={() => selection.details && setHoveredSelection(selection)}
-                            onMouseLeave={() => setHoveredSelection(null)}
+                            onClick={(e) => handlePolygonClick(e, selection)}
                         />
                     ))}
                 </svg>
             )}
 
 
-            {hoveredSelection?.details && (
+            {clickedSelection?.details && (
                 <div
                     className="absolute pointer-events-none z-10"
                     style={{ top: cardPosition.y + 20, left: cardPosition.x + 20 }}
                 >
-                    <Card className="bg-black/70 backdrop-blur-sm text-white border-yellow-500 w-64 shadow-2xl animate-in fade-in-50">
-                        <CardHeader>
-                            <CardTitle className="text-base">{hoveredSelection.details.title}</CardTitle>
+                    <Card className="pointer-events-auto bg-black/80 backdrop-blur-sm text-white border-yellow-500 w-64 shadow-2xl animate-in fade-in-50">
+                        <CardHeader className="flex-row items-start justify-between pb-2">
+                            <CardTitle className="text-base leading-tight pr-2">{clickedSelection.details.title}</CardTitle>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-neutral-400 hover:text-white" onClick={() => setClickedSelection(null)}>
+                                <X className="h-4 w-4" />
+                            </Button>
                         </CardHeader>
                         <CardContent className="text-sm">
-                            {hoveredSelection.details.description && <p className="text-neutral-300 mb-4">{hoveredSelection.details.description}</p>}
+                            {clickedSelection.details.description && <p className="text-neutral-300 mb-4">{clickedSelection.details.description}</p>}
                             <div className="flex justify-between text-neutral-400">
                                 <span>Width:</span>
-                                <span className="font-mono">{hoveredSelection.details.width}m</span>
+                                <span className="font-mono">{clickedSelection.details.width}m</span>
                             </div>
                             <div className="flex justify-between text-neutral-400">
                                 <span>Height:</span>
-                                <span className="font-mono">{hoveredSelection.details.height}m</span>
+                                <span className="font-mono">{clickedSelection.details.height}m</span>
                             </div>
                         </CardContent>
+                         {clickedSelection.details.makeAsView && clickedSelection.details.title && (
+                            <CardFooter>
+                                <Button className="w-full bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedSelection.details!.title)}>
+                                    <Navigation className="mr-2 h-4 w-4" />
+                                    Navigate to
+                                </Button>
+                            </CardFooter>
+                        )}
                     </Card>
                 </div>
             )}
