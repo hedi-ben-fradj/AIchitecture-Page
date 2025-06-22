@@ -2,17 +2,24 @@
 
 import { useState, useRef, type MouseEvent, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { Plus, Trash2, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import SelectionDetailsModal from './selection-details-modal';
 
 interface Point {
   x: number;
   y: number;
 }
 
-interface Polygon {
+export interface Polygon {
   id: number;
   points: Point[];
+  details?: {
+    title: string;
+    description?: string;
+    width: number;
+    height: number;
+  };
 }
 
 interface DragInfo {
@@ -42,6 +49,7 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedPolygonId, setSelectedPolygonId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const saveToHistory = (newState: Polygon[]) => {
     const newHistory = history.slice(0, historyIndex + 1);
@@ -55,6 +63,7 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
       const newIndex = historyIndex - 1;
       setHistoryIndex(newIndex);
       setPolygons(history[newIndex]);
+      setSelectedPolygonId(null);
     }
   };
 
@@ -97,10 +106,26 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
     saveToHistory(newPolygons);
   }
 
-  const handleSaveSelections = () => {
-    console.log("Saving selections:", JSON.stringify(polygons, null, 2));
-    alert(`${polygons.length} selection(s) saved to the console.`);
-  }
+  const handleConfirmSelection = () => {
+    if (!selectedPolygonId) return;
+    setIsModalOpen(true);
+  };
+
+  const handleSaveDetails = (data: any) => {
+    if (!selectedPolygonId) return;
+
+    const newPolygons = polygons.map(p => {
+        if (p.id === selectedPolygonId) {
+            return { ...p, details: data };
+        }
+        return p;
+    });
+
+    setPolygons(newPolygons);
+    saveToHistory(newPolygons);
+    console.log("Saving details for selection:", selectedPolygonId, data);
+    console.log("All polygons state:", newPolygons);
+  };
 
   const getMousePosition = (e: MouseEvent): Point => {
     const svg = svgRef.current;
@@ -214,66 +239,76 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
         saveToHistory(newPolygons);
     }
   };
+  
+  const selectedPolygon = polygons.find(p => p.id === selectedPolygonId);
 
   return (
-    <div className="relative w-full max-w-5xl mx-auto" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        <Button
-            onClick={handleAddPolygon}
-            className="absolute top-2 right-2 z-20 bg-yellow-500 hover:bg-yellow-600 text-black"
-        >
-            <Plus className="mr-2 h-4 w-4" />
-            New Selection
-        </Button>
-      <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600">
-        <img src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
-        <svg ref={svgRef} className="absolute top-0 left-0 w-full h-full z-10" onClick={() => setSelectedPolygonId(null)}>
-          {polygons.map(polygon => (
-            <g key={polygon.id} onClick={(e) => e.stopPropagation()}>
-              <polygon
-                points={polygon.points.map(p => `${p.x},${p.y}`).join(' ')}
-                className={cn(
-                    "fill-white/30 stroke-2 cursor-move transition-colors",
-                    selectedPolygonId === polygon.id ? "stroke-yellow-500" : "stroke-blue-500 hover:stroke-yellow-400"
-                )}
-                onMouseDown={(e) => handleMouseDownOnPolygon(e, polygon.id)}
-                onDoubleClick={(e) => handlePolygonDoubleClick(e, polygon.id)}
-              />
-              {polygon.points.map((point, index) => (
-                <circle
-                  key={index}
-                  cx={point.x}
-                  cy={point.y}
-                  r="5"
+    <>
+      <SelectionDetailsModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSaveDetails}
+        selectionData={selectedPolygon}
+      />
+      <div className="relative w-full max-w-5xl mx-auto" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+          <Button
+              onClick={handleAddPolygon}
+              className="absolute top-2 right-2 z-20 bg-yellow-500 hover:bg-yellow-600 text-black"
+          >
+              <Plus className="mr-2 h-4 w-4" />
+              New Selection
+          </Button>
+        <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600">
+          <img src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
+          <svg ref={svgRef} className="absolute top-0 left-0 w-full h-full z-10" onClick={() => setSelectedPolygonId(null)}>
+            {polygons.map(polygon => (
+              <g key={polygon.id} onClick={(e) => e.stopPropagation()}>
+                <polygon
+                  points={polygon.points.map(p => `${p.x},${p.y}`).join(' ')}
                   className={cn(
-                    "stroke-white stroke-1 cursor-grab transition-colors",
-                    selectedPolygonId === polygon.id ? "fill-yellow-500" : "fill-blue-500"
+                      "fill-white/30 stroke-2 cursor-move transition-colors",
+                      selectedPolygonId === polygon.id ? "stroke-yellow-500" : "stroke-blue-500 hover:stroke-yellow-400"
                   )}
-                  onMouseDown={(e) => handleMouseDownOnVertex(e, polygon.id, index)}
+                  onMouseDown={(e) => handleMouseDownOnPolygon(e, polygon.id)}
+                  onDoubleClick={(e) => handlePolygonDoubleClick(e, polygon.id)}
                 />
-              ))}
-            </g>
-          ))}
-        </svg>
+                {polygon.points.map((point, index) => (
+                  <circle
+                    key={index}
+                    cx={point.x}
+                    cy={point.y}
+                    r="5"
+                    className={cn(
+                      "stroke-white stroke-1 cursor-grab transition-colors",
+                      selectedPolygonId === polygon.id ? "fill-yellow-500" : "fill-blue-500"
+                    )}
+                    onMouseDown={(e) => handleMouseDownOnVertex(e, polygon.id, index)}
+                  />
+                ))}
+              </g>
+            ))}
+          </svg>
+        </div>
+        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
+          <Button 
+              variant="destructive" 
+              onClick={handleDeleteSelection} 
+              disabled={!selectedPolygonId}
+              className="bg-red-600 hover:bg-red-700 text-white"
+          >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+          </Button>
+          <Button 
+              onClick={handleConfirmSelection}
+              disabled={!selectedPolygonId}
+              className="bg-green-600 hover:bg-green-700 text-white"
+          >
+              <CheckSquare className="mr-2 h-4 w-4" />
+              Confirm Selection
+          </Button>
+        </div>
       </div>
-       <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
-        <Button 
-            variant="destructive" 
-            onClick={handleDeleteSelection} 
-            disabled={!selectedPolygonId}
-            className="bg-red-600 hover:bg-red-700 text-white"
-        >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-        </Button>
-        <Button 
-            onClick={handleSaveSelections}
-            disabled={polygons.length === 0}
-            className="bg-green-600 hover:bg-green-700 text-white"
-        >
-            <Save className="mr-2 h-4 w-4" />
-            Save Selections
-        </Button>
-      </div>
-    </div>
+    </>
   );
 }
