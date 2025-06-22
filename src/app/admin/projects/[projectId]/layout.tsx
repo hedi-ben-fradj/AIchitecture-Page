@@ -1,15 +1,9 @@
 'use client';
 
-import type { Metadata } from 'next';
 import { ArrowLeft, Eye, Building2, Home } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
-
-export const metadata: Metadata = {
-  title: 'Edit Project',
-  description: 'Edit project details.',
-};
 
 // This is a client component because we need to use usePathname hook
 
