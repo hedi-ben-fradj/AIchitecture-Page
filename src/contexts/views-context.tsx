@@ -29,40 +29,54 @@ const ViewsContext = createContext<ViewsContextType | undefined>(undefined);
 export function ViewsProvider({ children, projectId }: { children: ReactNode; projectId: string }) {
   const getStorageKey = useCallback(() => `project-data-${projectId}`, [projectId]);
 
-  const [views, setViews] = useState<View[]>([]);
-  const [landingPageViewId, setLandingPageViewIdState] = useState<string | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
+  const [views, setViews] = useState<View[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
     try {
-      const item = window.localStorage.getItem(getStorageKey());
+      const item = window.localStorage.getItem(`project-data-${projectId}`);
       if (item) {
         const data = JSON.parse(item);
-        // Re-hydrate the icon component, as it cannot be stringified.
-        const hydratedViews = (data.views || []).map((view: Omit<View, 'icon'>) => ({
-          ...view,
-          icon: Eye,
-        }));
-        setViews(hydratedViews);
-        setLandingPageViewIdState(data.landingPageViewId || null);
+        return (data.views || []).map((view: Omit<View, 'icon'>) => ({ ...view, icon: Eye }));
       }
     } catch (error) {
-      console.error("Failed to load data from storage", error);
+      console.error("Failed to load views from storage", error);
     }
-    setIsLoaded(true);
-  }, [projectId, getStorageKey]);
+    return [];
+  });
+
+  const [landingPageViewId, setLandingPageViewIdState] = useState<string | null>(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    try {
+      const item = window.localStorage.getItem(`project-data-${projectId}`);
+      if (item) {
+        const data = JSON.parse(item);
+        return data.landingPageViewId || null;
+      }
+    } catch (error) {
+      console.error("Failed to load landing page view ID from storage", error);
+    }
+    return null;
+  });
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (!isLoaded) return;
-    try {
-      // Create a version of views without the icon for serialization
-      const viewsToStore = views.map(({ icon, ...rest }) => rest);
-      const data = JSON.stringify({ views: viewsToStore, landingPageViewId });
-      window.localStorage.setItem(getStorageKey(), data);
-    } catch (error) {
-      console.error("Failed to save data to storage", error);
+    if (isMounted) {
+      try {
+        const viewsToStore = views.map(({ icon, ...rest }) => rest);
+        const data = JSON.stringify({ views: viewsToStore, landingPageViewId });
+        window.localStorage.setItem(getStorageKey(), data);
+      } catch (error) {
+        console.error("Failed to save data to storage", error);
+      }
     }
-  }, [views, landingPageViewId, getStorageKey, isLoaded]);
+  }, [views, landingPageViewId, getStorageKey, isMounted]);
 
   const getView = useCallback((viewId: string) => {
     return views.find(v => v.id === viewId);
@@ -112,8 +126,14 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     setLandingPageViewIdState(viewId);
   }, []);
 
+  const value = { views, landingPageViewId, setLandingPageViewId, getView, addView, deleteView, updateViewImage, updateViewSelections };
+
+  if (!isMounted) {
+    return null;
+  }
+
   return (
-    <ViewsContext.Provider value={{ views, landingPageViewId, setLandingPageViewId, getView, addView, deleteView, updateViewImage, updateViewSelections }}>
+    <ViewsContext.Provider value={value}>
       {children}
     </ViewsContext.Provider>
   );
