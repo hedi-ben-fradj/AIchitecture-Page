@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type MouseEvent, useRef } from 'react';
+import { useState, useEffect, type MouseEvent, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { View, Polygon } from '@/contexts/views-context';
@@ -38,7 +38,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                         if (viewMetadata) {
                             const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${landingViewId}`)) || undefined;
                             const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${landingViewId}`));
-                            const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
+                            const selections = selectionsStr ? JSON.parse(selectionsStr) : [];
                             
                             const landingView: Partial<View> = {
                                 ...viewMetadata,
@@ -66,7 +66,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         }
     }, [projectId]);
 
-    const calculateRect = () => {
+    const calculateRect = useCallback(() => {
         if (!imageRef.current || !containerRef.current) return;
         
         const { naturalWidth, naturalHeight } = imageRef.current;
@@ -91,19 +91,22 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         }
         
         setRenderedImageRect({ width: renderWidth, height: renderHeight, x, y });
-    };
+    }, []);
 
     useEffect(() => {
-        const resizeObserver = new ResizeObserver(() => {
-            calculateRect();
-        });
-        
-        if (containerRef.current) {
-            resizeObserver.observe(containerRef.current);
+        const resizeObserver = new ResizeObserver(calculateRect);
+        const container = containerRef.current;
+        if (container) {
+            resizeObserver.observe(container);
         }
         
-        return () => resizeObserver.disconnect();
-    }, [view]);
+        return () => {
+            if (container) {
+                resizeObserver.unobserve(container);
+            }
+        };
+    }, [calculateRect]);
+
 
     const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
         setCardPosition({ x: e.clientX, y: e.clientY });
@@ -132,7 +135,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                 src={view.imageUrl!}
                 alt={view.name}
                 layout="fill"
-                objectFit="contain" // Changed from 'cover' to 'contain' to match editor behavior
+                objectFit="contain"
                 onLoad={calculateRect}
             />
             
@@ -145,12 +148,12 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                         height: renderedImageRect.height,
                     }}
                 >
-                    {view.selections.filter(s => s.details).map(selection => (
+                    {view.selections.map(selection => (
                         <polygon
                             key={selection.id}
                             points={selection.points.map(p => `${p.x * renderedImageRect.width},${p.y * renderedImageRect.height}`).join(' ')}
                             className="fill-yellow-400/20 hover:fill-yellow-400/40 stroke-yellow-500 stroke-2 transition-all cursor-pointer"
-                            onMouseEnter={() => setHoveredSelection(selection)}
+                            onMouseEnter={() => selection.details && setHoveredSelection(selection)}
                             onMouseLeave={() => setHoveredSelection(null)}
                         />
                     ))}
