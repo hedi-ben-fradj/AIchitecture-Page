@@ -26,105 +26,149 @@ interface ViewsContextType {
 
 const ViewsContext = createContext<ViewsContextType | undefined>(undefined);
 
+// Helper type for what's stored in the main project data key
+type ViewMetadata = Omit<View, 'icon' | 'imageUrl' | 'selections'>;
+
 export function ViewsProvider({ children, projectId }: { children: ReactNode; projectId: string }) {
-  const getStorageKey = useCallback(() => `project-data-${projectId}`, [projectId]);
-
-  const [views, setViews] = useState<View[]>(() => {
-    if (typeof window === 'undefined') {
-      return [];
-    }
-    try {
-      const item = window.localStorage.getItem(`project-data-${projectId}`);
-      if (item) {
-        const data = JSON.parse(item);
-        return (data.views || []).map((view: Omit<View, 'icon'>) => ({ ...view, icon: Eye }));
-      }
-    } catch (error) {
-      console.error("Failed to load views from storage", error);
-    }
-    return [];
-  });
-
-  const [landingPageViewId, setLandingPageViewIdState] = useState<string | null>(() => {
-    if (typeof window === 'undefined') {
-      return null;
-    }
-    try {
-      const item = window.localStorage.getItem(`project-data-${projectId}`);
-      if (item) {
-        const data = JSON.parse(item);
-        return data.landingPageViewId || null;
-      }
-    } catch (error) {
-      console.error("Failed to load landing page view ID from storage", error);
-    }
-    return null;
-  });
+  const getStorageKey = useCallback((key: string) => `project-${projectId}-${key}`, [projectId]);
 
   const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const [views, setViews] = useState<View[]>([]);
+  const [landingPageViewId, setLandingPageViewIdState] = useState<string | null>(null);
 
+  // Load initial data from localStorage on mount
   useEffect(() => {
-    if (isMounted) {
+    if (typeof window !== 'undefined') {
       try {
-        const viewsToStore = views.map(({ icon, ...rest }) => rest);
-        const data = JSON.stringify({ views: viewsToStore, landingPageViewId });
-        window.localStorage.setItem(getStorageKey(), data);
+        const projectDataStr = window.localStorage.getItem(getStorageKey('data'));
+        let initialViews: View[] = [];
+        let initialLandingId: string | null = null;
+        
+        if (projectDataStr) {
+            const projectData = JSON.parse(projectDataStr);
+            initialLandingId = projectData.landingPageViewId || null;
+            const viewMetadatas: ViewMetadata[] = projectData.views || [];
+            
+            initialViews = viewMetadatas.map((meta) => {
+                const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${meta.id}`)) || undefined;
+                const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${meta.id}`));
+                const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
+
+                return {
+                    ...meta,
+                    icon: Eye,
+                    imageUrl,
+                    selections,
+                };
+            });
+        }
+        setViews(initialViews);
+        setLandingPageViewIdState(initialLandingId);
       } catch (error) {
-        console.error("Failed to save data to storage", error);
+        console.error("Failed to load views from storage", error);
+        setViews([]);
+        setLandingPageViewIdState(null);
       }
+      setIsMounted(true);
     }
-  }, [views, landingPageViewId, getStorageKey, isMounted]);
+  }, [getStorageKey]);
+
+  // Helper to save only the metadata
+  const saveProjectMetadata = useCallback((updatedViews: View[], updatedLandingId: string | null) => {
+    if (typeof window !== 'undefined') {
+        try {
+            const viewsToStore: ViewMetadata[] = updatedViews.map(({ id, name, href }) => ({ id, name, href }));
+            const data = JSON.stringify({ views: viewsToStore, landingPageViewId: updatedLandingId });
+            window.localStorage.setItem(getStorageKey('data'), data);
+        } catch (error) {
+            console.error("Failed to save project metadata to storage", error);
+        }
+    }
+  }, [getStorageKey]);
+
 
   const getView = useCallback((viewId: string) => {
     return views.find(v => v.id === viewId);
   }, [views]);
 
   const updateViewImage = useCallback((viewId: string, imageUrl: string) => {
-    setViews(prevViews =>
-      prevViews.map(view =>
-        view.id === viewId ? { ...view, imageUrl } : view
-      )
-    );
-  }, []);
+    setViews(prevViews => {
+        const newViews = prevViews.map(view =>
+            view.id === viewId ? { ...view, imageUrl } : view
+        );
+        try {
+            window.localStorage.setItem(getStorageKey(`view-image-${viewId}`), imageUrl);
+        } catch (error) {
+            console.error(`Failed to save image for view ${viewId}:`, error);
+            alert("Error: Could not save image. It might be too large (limit is 4MB).");
+            return prevViews;
+        }
+        return newViews;
+    });
+  }, [getStorageKey]);
   
   const updateViewSelections = useCallback((viewId: string, selections: Polygon[]) => {
-    setViews(prevViews =>
-      prevViews.map(view =>
-        view.id === viewId ? { ...view, selections } : view
-      )
-    );
-  }, []);
+    setViews(prevViews => {
+        const newViews = prevViews.map(view =>
+            view.id === viewId ? { ...view, selections } : view
+        );
+        try {
+            const selectionsStr = JSON.stringify(selections);
+            window.localStorage.setItem(getStorageKey(`view-selections-${viewId}`), selectionsStr);
+        } catch (error) {
+            console.error(`Failed to save selections for view ${viewId}:`, error);
+        }
+        return newViews;
+    });
+  }, [getStorageKey]);
 
   const addView = useCallback((viewName: string): string => {
     const slug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const newView: View = {
-      id: slug,
-      name: viewName,
-      icon: Eye,
-      href: `/admin/projects/${projectId}/views/${slug}`,
-    };
+    let newView: View | null = null;
     
     setViews(prevViews => {
         if (prevViews.some(v => v.id === slug)) {
             return prevViews;
         }
-        return [...prevViews, newView];
+        newView = {
+          id: slug,
+          name: viewName,
+          icon: Eye,
+          href: `/admin/projects/${projectId}/views/${slug}`,
+        };
+        const updatedViews = [...prevViews, newView];
+        saveProjectMetadata(updatedViews, landingPageViewId);
+        return updatedViews;
     });
 
-    return newView.href;
-  }, [projectId]);
+    return newView ? newView.href : `/admin/projects/${projectId}`;
+  }, [projectId, landingPageViewId, saveProjectMetadata]);
 
   const deleteView = useCallback((viewId: string) => {
-    setViews(prevViews => prevViews.filter(view => view.id !== viewId));
-    setLandingPageViewIdState(prevId => prevId === viewId ? null : prevId);
-  }, []);
+    const updatedLandingId = landingPageViewId === viewId ? null : landingPageViewId;
+    
+    setViews(prevViews => {
+        const updatedViews = prevViews.filter(view => view.id !== viewId);
+        saveProjectMetadata(updatedViews, updatedLandingId);
+        return updatedViews;
+    });
+
+    if (landingPageViewId === viewId) {
+        setLandingPageViewIdState(null);
+    }
+    
+    try {
+        window.localStorage.removeItem(getStorageKey(`view-image-${viewId}`));
+        window.localStorage.removeItem(getStorageKey(`view-selections-${viewId}`));
+    } catch (error) {
+        console.error(`Failed to remove data for view ${viewId}:`, error);
+    }
+  }, [landingPageViewId, saveProjectMetadata, getStorageKey]);
 
   const setLandingPageViewId = useCallback((viewId: string | null) => {
     setLandingPageViewIdState(viewId);
-  }, []);
+    saveProjectMetadata(views, viewId);
+  }, [views, saveProjectMetadata]);
 
   const value = { views, landingPageViewId, setLandingPageViewId, getView, addView, deleteView, updateViewImage, updateViewSelections };
 

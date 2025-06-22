@@ -5,11 +5,6 @@ import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { View, Polygon } from '@/contexts/views-context';
 
-interface StoredProjectData {
-    views: View[];
-    landingPageViewId: string | null;
-}
-
 export default function InteractiveLandingViewer({ projectId }: { projectId: string }) {
     const [view, setView] = useState<View | null>(null);
     const [hoveredSelection, setHoveredSelection] = useState<Polygon | null>(null);
@@ -17,20 +12,47 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     const [isLoaded, setIsLoaded] = useState(false);
 
     useEffect(() => {
-        const storageKey = `project-data-${projectId}`;
-        try {
-            const item = window.localStorage.getItem(storageKey);
-            if (item) {
-                const data: StoredProjectData = JSON.parse(item);
-                const landingView = data.views.find(v => v.id === data.landingPageViewId);
-                if (landingView?.imageUrl) {
-                    setView(landingView);
+        const getStorageKey = (key: string) => `project-${projectId}-${key}`;
+        
+        if (typeof window !== 'undefined') {
+            setIsLoaded(false);
+            try {
+                const projectDataStr = window.localStorage.getItem(getStorageKey('data'));
+                if (projectDataStr) {
+                    const projectData = JSON.parse(projectDataStr);
+                    const landingViewId = projectData.landingPageViewId;
+
+                    if (landingViewId) {
+                        const viewMetadata = projectData.views.find((v: any) => v.id === landingViewId);
+                        if (viewMetadata) {
+                            const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${landingViewId}`)) || undefined;
+                            const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${landingViewId}`));
+                            const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
+                            
+                            const landingView: Partial<View> = {
+                                ...viewMetadata,
+                                imageUrl,
+                                selections,
+                            };
+
+                            if (landingView.imageUrl) {
+                                setView(landingView as View);
+                            } else {
+                                setView(null);
+                            }
+                        } else {
+                           setView(null);
+                        }
+                    } else {
+                        setView(null);
+                    }
                 }
+            } catch (error) {
+                console.error("Failed to load view for landing page", error);
+                setView(null);
             }
-        } catch (error) {
-            console.error("Failed to load view for landing page", error);
+            setIsLoaded(true);
         }
-        setIsLoaded(true);
     }, [projectId]);
 
     const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {

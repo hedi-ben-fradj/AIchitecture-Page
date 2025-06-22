@@ -50,6 +50,13 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      if (file.size > 4 * 1024 * 1024) { // 4MB limit
+        alert("File size exceeds 4MB. Please choose a smaller image.");
+        if(fileInputRef.current) {
+          fileInputRef.current.value = ""; // Reset file input
+        }
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
@@ -96,7 +103,7 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
         )}
       </header>
       <div className="flex-1 p-8">
-        <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} ref={fileInputRef} />
+        <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} ref={fileInputRef} accept="image/png, image/jpeg, image/webp" />
         
         {!imageToEdit ? (
           <Card className="max-w-2xl mx-auto bg-[#2a2a2a] border-neutral-700 text-white">
@@ -107,7 +114,7 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <Upload className="w-8 h-8 mb-4 text-neutral-400" />
                     <p className="mb-2 text-sm text-neutral-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                    <p className="text-xs text-neutral-500">SVG, PNG, JPG or GIF</p>
+                    <p className="text-xs text-neutral-500">PNG, JPG, or WEBP (MAX. 4MB)</p>
                   </div>
                 </label>
               </div>
