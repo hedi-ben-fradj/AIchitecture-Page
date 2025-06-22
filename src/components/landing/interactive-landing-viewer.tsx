@@ -77,23 +77,29 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         
         let renderWidth, renderHeight, x, y;
         
-        // Image is wider than container, so it's constrained by width (letterboxed top/bottom)
         if (imageAspectRatio > containerAspectRatio) {
             renderWidth = containerWidth;
             renderHeight = containerWidth / imageAspectRatio;
             x = 0;
             y = (containerHeight - renderHeight) / 2;
-        } else { // Image is taller or same aspect, constrained by height (letterboxed left/right)
+        } else {
             renderHeight = containerHeight;
             renderWidth = containerHeight * imageAspectRatio;
             y = 0;
             x = (containerWidth - renderWidth) / 2;
         }
         
-        setRenderedImageRect({ width: renderWidth, height: renderHeight, x, y });
+        setRenderedImageRect(prevRect => {
+          const newRect = { width: renderWidth, height: renderHeight, x, y };
+          if (prevRect && prevRect.width === newRect.width && prevRect.height === newRect.height && prevRect.x === newRect.x && prevRect.y === newRect.y) {
+            return prevRect;
+          }
+          return newRect;
+        });
     }, []);
 
     useEffect(() => {
+        // Recalculate on window resize
         const resizeObserver = new ResizeObserver(calculateRect);
         const container = containerRef.current;
         if (container) {
@@ -132,14 +138,14 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         <div ref={containerRef} className="relative h-full w-full" onMouseMove={handleMouseMove}>
             <Image
                 ref={imageRef}
-                src={view.imageUrl!}
+                src={view.imageUrl}
                 alt={view.name}
                 layout="fill"
                 objectFit="contain"
                 onLoad={calculateRect}
             />
             
-            {renderedImageRect && view.selections && (
+            {renderedImageRect && view.selections && view.selections.length > 0 && (
                  <svg 
                     className="absolute top-0 left-0 w-full h-full"
                     style={{
