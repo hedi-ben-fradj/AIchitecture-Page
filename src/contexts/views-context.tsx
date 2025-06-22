@@ -100,7 +100,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
             window.localStorage.setItem(getStorageKey(`view-image-${viewId}`), imageUrl);
         } catch (error) {
             console.error(`Failed to save image for view ${viewId}:`, error);
-            alert("Error: Could not save image. It might be too large (limit is 4MB).");
+            alert("Error: Could not save image. It might be too large (limit is 3MB).");
             return prevViews;
         }
         return newViews;
