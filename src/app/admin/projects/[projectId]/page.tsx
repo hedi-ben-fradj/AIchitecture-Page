@@ -85,8 +85,8 @@ function ViewCard({ view, onDelete, isLandingView, onSetLandingView }: { view: V
 }
 
 
-export default function ProjectViewsPage({ params }: { params: { projectId: string } }) {
-    const projectName = params.projectId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+export default function ProjectViewsPage({ params: { projectId } }: { params: { projectId: string } }) {
+    const projectName = projectId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     const { views, deleteView, landingPageViewId, setLandingPageViewId } = useViews();
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
