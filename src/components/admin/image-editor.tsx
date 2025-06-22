@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, type MouseEvent, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useRef, type MouseEvent, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -65,12 +65,18 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   const [selectedPolygonId, setSelectedPolygonId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // By stringifying the initialPolygons, we create a stable dependency for the useEffect hook,
+  // preventing an infinite loop if the parent component passes a new array instance on every render.
+  const initialPolygonsKey = useMemo(() => JSON.stringify(initialPolygons), [initialPolygons]);
+  
   // This effect converts incoming RELATIVE polygons into ABSOLUTE coordinates for editing.
   useEffect(() => {
+    const currentInitialPolygons = JSON.parse(initialPolygonsKey) as Polygon[];
+
     if (svgRef.current && imageUrl) {
       const { width, height } = svgRef.current.getBoundingClientRect();
       if (width > 0 && height > 0) {
-        const absolutePolygons = initialPolygons.map(poly => ({
+        const absolutePolygons = currentInitialPolygons.map(poly => ({
           ...poly,
           points: poly.points.map(p => ({
             x: p.x * width,
@@ -87,7 +93,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
       setHistory([[]]);
       setHistoryIndex(0);
     }
-  }, [initialPolygons, imageUrl]);
+  }, [initialPolygonsKey, imageUrl]);
 
   useImperativeHandle(ref, () => ({
     getRelativePolygons: () => {
@@ -113,14 +119,14 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     setHistoryIndex(newHistory.length - 1);
   };
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
       setHistoryIndex(newIndex);
       setPolygons(history[newIndex]);
       setSelectedPolygonId(null);
     }
-  };
+  }, [history, historyIndex]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -133,7 +139,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [history, historyIndex]);
+  }, [handleUndo]);
 
   const handleAddPolygon = () => {
     if (!svgRef.current) return;
