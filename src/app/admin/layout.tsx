@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ArrowLeft, LayoutGrid, FolderKanban, AppWindow, MapPin, User, Settings, LogOut } from 'lucide-react';
+import { ArrowLeft, LayoutGrid, FolderKanban, AppWindow, MapPin, User, Settings, LogOut, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ const mainNavItems = [
 ];
 
 const bottomNavItems = [
+    { title: 'View as Client', href: '/', icon: Eye },
     { title: 'Profile', href: '#', icon: User },
     { title: 'Settings', href: '#', icon: Settings },
     { title: 'Logout', href: '#', icon: LogOut },
