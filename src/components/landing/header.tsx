@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 const navLinks = [
   { id: 'home', label: 'HOME' },
   { id: 'apartments', label: 'APARTMENTS' },
   { id: 'features', label: 'FEATURES' },
   { id: 'contact', label: 'CONTACT' },
+  { id: 'admin', label: 'ADMIN' },
 ];
 
 interface HeaderProps {
@@ -18,24 +20,35 @@ interface HeaderProps {
 }
 
 export default function Header({ activeView, setActiveView }: HeaderProps) {
-
   const navItems = (
     <>
-      {navLinks.map((link) => (
-        <button
-          key={link.id}
-          onClick={() => setActiveView(link.id)}
-          className={cn(
-            'text-sm font-light tracking-widest text-primary/80 hover:text-primary transition-colors relative py-2 bg-transparent border-none',
-            activeView === link.id && 'text-primary'
-          )}
-        >
-          {link.label}
-          {activeView === link.id && (
-            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4/5 h-px bg-primary" />
-          )}
-        </button>
-      ))}
+      {navLinks.map((link) => {
+        const className = cn(
+          'text-sm font-light tracking-widest text-primary/80 hover:text-primary transition-colors relative py-2 bg-transparent border-none',
+          activeView === link.id && 'text-primary'
+        );
+
+        if (link.id === 'admin') {
+          return (
+            <Link key={link.id} href="/admin" className={className}>
+              {link.label}
+            </Link>
+          );
+        }
+
+        return (
+          <button
+            key={link.id}
+            onClick={() => setActiveView(link.id)}
+            className={className}
+          >
+            {link.label}
+            {activeView === link.id && (
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4/5 h-px bg-primary" />
+            )}
+          </button>
+        );
+      })}
     </>
   );
 
