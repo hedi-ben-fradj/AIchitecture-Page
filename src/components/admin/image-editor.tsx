@@ -21,6 +21,17 @@ interface DragInfo {
   offset: Point;
 }
 
+// Helper function to calculate the squared distance from a point to a line segment
+function distToSegmentSquared(p: Point, v: Point, w: Point): number {
+    const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+    if (l2 === 0) return (p.x - v.x) ** 2 + (p.y - v.y) ** 2;
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    const projectionX = v.x + t * (w.x - v.x);
+    const projectionY = v.y + t * (w.y - v.y);
+    return (p.x - projectionX) ** 2 + (p.y - projectionY) ** 2;
+}
+
 export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
@@ -113,6 +124,42 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
     setDragInfo(null);
   };
 
+  const handlePolygonDoubleClick = (e: MouseEvent, polygonId: number) => {
+    e.preventDefault();
+    const mousePos = getMousePosition(e);
+    const thresholdSquared = 100; // 10px threshold, squared for performance
+
+    setPolygons(polys => {
+        const polyIndex = polys.findIndex(p => p.id === polygonId);
+        if (polyIndex === -1) return polys;
+
+        const polygon = polys[polyIndex];
+        let closestEdgeIndex = -1;
+        let minDistanceSquared = Infinity;
+
+        for (let i = 0; i < polygon.points.length; i++) {
+            const p1 = polygon.points[i];
+            const p2 = polygon.points[(i + 1) % polygon.points.length];
+            const distance = distToSegmentSquared(mousePos, p1, p2);
+
+            if (distance < minDistanceSquared) {
+                minDistanceSquared = distance;
+                closestEdgeIndex = i;
+            }
+        }
+        
+        if (closestEdgeIndex !== -1 && minDistanceSquared < thresholdSquared) {
+            const newPolygons = [...polys];
+            const newPoints = [...polygon.points];
+            newPoints.splice(closestEdgeIndex + 1, 0, mousePos);
+            newPolygons[polyIndex] = { ...polygon, points: newPoints };
+            return newPolygons;
+        }
+
+        return polys;
+    });
+  };
+
   return (
     <div className="relative w-full max-w-5xl mx-auto" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
         <Button
@@ -131,6 +178,7 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
                 points={polygon.points.map(p => `${p.x},${p.y}`).join(' ')}
                 className="fill-white/30 stroke-blue-500 stroke-2 cursor-move"
                 onMouseDown={(e) => handleMouseDownOnPolygon(e, polygon.id)}
+                onDoubleClick={(e) => handlePolygonDoubleClick(e, polygon.id)}
               />
               {polygon.points.map((point, index) => (
                 <circle
