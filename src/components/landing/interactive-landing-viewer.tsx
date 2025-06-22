@@ -1,15 +1,26 @@
 'use client';
 
-import { useState, useEffect, type MouseEvent } from 'react';
+import { useState, useEffect, type MouseEvent, useRef } from 'react';
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { View, Polygon } from '@/contexts/views-context';
+
+interface RenderedImageRect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
 
 export default function InteractiveLandingViewer({ projectId }: { projectId: string }) {
     const [view, setView] = useState<View | null>(null);
     const [hoveredSelection, setHoveredSelection] = useState<Polygon | null>(null);
     const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
     const [isLoaded, setIsLoaded] = useState(false);
+    const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const imageRef = useRef<HTMLImageElement>(null);
 
     useEffect(() => {
         const getStorageKey = (key: string) => `project-${projectId}-${key}`;
@@ -55,6 +66,45 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         }
     }, [projectId]);
 
+    const calculateRect = () => {
+        if (!imageRef.current || !containerRef.current) return;
+        
+        const { naturalWidth, naturalHeight } = imageRef.current;
+        const { width: containerWidth, height: containerHeight } = containerRef.current.getBoundingClientRect();
+        
+        const imageAspectRatio = naturalWidth / naturalHeight;
+        const containerAspectRatio = containerWidth / containerHeight;
+        
+        let renderWidth, renderHeight, x, y;
+        
+        // Image is wider than container, so it's constrained by width (letterboxed top/bottom)
+        if (imageAspectRatio > containerAspectRatio) {
+            renderWidth = containerWidth;
+            renderHeight = containerWidth / imageAspectRatio;
+            x = 0;
+            y = (containerHeight - renderHeight) / 2;
+        } else { // Image is taller or same aspect, constrained by height (letterboxed left/right)
+            renderHeight = containerHeight;
+            renderWidth = containerHeight * imageAspectRatio;
+            y = 0;
+            x = (containerWidth - renderWidth) / 2;
+        }
+        
+        setRenderedImageRect({ width: renderWidth, height: renderHeight, x, y });
+    };
+
+    useEffect(() => {
+        const resizeObserver = new ResizeObserver(() => {
+            calculateRect();
+        });
+        
+        if (containerRef.current) {
+            resizeObserver.observe(containerRef.current);
+        }
+        
+        return () => resizeObserver.disconnect();
+    }, [view]);
+
     const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
         setCardPosition({ x: e.clientX, y: e.clientY });
     };
@@ -67,29 +117,46 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         )
     }
 
-    if (!view) {
+    if (!view || !view.imageUrl) {
         return (
             <div className="h-full w-full flex items-center justify-center bg-muted">
                 <p className="text-muted-foreground">No interactive view has been configured.</p>
             </div>
         );
     }
-
+    
     return (
-        <div className="relative h-full w-full" onMouseMove={handleMouseMove}>
-            <Image src={view.imageUrl!} alt={view.name} layout="fill" objectFit="cover" />
+        <div ref={containerRef} className="relative h-full w-full" onMouseMove={handleMouseMove}>
+            <Image
+                ref={imageRef}
+                src={view.imageUrl!}
+                alt={view.name}
+                layout="fill"
+                objectFit="contain" // Changed from 'cover' to 'contain' to match editor behavior
+                onLoad={calculateRect}
+            />
             
-            <svg className="absolute top-0 left-0 w-full h-full">
-                {view.selections?.filter(s => s.details).map(selection => (
-                    <polygon
-                        key={selection.id}
-                        points={selection.points.map(p => `${p.x},${p.y}`).join(' ')}
-                        className="fill-yellow-400/20 hover:fill-yellow-400/40 stroke-yellow-500 stroke-2 transition-all cursor-pointer"
-                        onMouseEnter={() => setHoveredSelection(selection)}
-                        onMouseLeave={() => setHoveredSelection(null)}
-                    />
-                ))}
-            </svg>
+            {renderedImageRect && view.selections && (
+                 <svg 
+                    className="absolute top-0 left-0 w-full h-full"
+                    style={{
+                        transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`,
+                        width: renderedImageRect.width,
+                        height: renderedImageRect.height,
+                    }}
+                >
+                    {view.selections.filter(s => s.details).map(selection => (
+                        <polygon
+                            key={selection.id}
+                            points={selection.points.map(p => `${p.x * renderedImageRect.width},${p.y * renderedImageRect.height}`).join(' ')}
+                            className="fill-yellow-400/20 hover:fill-yellow-400/40 stroke-yellow-500 stroke-2 transition-all cursor-pointer"
+                            onMouseEnter={() => setHoveredSelection(selection)}
+                            onMouseLeave={() => setHoveredSelection(null)}
+                        />
+                    ))}
+                </svg>
+            )}
+
 
             {hoveredSelection?.details && (
                 <div

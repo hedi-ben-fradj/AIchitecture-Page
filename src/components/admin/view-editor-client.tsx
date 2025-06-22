@@ -121,7 +121,7 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
   };
 
   const handleSaveAndExit = () => {
-    const currentPolygons = editorRef.current?.getPolygons();
+    const currentPolygons = editorRef.current?.getRelativePolygons();
     if (view && currentPolygons) {
         updateViewSelections(view.id, currentPolygons);
         router.push(`/admin/projects/${projectId}`);

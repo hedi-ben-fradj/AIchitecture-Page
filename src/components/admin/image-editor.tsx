@@ -14,7 +14,7 @@ interface Point {
 
 export interface Polygon {
   id: number;
-  points: Point[];
+  points: Point[]; // Will be relative (0-1) when passed as props, but absolute internally.
   details?: {
     title: string;
     description?: string;
@@ -35,11 +35,11 @@ interface DragInfo {
 interface ImageEditorProps {
     imageUrl: string;
     onMakeView?: (viewName: string) => void;
-    initialPolygons?: Polygon[];
+    initialPolygons?: Polygon[]; // These are expected to be in relative (0-1) format
 }
 
 export interface ImageEditorRef {
-  getPolygons: () => Polygon[];
+  getRelativePolygons: () => Polygon[];
 }
 
 // Helper function to calculate the squared distance from a point to a line segment
@@ -54,9 +54,10 @@ function distToSegmentSquared(p: Point, v: Point, w: Point): number {
 }
 
 const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
-  ({ imageUrl, onMakeView, initialPolygons }, ref) => {
-  const [polygons, setPolygons] = useState<Polygon[]>(initialPolygons || []);
-  const [history, setHistory] = useState<Polygon[][]>([initialPolygons || []]);
+  ({ imageUrl, onMakeView, initialPolygons = [] }, ref) => {
+  // `polygons` state is for internal use and stores coordinates in ABSOLUTE pixels for easier editing.
+  const [polygons, setPolygons] = useState<Polygon[]>([]);
+  const [history, setHistory] = useState<Polygon[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
@@ -64,8 +65,45 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   const [selectedPolygonId, setSelectedPolygonId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // This effect converts incoming RELATIVE polygons into ABSOLUTE coordinates for editing.
+  useEffect(() => {
+    if (svgRef.current && imageUrl) {
+      const { width, height } = svgRef.current.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        const absolutePolygons = initialPolygons.map(poly => ({
+          ...poly,
+          points: poly.points.map(p => ({
+            x: p.x * width,
+            y: p.y * height,
+          })),
+        }));
+        setPolygons(absolutePolygons);
+        setHistory([absolutePolygons]);
+        setHistoryIndex(0);
+      }
+    } else if (!imageUrl) {
+      // Clear polygons if image is removed
+      setPolygons([]);
+      setHistory([[]]);
+      setHistoryIndex(0);
+    }
+  }, [initialPolygons, imageUrl]);
+
   useImperativeHandle(ref, () => ({
-    getPolygons: () => polygons,
+    getRelativePolygons: () => {
+      // On save, convert internal ABSOLUTE coordinates back to RELATIVE.
+      if (!svgRef.current) return [];
+      const { width, height } = svgRef.current.getBoundingClientRect();
+      if (width === 0 || height === 0) return []; // Avoid division by zero
+      
+      return polygons.map(poly => ({
+        ...poly,
+        points: poly.points.map(p => ({
+          x: p.x / width,
+          y: p.y / height
+        }))
+      }));
+    },
   }));
 
   const saveToHistory = (newState: Polygon[]) => {
@@ -91,22 +129,23 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
         handleUndo();
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [history, historyIndex]);
 
-
   const handleAddPolygon = () => {
+    if (!svgRef.current) return;
+    const { width, height } = svgRef.current.getBoundingClientRect();
+    // Create new polygons with absolute coordinates based on the editor size.
     const newPolygon: Polygon = {
       id: Date.now(),
       points: [
-        { x: 20, y: 20 },
-        { x: 120, y: 20 },
-        { x: 120, y: 80 },
-        { x: 20, y: 80 },
+        { x: width * 0.2, y: height * 0.2 },
+        { x: width * 0.8, y: height * 0.2 },
+        { x: width * 0.8, y: height * 0.8 },
+        { x: width * 0.2, y: height * 0.8 },
       ],
     };
     const newPolygons = [...polygons, newPolygon];
