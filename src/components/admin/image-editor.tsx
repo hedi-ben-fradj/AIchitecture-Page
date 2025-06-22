@@ -276,7 +276,8 @@ export default function ImageEditor({ imageUrl, onMakeView }: ImageEditorProps) 
                 <polygon
                   points={polygon.points.map(p => `${p.x},${p.y}`).join(' ')}
                   className={cn(
-                      "fill-white/30 stroke-2 cursor-move transition-colors",
+                      "stroke-2 cursor-move transition-colors",
+                      polygon.details ? "fill-green-600/40" : "fill-white/30",
                       selectedPolygonId === polygon.id ? "stroke-yellow-500" : "stroke-blue-500 hover:stroke-yellow-400"
                   )}
                   onMouseDown={(e) => handleMouseDownOnPolygon(e, polygon.id)}

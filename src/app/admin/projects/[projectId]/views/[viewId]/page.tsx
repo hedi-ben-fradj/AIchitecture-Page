@@ -36,8 +36,7 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
   };
   
   const handleMakeView = (newViewName: string) => {
-    const newPath = addView(newViewName);
-    router.push(newPath);
+    addView(newViewName);
   };
 
   return (
