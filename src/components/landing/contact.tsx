@@ -2,7 +2,7 @@ import ContactForm from './contact-form';
 
 export default function Contact() {
   return (
-    <section id="contact" className="py-20 md:py-28 bg-background">
+    <section id="contact" className="h-screen bg-background flex items-center justify-center">
       <div className="container mx-auto max-w-7xl px-4 md:px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>

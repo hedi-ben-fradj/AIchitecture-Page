@@ -1,78 +1,134 @@
 import Image from 'next/image';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { BedDouble, Bath, Car, AreaChart } from 'lucide-react';
+import { ArrowLeft, Layers, Settings2, Download } from 'lucide-react';
 
-const propertyInfo = {
-  title: 'Modern Villa with Ocean View',
-  location: 'Malibu, California',
-  price: '$5,450,000',
-  specs: [
-    { icon: <BedDouble className="h-5 w-5" />, label: '4 Bedrooms' },
-    { icon: <Bath className="h-5 w-5" />, label: '5 Bathrooms' },
-    { icon: <Car className="h-5 w-5" />, label: '3-Car Garage' },
-    { icon: <AreaChart className="h-5 w-5" />, label: '4,800 sq. ft.' },
-  ],
-  gallery: [
-    { src: 'https://placehold.co/600x400.png', alt: 'Living room', hint: 'living room' },
-    { src: 'https://placehold.co/600x400.png', alt: 'Kitchen', hint: 'kitchen modern' },
-    { src: 'https://placehold.co/600x400.png', alt: 'Bedroom', hint: 'bedroom modern' },
-    { src: 'https://placehold.co/600x400.png', alt: 'Exterior view', hint: 'modern house' },
+const floorPlans = [
+  { src: "https://placehold.co/100x100.png", alt: "Ground Floor", hint: "floor plan sketch" },
+  { src: "https://placehold.co/100x100.png", alt: "First Floor", hint: "floor plan architecture" },
+  { src: "https://placehold.co/100x100.png", alt: "Basement", hint: "floor plan blueprint" },
+];
+
+const cinematicThumbnails = [
+    { src: 'https://placehold.co/150x84.png', alt: 'Cinematic 1', hint: 'modern house exterior' },
+    { src: 'https://placehold.co/150x84.png', alt: 'Cinematic 2', hint: 'modern house interior' },
+    { src: 'https://placehold.co/150x84.png', alt: 'Cinematic 3', hint: 'modern house garden' },
+];
+
+const stats = {
+  plot: '154 m²',
+  house: '168.8 m²',
+  price: '1,600,000',
+  rooms: [
+    { name: 'SALON', size: '31.5 m²' },
+    { name: 'KUCHNIA', size: '8.5 m²' },
+    { name: 'GABINET', size: '8.5 m²' },
+    { name: 'SYPIALNIA 1', size: '13.5 m²' },
+    { name: 'SYPIALNIA 2', size: '11.5 m²' },
+    { name: 'SYPIALNIA 3', size: '14 m²' },
+    { name: 'ŁAZIENKA', size: '4 m²' },
   ],
 };
 
+
 export default function PropertyViewer() {
   return (
-    <section id="apartments" className="py-20 md:py-28 bg-background/80">
-      <div className="container mx-auto max-w-7xl px-4 md:px-6">
-        <div className="text-center mb-12">
-          <h2 className="font-headline text-3xl md:text-4xl font-bold">Apartments</h2>
-          <p className="mt-4 max-w-2xl mx-auto text-lg text-muted-foreground">
-            Explore our available apartments. Use our interactive tools to explore every detail.
-          </p>
-        </div>
-        <Card className="overflow-hidden bg-card border-border shadow-2xl">
-          <CardContent className="p-0">
-            <div className="grid grid-cols-1 lg:grid-cols-2">
-              <div className="p-6 md:p-8">
-                <Badge variant="outline" className="mb-2 border-primary/20 text-primary">Featured Property</Badge>
-                <h3 className="font-headline text-2xl md:text-3xl font-bold text-primary">{propertyInfo.title}</h3>
-                <p className="text-muted-foreground mt-1">{propertyInfo.location}</p>
-                <p className="font-headline text-3xl md:text-4xl font-bold text-primary my-4">{propertyInfo.price}</p>
-                
-                <div className="grid grid-cols-2 gap-4 my-6">
-                  {propertyInfo.specs.map(spec => (
-                    <div key={spec.label} className="flex items-center gap-3 text-foreground">
-                      <div className="text-primary">{spec.icon}</div>
-                      <span>{spec.label}</span>
-                    </div>
-                  ))}
-                </div>
+    <section id="apartments" className="relative h-screen w-full text-white overflow-hidden">
+      <Image
+        src="https://placehold.co/1920x1080.png"
+        alt="Modern house exterior with wooden panels"
+        layout="fill"
+        objectFit="cover"
+        className="z-0"
+        data-ai-hint="modern house wood"
+      />
+      <div className="absolute inset-0 bg-black/30 z-10" />
 
-                <div className="relative aspect-video w-full rounded-lg overflow-hidden mt-6 bg-muted">
-                   <Image src="https://placehold.co/800x450.png" alt="3D property viewer" fill className="object-cover" data-ai-hint="3d model property"/>
-                   <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                     <p className="text-white font-semibold text-lg">Interactive 3D Viewer</p>
-                   </div>
-                </div>
-              </div>
-              <div className="p-6 md:p-8 bg-black/20">
-                <h4 className="font-headline text-xl font-semibold mb-4 text-primary">Image Gallery</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {propertyInfo.gallery.map((image, index) => (
-                    <div key={index} className="relative aspect-video w-full rounded-lg overflow-hidden group">
-                      <Image src={image.src} alt={image.alt} fill className="object-cover transition-transform duration-300 group-hover:scale-105" data-ai-hint={image.hint}/>
-                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <p className="text-white font-semibold">{image.alt}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Top Left - Back button */}
+      <div className="absolute top-8 left-8 z-20">
+        <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white rounded-full p-2">
+            <ArrowLeft className="h-6 w-6 mr-2"/>
+            WRÓĆ DO LISTY DOMÓW
+        </Button>
       </div>
+
+      {/* Left Sidebar */}
+      <aside className="absolute top-1/2 left-8 -translate-y-1/2 z-20 p-4 bg-black/50 backdrop-blur-sm rounded-lg border border-white/20 w-64 space-y-4">
+        <div className="flex items-center justify-between">
+            <h2 className="text-5xl font-light">38A</h2>
+            <span className="text-xs text-white/70">3Q/2023</span>
+        </div>
+        <div className="space-y-2">
+            {floorPlans.map((plan, index) => (
+                <Card key={index} className="bg-white/10 border-white/20 hover:border-white cursor-pointer transition-colors">
+                    <CardContent className="p-2">
+                        <Image src={plan.src} alt={plan.alt} width={100} height={100} className="rounded-md w-full h-auto" data-ai-hint={plan.hint}/>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+        <div className="text-center space-y-2 pt-2">
+            <Button variant="outline" className="w-full bg-transparent border-white/20 text-white hover:bg-white/20 hover:text-white">
+                <Download className="mr-2 h-4 w-4"/>
+                DOKUMENTACJA DOMU.PDF
+            </Button>
+            <Button className="w-full bg-white/90 text-black hover:bg-white font-bold">
+                UMÓW SIĘ
+            </Button>
+        </div>
+      </aside>
+
+      {/* Info Panel */}
+      <div className="absolute top-1/4 left-1/3 z-20 p-6 bg-[rgba(190,142,64,0.4)] backdrop-blur-md rounded-lg border border-[rgba(255,255,255,0.2)] text-white w-[500px]">
+        <div className="grid grid-cols-3 gap-4 border-b border-white/20 pb-4 mb-4">
+            <div>
+                <p className="text-xs text-white/70 uppercase">Działka</p>
+                <p className="text-2xl font-light">{stats.plot}</p>
+            </div>
+            <div>
+                <p className="text-xs text-white/70 uppercase">Dom</p>
+                <p className="text-2xl font-light">{stats.house}</p>
+            </div>
+            <div>
+                <p className="text-xs text-white/70 uppercase">Cena (PLN)</p>
+                <p className="text-2xl font-light">{stats.price}</p>
+            </div>
+        </div>
+        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+            {stats.rooms.map(room => (
+                <div key={room.name} className="flex justify-between text-sm">
+                    <span className="text-white/80">{room.name}</span>
+                    <span className="font-light">{room.size}</span>
+                </div>
+            ))}
+        </div>
+      </div>
+
+      {/* Bottom Bar */}
+      <footer className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 to-transparent">
+        <div className="container mx-auto max-w-7xl flex items-end justify-center gap-12 text-white">
+            <div className="text-center">
+                <p className="text-sm tracking-widest mb-2">CINEMATIC</p>
+                <div className="flex gap-2">
+                    {cinematicThumbnails.map((thumb, i) => (
+                        <div key={i} className="relative w-[120px] h-[67px] rounded-md overflow-hidden border-2 border-transparent hover:border-white cursor-pointer transition-colors">
+                            <Image src={thumb.src} alt={thumb.alt} layout="fill" objectFit="cover" data-ai-hint={thumb.hint}/>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="flex items-center gap-8 pb-1">
+                <Button variant="ghost" className="flex-col h-auto p-2 hover:bg-white/10 rounded-md">
+                    <Layers className="h-8 w-8"/>
+                    <span className="mt-1 text-xs">FLOORS</span>
+                </Button>
+                <Button variant="ghost" className="flex-col h-auto p-2 hover:bg-white/10 rounded-md">
+                    <Settings2 className="h-8 w-8"/>
+                    <span className="mt-1 text-xs">CONFIGURATOR</span>
+                </Button>
+            </div>
+        </div>
+      </footer>
     </section>
   );
 }

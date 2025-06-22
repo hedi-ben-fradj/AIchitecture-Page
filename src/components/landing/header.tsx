@@ -1,65 +1,46 @@
 'use client';
-import { useState, useEffect } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navLinks = [
-  { href: '#home', label: 'HOME' },
-  { href: '#apartments', label: 'APARTMENTS' },
-  { href: '#features', label: 'FEATURES' },
-  { href: '#contact', label: 'CONTACT' },
+  { id: 'home', label: 'HOME' },
+  { id: 'apartments', label: 'APARTMENTS' },
+  { id: 'features', label: 'FEATURES' },
+  { id: 'contact', label: 'CONTACT' },
 ];
 
-export default function Header() {
-  const [activeLink, setActiveLink] = useState('#home');
-  const [hasScrolled, setHasScrolled] = useState(false);
+interface HeaderProps {
+    activeView: string;
+    setActiveView: (view: string) => void;
+}
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setHasScrolled(window.scrollY > 10);
-      
-      const sections = navLinks.map(link => document.querySelector(link.href));
-      const scrollPosition = window.scrollY + 100;
-
-      sections.forEach(section => {
-        if (section && section.offsetTop <= scrollPosition && section.offsetTop + section.offsetHeight > scrollPosition) {
-          setActiveLink(`#${section.id}`);
-        }
-      });
-    };
-    
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+export default function Header({ activeView, setActiveView }: HeaderProps) {
 
   const navItems = (
     <>
       {navLinks.map((link) => (
-        <a
-          key={link.href}
-          href={link.href}
-          onClick={() => setActiveLink(link.href)}
+        <button
+          key={link.id}
+          onClick={() => setActiveView(link.id)}
           className={cn(
-            'text-sm font-light tracking-widest text-primary/80 hover:text-primary transition-colors relative py-2',
-            activeLink === link.href && 'text-primary'
+            'text-sm font-light tracking-widest text-primary/80 hover:text-primary transition-colors relative py-2 bg-transparent border-none',
+            activeView === link.id && 'text-primary'
           )}
         >
           {link.label}
-          {activeLink === link.href && (
+          {activeView === link.id && (
             <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4/5 h-px bg-primary" />
           )}
-        </a>
+        </button>
       ))}
     </>
   );
 
   return (
-    <header className={cn(
-        "fixed top-0 z-50 w-full transition-colors duration-300",
-        hasScrolled ? "bg-black/50 backdrop-blur-sm" : "bg-transparent"
-    )}>
+    <header className="fixed top-0 z-50 w-full bg-transparent">
       <div className="container mx-auto flex h-20 max-w-7xl items-center justify-center px-4 md:px-6">
         <nav className="hidden md:flex items-center gap-10 bg-black/30 px-8 py-2 rounded-full border border-white/10 shadow-lg">
           {navItems}

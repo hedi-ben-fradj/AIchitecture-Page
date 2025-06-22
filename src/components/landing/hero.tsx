@@ -12,7 +12,7 @@ export default function Hero() {
   return (
     <section id="home" className="relative h-screen min-h-[700px] w-full flex items-center justify-start text-white">
       <Image
-        src="https://placehold.co/1920x1080.png"
+        src="/assets/birds-eye.png"
         alt="Modern apartment building"
         layout="fill"
         objectFit="cover"

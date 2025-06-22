@@ -36,7 +36,7 @@ const features = [
 
 export default function Features() {
   return (
-    <section id="features" className="py-20 md:py-28 bg-background">
+    <section id="features" className="h-screen bg-background flex flex-col items-center justify-center">
       <div className="container mx-auto max-w-7xl px-4 md:px-6">
         <div className="text-center mb-12">
           <h2 className="font-headline text-3xl md:text-4xl font-bold">A New Dimension in Property Tours</h2>
