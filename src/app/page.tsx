@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Header from '@/components/landing/header';
 import Hero from '@/components/landing/hero';
 import Features from '@/components/landing/features';
-import PropertyViewer from '@/components/landing/property-viewer';
+import InteractiveLandingViewer from '@/components/landing/interactive-landing-viewer';
 import Contact from '@/components/landing/contact';
 
 export default function Home() {
@@ -15,7 +15,14 @@ export default function Home() {
       case 'home':
         return <Hero />;
       case 'explore':
-        return <PropertyViewer />;
+        return (
+          <section
+            id="explore"
+            className="relative h-screen w-full text-white overflow-hidden"
+          >
+            <InteractiveLandingViewer projectId="porto-montenegro" />
+          </section>
+        );
       case 'features':
         return <Features />;
       case 'contact':
