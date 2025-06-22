@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useRef, type MouseEvent, useEffect } from 'react';
+import { useState, useRef, type MouseEvent, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SelectionDetailsModal from './selection-details-modal';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Point {
   x: number;
@@ -34,6 +35,11 @@ interface DragInfo {
 interface ImageEditorProps {
     imageUrl: string;
     onMakeView?: (viewName: string) => void;
+    initialPolygons?: Polygon[];
+}
+
+export interface ImageEditorRef {
+  getPolygons: () => Polygon[];
 }
 
 // Helper function to calculate the squared distance from a point to a line segment
@@ -47,15 +53,20 @@ function distToSegmentSquared(p: Point, v: Point, w: Point): number {
     return (p.x - projectionX) ** 2 + (p.y - projectionY) ** 2;
 }
 
-export default function ImageEditor({ imageUrl, onMakeView }: ImageEditorProps) {
-  const [polygons, setPolygons] = useState<Polygon[]>([]);
-  const [history, setHistory] = useState<Polygon[][]>([[]]);
+const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
+  ({ imageUrl, onMakeView, initialPolygons }, ref) => {
+  const [polygons, setPolygons] = useState<Polygon[]>(initialPolygons || []);
+  const [history, setHistory] = useState<Polygon[][]>([initialPolygons || []]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedPolygonId, setSelectedPolygonId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  useImperativeHandle(ref, () => ({
+    getPolygons: () => polygons,
+  }));
 
   const saveToHistory = (newState: Polygon[]) => {
     const newHistory = history.slice(0, historyIndex + 1);
@@ -133,8 +144,6 @@ export default function ImageEditor({ imageUrl, onMakeView }: ImageEditorProps) 
 
     setPolygons(newPolygons);
     saveToHistory(newPolygons);
-    console.log("Saving details for selection:", selectedPolygonId, data);
-    console.log("All polygons state:", newPolygons);
   };
 
   const getMousePosition = (e: MouseEvent): Point => {
@@ -253,73 +262,88 @@ export default function ImageEditor({ imageUrl, onMakeView }: ImageEditorProps) 
   const selectedPolygon = polygons.find(p => p.id === selectedPolygonId);
 
   return (
-    <>
+    <TooltipProvider>
       <SelectionDetailsModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveDetails}
         selectionData={selectedPolygon}
       />
-      <div className="relative w-full max-w-5xl mx-auto" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-          <Button
-              onClick={handleAddPolygon}
-              className="absolute top-2 right-2 z-20 bg-yellow-500 hover:bg-yellow-600 text-black"
-          >
-              <Plus className="mr-2 h-4 w-4" />
-              New Selection
-          </Button>
-        <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600">
-          <img src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
-          <svg ref={svgRef} className="absolute top-0 left-0 w-full h-full z-10" onClick={() => setSelectedPolygonId(null)}>
-            {polygons.map(polygon => (
-              <g key={polygon.id} onClick={(e) => e.stopPropagation()}>
-                <polygon
-                  points={polygon.points.map(p => `${p.x},${p.y}`).join(' ')}
-                  className={cn(
-                      "stroke-2 cursor-move transition-colors",
-                      polygon.details ? "fill-green-600/40" : "fill-white/30",
-                      selectedPolygonId === polygon.id ? "stroke-yellow-500" : "stroke-blue-500 hover:stroke-yellow-400"
-                  )}
-                  onMouseDown={(e) => handleMouseDownOnPolygon(e, polygon.id)}
-                  onDoubleClick={(e) => handlePolygonDoubleClick(e, polygon.id)}
-                />
-                {polygon.points.map((point, index) => (
-                  <circle
-                    key={index}
-                    cx={point.x}
-                    cy={point.y}
-                    r="5"
-                    className={cn(
-                      "stroke-white stroke-1 cursor-grab transition-colors",
-                      selectedPolygonId === polygon.id ? "fill-yellow-500" : "fill-blue-500"
-                    )}
-                    onMouseDown={(e) => handleMouseDownOnVertex(e, polygon.id, index)}
-                  />
-                ))}
-              </g>
-            ))}
-          </svg>
+      <div className="flex flex-col gap-4 items-center">
+        <div className="w-full flex justify-end gap-2">
+            <Button
+                onClick={handleAddPolygon}
+                className="bg-yellow-500 hover:bg-yellow-600 text-black"
+            >
+                <Plus className="mr-2 h-4 w-4" />
+                New Selection
+            </Button>
+            <Button 
+                variant="outline"
+                onClick={handleConfirmSelection}
+                disabled={!selectedPolygonId}
+                className="bg-green-600 hover:bg-green-700 text-white"
+            >
+                <CheckSquare className="mr-2 h-4 w-4" />
+                Edit Details
+            </Button>
+            <Button 
+                variant="destructive" 
+                onClick={handleDeleteSelection} 
+                disabled={!selectedPolygonId}
+                className="bg-red-600 hover:bg-red-700 text-white"
+            >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+            </Button>
         </div>
-        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
-          <Button 
-              variant="destructive" 
-              onClick={handleDeleteSelection} 
-              disabled={!selectedPolygonId}
-              className="bg-red-600 hover:bg-red-700 text-white"
-          >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-          </Button>
-          <Button 
-              onClick={handleConfirmSelection}
-              disabled={!selectedPolygonId}
-              className="bg-green-600 hover:bg-green-700 text-white"
-          >
-              <CheckSquare className="mr-2 h-4 w-4" />
-              Confirm Selection
-          </Button>
+        <div className="relative w-full max-w-5xl mx-auto" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+          <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600">
+            <img src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
+            <svg ref={svgRef} className="absolute top-0 left-0 w-full h-full z-10" onClick={() => setSelectedPolygonId(null)}>
+              {polygons.map(polygon => (
+                <Tooltip key={polygon.id} delayDuration={100}>
+                  <TooltipTrigger asChild>
+                    <g onClick={(e) => e.stopPropagation()}>
+                      <polygon
+                        points={polygon.points.map(p => `${p.x},${p.y}`).join(' ')}
+                        className={cn(
+                            "stroke-2 cursor-move transition-colors",
+                            polygon.details ? "fill-green-600/40" : "fill-white/30",
+                            selectedPolygonId === polygon.id ? "stroke-yellow-500" : "stroke-blue-500 hover:stroke-yellow-400"
+                        )}
+                        onMouseDown={(e) => handleMouseDownOnPolygon(e, polygon.id)}
+                        onDoubleClick={(e) => handlePolygonDoubleClick(e, polygon.id)}
+                      />
+                      {polygon.points.map((point, index) => (
+                        <circle
+                          key={index}
+                          cx={point.x}
+                          cy={point.y}
+                          r="5"
+                          className={cn(
+                            "stroke-white stroke-1 cursor-grab transition-colors",
+                            selectedPolygonId === polygon.id ? "fill-yellow-500" : "fill-blue-500"
+                          )}
+                          onMouseDown={(e) => handleMouseDownOnVertex(e, polygon.id, index)}
+                        />
+                      ))}
+                    </g>
+                  </TooltipTrigger>
+                  {polygon.details?.title && (
+                    <TooltipContent className="bg-black text-white border-neutral-600">
+                      <p>{polygon.details.title}</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              ))}
+            </svg>
+          </div>
         </div>
       </div>
-    </>
+    </TooltipProvider>
   );
-}
+});
+
+ImageEditor.displayName = "ImageEditor";
+export default ImageEditor;

@@ -4,16 +4,17 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload } from 'lucide-react';
-import ImageEditor from '@/components/admin/image-editor';
+import { Upload, Save } from 'lucide-react';
+import ImageEditor, { type ImageEditorRef } from '@/components/admin/image-editor';
 import { useViews } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
 
 export default function ViewEditorPage({ params }: { params: { projectId: string; viewId: string } }) {
-  const { getView, updateViewImage, addView } = useViews();
+  const { getView, updateViewImage, updateViewSelections, addView } = useViews();
   const router = useRouter();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<ImageEditorRef>(null);
 
   const view = getView(params.viewId);
 
@@ -63,15 +64,30 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
     fileInputRef.current?.click();
   };
 
+  const handleSaveAndExit = () => {
+    const currentPolygons = editorRef.current?.getPolygons();
+    if (view && currentPolygons) {
+        updateViewSelections(view.id, currentPolygons);
+        router.push(`/admin/projects/${params.projectId}`);
+    }
+  };
+
+
   return (
     <div className="flex flex-col h-full bg-[#313131]">
       <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 border-b border-neutral-700 bg-[#3c3c3c]">
         <h1 className="text-xl font-semibold text-white">{viewName} Editor</h1>
         {imageToEdit && (
-          <Button onClick={triggerFileInput} variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
-            Change Image
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={triggerFileInput} variant="outline">
+              <Upload className="mr-2 h-4 w-4" />
+              Change Image
+            </Button>
+            <Button onClick={handleSaveAndExit} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+              <Save className="mr-2 h-4 w-4" />
+              Save and Exit
+            </Button>
+          </div>
         )}
       </header>
       <div className="flex-1 p-8">
@@ -95,7 +111,12 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
         ) : (
            <div>
              <h2 className="text-lg font-semibold mb-4 text-center text-white">Define Selections for {viewName}</h2>
-             <ImageEditor imageUrl={imageToEdit} onMakeView={handleMakeView} />
+             <ImageEditor
+                ref={editorRef}
+                imageUrl={imageToEdit}
+                onMakeView={handleMakeView}
+                initialPolygons={view?.selections}
+             />
            </div>
         )}
       </div>

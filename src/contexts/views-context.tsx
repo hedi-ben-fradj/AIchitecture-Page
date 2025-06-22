@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { Eye, Building2, Home, type LucideIcon } from 'lucide-react';
+import { Eye, type LucideIcon } from 'lucide-react';
+import type { Polygon } from '@/components/admin/image-editor';
 
 export interface View {
   id: string;
@@ -9,6 +10,7 @@ export interface View {
   icon: LucideIcon;
   href: string;
   imageUrl?: string;
+  selections?: Polygon[];
 }
 
 interface ViewsContextType {
@@ -17,6 +19,7 @@ interface ViewsContextType {
   addView: (viewName: string) => string;
   deleteView: (viewId: string) => void;
   updateViewImage: (viewId: string, imageUrl: string) => void;
+  updateViewSelections: (viewId: string, selections: Polygon[]) => void;
 }
 
 const ViewsContext = createContext<ViewsContextType | undefined>(undefined);
@@ -32,6 +35,14 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     setViews(prevViews =>
       prevViews.map(view =>
         view.id === viewId ? { ...view, imageUrl } : view
+      )
+    );
+  }, []);
+  
+  const updateViewSelections = useCallback((viewId: string, selections: Polygon[]) => {
+    setViews(prevViews =>
+      prevViews.map(view =>
+        view.id === viewId ? { ...view, selections } : view
       )
     );
   }, []);
@@ -62,7 +73,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, []);
 
   return (
-    <ViewsContext.Provider value={{ views, getView, addView, deleteView, updateViewImage }}>
+    <ViewsContext.Provider value={{ views, getView, addView, deleteView, updateViewImage, updateViewSelections }}>
       {children}
     </ViewsContext.Provider>
   );
