@@ -10,18 +10,19 @@ import { useViews } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
 
 export default function ViewEditorPage({ params }: { params: { projectId: string; viewId: string } }) {
+  const { projectId, viewId } = params;
   const { getView, updateViewImage, updateViewSelections, addView } = useViews();
   const router = useRouter();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<ImageEditorRef>(null);
 
-  const view = getView(params.viewId);
+  const view = getView(viewId);
 
   useEffect(() => {
     // If the view doesn't exist (e.g., after deletion or bad URL), redirect.
     if (!view) {
-      router.replace(`/admin/projects/${params.projectId}`);
+      router.replace(`/admin/projects/${projectId}`);
       return;
     }
     if (view.imageUrl) {
@@ -29,7 +30,7 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
     } else {
       setImageToEdit(null); // Reset if navigating to a view without an image
     }
-  }, [view, router, params.projectId]);
+  }, [view, router, projectId]);
 
   // If view is not found yet, show a loading state or return null to avoid errors.
   if (!view) {
@@ -49,7 +50,7 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
       reader.onload = (e) => {
         const result = e.target?.result as string;
         setImageToEdit(result);
-        updateViewImage(params.viewId, result);
+        updateViewImage(viewId, result);
       };
       reader.readAsDataURL(file);
     }
@@ -68,7 +69,7 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
     const currentPolygons = editorRef.current?.getPolygons();
     if (view && currentPolygons) {
         updateViewSelections(view.id, currentPolygons);
-        router.push(`/admin/projects/${params.projectId}`);
+        router.push(`/admin/projects/${projectId}`);
     }
   };
 
