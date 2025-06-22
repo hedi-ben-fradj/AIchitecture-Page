@@ -92,19 +92,22 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, [views]);
 
   const updateViewImage = useCallback((viewId: string, imageUrl: string) => {
-    setViews(prevViews => {
-        const newViews = prevViews.map(view =>
-            view.id === viewId ? { ...view, imageUrl } : view
-        );
-        try {
-            window.localStorage.setItem(getStorageKey(`view-image-${viewId}`), imageUrl);
-        } catch (error) {
-            console.error(`Failed to save image for view ${viewId}:`, error);
-            alert("Error: Could not save image. It might be too large (limit is 3MB).");
-            return prevViews;
-        }
-        return newViews;
-    });
+    // Optimistically update the React state so the UI feels responsive.
+    setViews(prevViews =>
+      prevViews.map(view =>
+        view.id === viewId ? { ...view, imageUrl } : view
+      )
+    );
+
+    // Attempt to persist the change to localStorage.
+    try {
+      window.localStorage.setItem(getStorageKey(`view-image-${viewId}`), imageUrl);
+    } catch (error) {
+      console.error(`Failed to save image for view ${viewId}:`, error);
+      // If saving fails, inform the user but don't revert the UI state.
+      // This provides a better user experience as their selected image remains visible.
+      alert("Error: Could not save image. It's likely too large (limit is ~3MB). Your changes will be visible now but won't be saved permanently.");
+    }
   }, [getStorageKey]);
   
   const updateViewSelections = useCallback((viewId: string, selections: Polygon[]) => {
