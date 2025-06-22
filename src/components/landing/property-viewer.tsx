@@ -23,20 +23,20 @@ const propertyInfo = {
 
 export default function PropertyViewer() {
   return (
-    <section id="viewer" className="py-20 md:py-28 bg-primary/5">
+    <section id="apartments" className="py-20 md:py-28 bg-background/80">
       <div className="container mx-auto max-w-7xl px-4 md:px-6">
         <div className="text-center mb-12">
-          <h2 className="font-headline text-3xl md:text-4xl font-bold">Immersive Property Exploration</h2>
-          <p className="mt-4 max-w-2xl mx-auto text-lg text-foreground/70">
-            Step inside our featured property. Use our interactive tools to explore every detail.
+          <h2 className="font-headline text-3xl md:text-4xl font-bold">Apartments</h2>
+          <p className="mt-4 max-w-2xl mx-auto text-lg text-muted-foreground">
+            Explore our available apartments. Use our interactive tools to explore every detail.
           </p>
         </div>
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden bg-card border-border shadow-2xl">
           <CardContent className="p-0">
             <div className="grid grid-cols-1 lg:grid-cols-2">
               <div className="p-6 md:p-8">
-                <Badge variant="secondary" className="mb-2">Featured Property</Badge>
-                <h3 className="font-headline text-2xl md:text-3xl font-bold">{propertyInfo.title}</h3>
+                <Badge variant="outline" className="mb-2 border-primary/20 text-primary">Featured Property</Badge>
+                <h3 className="font-headline text-2xl md:text-3xl font-bold text-primary">{propertyInfo.title}</h3>
                 <p className="text-muted-foreground mt-1">{propertyInfo.location}</p>
                 <p className="font-headline text-3xl md:text-4xl font-bold text-primary my-4">{propertyInfo.price}</p>
                 
@@ -56,12 +56,15 @@ export default function PropertyViewer() {
                    </div>
                 </div>
               </div>
-              <div className="p-6 md:p-8 bg-background">
-                <h4 className="font-headline text-xl font-semibold mb-4">Image Gallery</h4>
+              <div className="p-6 md:p-8 bg-black/20">
+                <h4 className="font-headline text-xl font-semibold mb-4 text-primary">Image Gallery</h4>
                 <div className="grid grid-cols-2 gap-4">
                   {propertyInfo.gallery.map((image, index) => (
                     <div key={index} className="relative aspect-video w-full rounded-lg overflow-hidden group">
                       <Image src={image.src} alt={image.alt} fill className="object-cover transition-transform duration-300 group-hover:scale-105" data-ai-hint={image.hint}/>
+                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <p className="text-white font-semibold">{image.alt}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
