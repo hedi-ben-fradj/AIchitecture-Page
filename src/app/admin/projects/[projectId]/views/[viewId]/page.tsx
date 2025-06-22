@@ -1,15 +1,20 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload } from 'lucide-react';
 import ImageEditor from '@/components/admin/image-editor';
+import { useViews } from '@/contexts/views-context';
 
 export default function ViewEditorPage({ params }: { params: { projectId: string; viewId: string } }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  
+  const router = useRouter();
+  const { addView } = useViews();
 
   const viewName = params.viewId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
@@ -28,6 +33,11 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
     if (uploadedImage) {
       setCurrentStep(2);
     }
+  };
+  
+  const handleMakeView = (newViewName: string) => {
+    const newPath = addView(newViewName);
+    router.push(newPath);
   };
 
   return (
@@ -80,7 +90,7 @@ export default function ViewEditorPage({ params }: { params: { projectId: string
         {currentStep === 2 && uploadedImage && (
            <div>
              <h2 className="text-lg font-semibold mb-4 text-center text-white">Step 2: Define Selections</h2>
-             <ImageEditor imageUrl={uploadedImage} />
+             <ImageEditor imageUrl={uploadedImage} onMakeView={handleMakeView} />
            </div>
         )}
       </div>

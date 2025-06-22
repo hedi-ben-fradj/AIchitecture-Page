@@ -19,6 +19,7 @@ export interface Polygon {
     description?: string;
     width: number;
     height: number;
+    makeAsView?: boolean;
   };
 }
 
@@ -28,6 +29,11 @@ interface DragInfo {
   vertexIndex?: number;
   offset: Point;
   initialPoints: Point[];
+}
+
+interface ImageEditorProps {
+    imageUrl: string;
+    onMakeView?: (viewName: string) => void;
 }
 
 // Helper function to calculate the squared distance from a point to a line segment
@@ -41,7 +47,7 @@ function distToSegmentSquared(p: Point, v: Point, w: Point): number {
     return (p.x - projectionX) ** 2 + (p.y - projectionY) ** 2;
 }
 
-export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
+export default function ImageEditor({ imageUrl, onMakeView }: ImageEditorProps) {
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [history, setHistory] = useState<Polygon[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -111,8 +117,12 @@ export default function ImageEditor({ imageUrl }: { imageUrl: string }) {
     setIsModalOpen(true);
   };
 
-  const handleSaveDetails = (data: any) => {
-    if (!selectedPolygonId) return;
+  const handleSaveDetails = (data: Polygon['details']) => {
+    if (!selectedPolygonId || !data) return;
+
+    if (data.makeAsView && data.title && onMakeView) {
+        onMakeView(data.title);
+    }
 
     const newPolygons = polygons.map(p => {
         if (p.id === selectedPolygonId) {

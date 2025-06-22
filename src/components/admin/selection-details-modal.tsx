@@ -8,9 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import type { Polygon } from './image-editor';
 
 const selectionDetailsSchema = z.object({
@@ -18,6 +17,7 @@ const selectionDetailsSchema = z.object({
     description: z.string().optional(),
     width: z.coerce.number().positive('Width must be a positive number.'),
     height: z.coerce.number().positive('Height must be a positive number.'),
+    makeAsView: z.boolean().default(false).optional(),
 });
 
 type SelectionDetailsFormValues = z.infer<typeof selectionDetailsSchema>;
@@ -37,6 +37,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
             description: '',
             width: 0,
             height: 0,
+            makeAsView: false,
         },
     });
     
@@ -49,6 +50,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
             description: '',
             width: 0,
             height: 0,
+            makeAsView: false,
           });
         }
     }, [selectionData, form]);
@@ -121,10 +123,26 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
                                 )}
                             />
                         </div>
-                        <div className="flex items-center space-x-2 pt-4">
-                            <Switch id="make-view" disabled />
-                            <Label htmlFor="make-view" className="text-neutral-400">Make View (Coming Soon)</Label>
-                        </div>
+                        <FormField
+                            control={form.control}
+                            name="makeAsView"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-neutral-600 p-3 shadow-sm mt-4 bg-[#313131]">
+                                    <div className="space-y-0.5">
+                                        <FormLabel>Make View</FormLabel>
+                                        <FormDescription className="text-neutral-400">
+                                            Create a new navigable view from this selection.
+                                        </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                        <Switch
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
 
                         <DialogFooter className="pt-4">
                             <Button type="button" variant="ghost" onClick={onClose} className="hover:bg-neutral-700">Cancel</Button>
