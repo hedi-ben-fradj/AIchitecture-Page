@@ -61,6 +61,8 @@ type ProjectMetadata = {
 
 export function ViewsProvider({ children, projectId }: { children: ReactNode; projectId: string }) {
   const getStorageKey = useCallback((key: string) => `project-${projectId}-${key}`, [projectId]);
+  const getStorageSafeViewId = (viewId: string) => viewId.replace(/\//g, '__');
+
 
   const [isMounted, setIsMounted] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
@@ -108,8 +110,8 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
               ...entityMeta,
               entityType: entityMeta.entityType || 'Apartment', // Default for legacy data
               views: entityMeta.views.map((viewMeta: any) => {
-                const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${viewMeta.id}`)) || undefined;
-                const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${viewMeta.id}`));
+                const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${getStorageSafeViewId(viewMeta.id)}`)) || undefined;
+                const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewMeta.id)}`));
                 const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
                 return { ...viewMeta, imageUrl, selections };
               })
@@ -188,8 +190,8 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         if (entityToDelete) {
           entityToDelete.views.forEach(view => {
             try {
-              window.localStorage.removeItem(getStorageKey(`view-image-${view.id}`));
-              window.localStorage.removeItem(getStorageKey(`view-selections-${view.id}`));
+              window.localStorage.removeItem(getStorageKey(`view-image-${getStorageSafeViewId(view.id)}`));
+              window.localStorage.removeItem(getStorageKey(`view-selections-${getStorageSafeViewId(view.id)}`));
             } catch (error) {
               console.error(`Failed to remove data for view ${view.id}:`, error);
             }
@@ -223,7 +225,6 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, [entities, saveMetadata, projectId]);
 
   const addView = useCallback((entityId: string, viewName: string) => {
-    const slug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     let newViewHref = '';
 
     setEntities(prevEntities => {
@@ -232,21 +233,44 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         console.error(`Entity with id "${entityId}" not found.`);
         return prevEntities;
       }
-      
-      const entityViewIds = targetEntity.views.map(v => v.id);
-      if (!slug || entityViewIds.includes(slug)) {
-        alert(`A view with name "${viewName}" already exists in this entity. Please choose a unique name.`);
+
+      const hasDuplicateName = targetEntity.views.some(v => v.name.toLowerCase() === viewName.toLowerCase());
+      if (hasDuplicateName) {
+        alert(`A view with the name "${viewName}" already exists in this entity. Please choose a different name.`);
         return prevEntities;
       }
+
+      const viewSlug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      if (!viewSlug) {
+        alert("Invalid view name.");
+        return prevEntities;
+      }
+
+      const getEntityPath = (currentEntityId: string, allEntities: Entity[]): string[] => {
+        const path: string[] = [];
+        let currentId: string | undefined | null = currentEntityId;
+        while(currentId) {
+          const entity = allEntities.find(e => e.id === currentId);
+          if (entity) {
+            path.unshift(entity.id);
+            currentId = entity.parentId;
+          } else {
+            currentId = null;
+          }
+        }
+        return path;
+      };
       
-      const newView: View = { id: slug, name: viewName };
-      newViewHref = `/admin/projects/${projectId}/entities/${entityId}/views/${slug}`;
+      const entityPath = getEntityPath(entityId, prevEntities);
+      const newViewId = [...entityPath, viewSlug].join('/');
+
+      const newView: View = { id: newViewId, name: viewName };
+      newViewHref = `/admin/projects/${projectId}/entities/${entityId}/views/${encodeURIComponent(newViewId)}`;
 
       const updatedEntities = prevEntities.map(entity => {
         if (entity.id === entityId) {
           const updatedViews = [...entity.views, newView];
-          // If this is the first view, set it as default
-          const newDefaultViewId = updatedViews.length === 1 ? slug : entity.defaultViewId;
+          const newDefaultViewId = updatedViews.length === 1 ? newViewId : entity.defaultViewId;
           return { ...entity, views: updatedViews, defaultViewId: newDefaultViewId };
         }
         return entity;
@@ -265,7 +289,6 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         if (entity.id === entityId) {
           const updatedViews = entity.views.filter(v => v.id !== viewId);
           let newDefaultViewId = entity.defaultViewId;
-          // If the deleted view was the default, pick a new default
           if (entity.defaultViewId === viewId) {
             newDefaultViewId = updatedViews.length > 0 ? updatedViews[0].id : null;
           }
@@ -277,10 +300,9 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       return updatedEntities;
     });
     
-    // Clean up storage
     try {
-      window.localStorage.removeItem(getStorageKey(`view-image-${viewId}`));
-      window.localStorage.removeItem(getStorageKey(`view-selections-${viewId}`));
+      window.localStorage.removeItem(getStorageKey(`view-image-${getStorageSafeViewId(viewId)}`));
+      window.localStorage.removeItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewId)}`));
     } catch (error) {
       console.error(`Failed to remove data for view ${viewId}:`, error);
     }
@@ -293,7 +315,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         : entity
     ));
     try {
-      window.localStorage.setItem(getStorageKey(`view-image-${viewId}`), imageUrl);
+      window.localStorage.setItem(getStorageKey(`view-image-${getStorageSafeViewId(viewId)}`), imageUrl);
     } catch (error) {
       console.error(`Failed to save image for view ${viewId}:`, error);
       alert("Error: Could not save image due to browser storage limits. Your changes are visible now but won't be saved. Please try a smaller image or clear some space by removing other views.");
@@ -307,7 +329,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         : entity
     ));
     try {
-      window.localStorage.setItem(getStorageKey(`view-selections-${viewId}`), JSON.stringify(selections));
+      window.localStorage.setItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewId)}`), JSON.stringify(selections));
     } catch (error) {
       console.error(`Failed to save selections for view ${viewId}:`, error);
     }

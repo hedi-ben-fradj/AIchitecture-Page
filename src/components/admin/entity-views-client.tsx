@@ -26,7 +26,7 @@ import Image from 'next/image';
 
 function ViewCard({ view, onDelete, isDefaultView, onSetDefaultView, projectId, entityId }: { view: View, onDelete: (viewId: string) => void, isDefaultView: boolean, onSetDefaultView: (viewId: string) => void, projectId: string, entityId: string }) {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
-    const href = `/admin/projects/${projectId}/entities/${entityId}/views/${view.id}`;
+    const href = `/admin/projects/${projectId}/entities/${entityId}/views/${encodeURIComponent(view.id)}`;
 
     const handleDelete = (e: React.MouseEvent) => {
         e.preventDefault();
