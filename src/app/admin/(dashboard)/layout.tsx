@@ -49,7 +49,7 @@ const EntitySidebarNode = ({
             </Link>
             
             {isNodeOnActivePath && (
-                 <div className="pl-4 border-l border-neutral-700 ml-5">
+                 <div className="pl-3 border-l border-neutral-700 ml-4">
                     {/* Views */}
                     {entity.views.length > 0 && (
                         <div className="pt-2 space-y-1">
@@ -160,11 +160,11 @@ export default function AdminLayout({
 
   return (
     <div className="bg-neutral-900 text-foreground min-h-screen flex">
-      <aside className="w-60 bg-[#212121] flex flex-col border-r border-neutral-700 flex-shrink-0">
+      <aside className="w-80 bg-[#212121] flex flex-col border-r border-neutral-700 flex-shrink-0">
         <div className="h-16 flex items-center px-6">
            <h1 className="text-xl font-semibold text-white">Dashboard</h1>
         </div>
-        <div className="flex-1 flex flex-col justify-between p-4 overflow-y-auto">
+        <div className="flex-1 flex flex-col justify-between p-2 overflow-y-auto">
             <nav className="space-y-1">
                 {mainNavItems.map((item) => (
                     <Link
@@ -190,7 +190,7 @@ export default function AdminLayout({
                       <span>Projects</span>
                   </Link>
                   {projectId && (
-                      <div className="pl-4 pt-1 space-y-1 border-l border-neutral-700 ml-5">
+                      <div className="pl-3 pt-1 space-y-1 border-l border-neutral-700 ml-4">
                           {rootEntities.map(entity => (
                              <EntitySidebarNode 
                                 key={entity.id}
