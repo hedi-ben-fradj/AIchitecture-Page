@@ -15,6 +15,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AddProjectModal } from '@/components/admin/add-project-modal';
+import { useRouter } from 'next/navigation';
 
 interface Project {
     id: string;
@@ -28,6 +30,9 @@ export default function AdminProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     const [isMounted, setIsMounted] = useState(false);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const router = useRouter();
+
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -83,6 +88,25 @@ export default function AdminProjectsPage() {
         setProjectToDelete(null);
     };
     
+    const handleAddProject = (name: string, description: string) => {
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        if (!slug || projects.some(p => p.id === slug)) {
+            alert(`A project with a similar name already exists or is invalid.`);
+            return;
+        }
+
+        const newProject: Project = {
+            id: slug,
+            name,
+            description,
+        };
+
+        const updatedProjects = [...projects, newProject];
+        setProjects(updatedProjects);
+        updateProjectsInStorage(updatedProjects);
+        router.push(`/admin/projects/${slug}`);
+    };
+    
     // Prevent hydration errors by not rendering until the client has mounted and loaded state
     if (!isMounted) {
         return null;
@@ -90,6 +114,12 @@ export default function AdminProjectsPage() {
 
     return (
         <>
+            <AddProjectModal 
+                isOpen={isAddModalOpen} 
+                onClose={() => setIsAddModalOpen(false)} 
+                onAddProject={handleAddProject} 
+            />
+
             <AlertDialog open={!!projectToDelete} onOpenChange={() => setProjectToDelete(null)}>
                 <AlertDialogContent className="bg-[#2a2a2a] border-neutral-700 text-white">
                     <AlertDialogHeader>
@@ -134,18 +164,17 @@ export default function AdminProjectsPage() {
                         </div>
                     ))}
 
-                    <Card className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg">
+                    <Card 
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg border-2 border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 cursor-pointer transition-colors"
+                    >
                         <CardHeader className="items-center text-center p-4">
+                            <Plus className="h-8 w-8 mb-2" />
                             <CardTitle className="text-lg font-medium">New Project</CardTitle>
                             <CardDescription className="text-neutral-400 pt-2 text-sm">
                                 Create or import a new project
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <Button variant="outline" size="icon" className="h-14 w-14 rounded-full bg-transparent border-neutral-600 hover:bg-neutral-700 hover:border-neutral-500">
-                                <Plus className="h-7 w-7 text-neutral-400" />
-                            </Button>
-                        </CardContent>
                     </Card>
                 </div>
             </main>
