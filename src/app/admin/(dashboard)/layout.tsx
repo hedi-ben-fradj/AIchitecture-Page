@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { Entity, View } from '@/contexts/views-context';
-import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Camera } from 'lucide-react';
+import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Building } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePathname, useParams } from 'next/navigation';
@@ -18,10 +18,22 @@ interface SidebarEntity extends Entity {
 }
 
 // New recursive component for the sidebar
-const EntitySidebarNode = ({ entity, allEntities, projectId, pathname }: { entity: SidebarEntity, allEntities: SidebarEntity[], projectId: string, pathname: string }) => {
+const EntitySidebarNode = ({ 
+  entity, 
+  allEntities, 
+  projectId, 
+  pathname,
+  activePathIds
+}: { 
+  entity: SidebarEntity, 
+  allEntities: SidebarEntity[], 
+  projectId: string, 
+  pathname: string,
+  activePathIds: Set<string>
+}) => {
     const children = useMemo(() => allEntities.filter(e => e.parentId === entity.id), [allEntities, entity.id]);
     const entityHref = `/admin/projects/${projectId}/entities/${entity.id}`;
-    const isEntityActive = pathname.startsWith(entityHref);
+    const isNodeOnActivePath = activePathIds.has(entity.id);
 
     return (
         <div>
@@ -29,15 +41,14 @@ const EntitySidebarNode = ({ entity, allEntities, projectId, pathname }: { entit
                 href={entityHref}
                 className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
-                    isEntityActive && "bg-neutral-600 text-white"
+                    isNodeOnActivePath && "bg-neutral-600 text-white"
                 )}
             >
-                <Eye className="h-4 w-4" />
+                <Building className="h-4 w-4" />
                 {entity.name}
             </Link>
             
-            {/* Render children and views if the entity is active */}
-            {isEntityActive && (
+            {isNodeOnActivePath && (
                  <div className="pl-4 border-l border-neutral-700 ml-5">
                     {/* Views */}
                     {entity.views.length > 0 && (
@@ -54,7 +65,7 @@ const EntitySidebarNode = ({ entity, allEntities, projectId, pathname }: { entit
                                             isViewActive && "bg-neutral-700 text-white"
                                         )}
                                     >
-                                        <Camera className="h-4 w-4" />
+                                        <Eye className="h-4 w-4" />
                                         {view.name}
                                     </Link>
                                 );
@@ -71,6 +82,7 @@ const EntitySidebarNode = ({ entity, allEntities, projectId, pathname }: { entit
                                     allEntities={allEntities}
                                     projectId={projectId}
                                     pathname={pathname}
+                                    activePathIds={activePathIds}
                                 />
                             ))}
                         </div>
@@ -100,8 +112,8 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const params = useParams<{ projectId?: string }>();
-  const { projectId } = params;
+  const params = useParams<{ projectId?: string; entityId?: string }>();
+  const { projectId, entityId } = params;
 
   const [entities, setEntities] = useState<SidebarEntity[]>([]);
 
@@ -130,6 +142,21 @@ export default function AdminLayout({
   }, [projectId]);
 
   const rootEntities = useMemo(() => entities.filter(e => !e.parentId), [entities]);
+  
+  const activePathIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!entityId || !entities.length) {
+      return ids;
+    }
+    
+    let currentId: string | undefined | null = entityId;
+    while(currentId) {
+      ids.add(currentId);
+      const currentEntity = entities.find(e => e.id === currentId);
+      currentId = currentEntity?.parentId;
+    }
+    return ids;
+  }, [entityId, entities]);
 
   return (
     <div className="bg-neutral-900 text-foreground min-h-screen flex">
@@ -171,6 +198,7 @@ export default function AdminLayout({
                                 allEntities={entities}
                                 projectId={projectId}
                                 pathname={pathname}
+                                activePathIds={activePathIds}
                              />
                           ))}
                       </div>
