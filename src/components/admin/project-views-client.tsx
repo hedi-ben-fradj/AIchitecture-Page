@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Eye } from 'lucide-react';
+import { Plus, Trash2, Building } from 'lucide-react';
 import { useProjectData, type Entity } from '@/contexts/views-context';
 import {
   AlertDialog,
@@ -76,7 +76,7 @@ function EntityCardRecursive({
                         <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg cursor-pointer hover:border-yellow-500 transition-colors">
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <div className="flex items-center gap-4">
-                                  <Eye className="h-8 w-8 text-yellow-500" />
+                                  <Building className="h-8 w-8 text-yellow-500" />
                                   <CardTitle className="text-lg font-medium">{entity.name}</CardTitle>
                                 </div>
                                 <div className="text-sm text-neutral-400">
