@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
@@ -22,11 +22,40 @@ interface Project {
     description: string;
 }
 
+const PROJECTS_STORAGE_KEY = 'projects_list';
+
 export default function AdminProjectsPage() {
-    const [projects, setProjects] = useState<Project[]>([
-        { id: 'porto-montenegro', name: 'Porto Montenegro', description: 'description placeholder' }
-    ]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const storedProjects = localStorage.getItem(PROJECTS_STORAGE_KEY);
+                if (storedProjects) {
+                    setProjects(JSON.parse(storedProjects));
+                } else {
+                    // Initialize with a default project if nothing is stored
+                    const defaultProjects = [{ id: 'porto-montenegro', name: 'Porto Montenegro', description: 'description placeholder' }];
+                    setProjects(defaultProjects);
+                    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(defaultProjects));
+                }
+            } catch (error) {
+                console.error("Failed to load or parse projects from localStorage", error);
+                // Fallback to default if storage is corrupted
+                const defaultProjects = [{ id: 'porto-montenegro', name: 'Porto Montenegro', description: 'description placeholder' }];
+                setProjects(defaultProjects);
+            }
+            setIsMounted(true);
+        }
+    }, []);
+    
+    const updateProjectsInStorage = (updatedProjects: Project[]) => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(updatedProjects));
+        }
+    };
 
     const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
         e.preventDefault();
@@ -37,7 +66,7 @@ export default function AdminProjectsPage() {
     const confirmDelete = () => {
         if (!projectToDelete) return;
 
-        // Remove from localStorage
+        // Remove project-specific data from localStorage
         if (typeof window !== 'undefined') {
             Object.keys(localStorage).forEach(key => {
                 if (key.startsWith(`project-${projectToDelete.id}-`)) {
@@ -46,10 +75,18 @@ export default function AdminProjectsPage() {
             });
         }
 
-        // Remove from state
-        setProjects(projects.filter(p => p.id !== projectToDelete.id));
+        // Update the main projects list in state and storage
+        const updatedProjects = projects.filter(p => p.id !== projectToDelete.id);
+        setProjects(updatedProjects);
+        updateProjectsInStorage(updatedProjects);
+        
         setProjectToDelete(null);
     };
+    
+    // Prevent hydration errors by not rendering until the client has mounted and loaded state
+    if (!isMounted) {
+        return null;
+    }
 
     return (
         <>
