@@ -4,7 +4,7 @@ import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo } fr
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Navigation, X, ArrowLeft, SlidersHorizontal } from 'lucide-react';
+import { Navigation, X, ArrowLeft, SlidersHorizontal, Eye } from 'lucide-react';
 import type { View, Polygon, Entity } from '@/contexts/views-context';
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
@@ -23,6 +23,7 @@ interface FullView extends View {
 
 export default function InteractiveLandingViewer() {
     const [currentView, setCurrentView] = useState<FullView | null>(null);
+    const [entityViews, setEntityViews] = useState<View[]>([]);
     const [viewHistory, setViewHistory] = useState<string[]>([]); // Stores view IDs
     const [clickedSelection, setClickedSelection] = useState<Polygon | null>(null);
     const [hoveredSelectionId, setHoveredSelectionId] = useState<number | null>(null);
@@ -97,15 +98,18 @@ export default function InteractiveLandingViewer() {
                 if (landingEntity && landingEntity.defaultViewId) {
                     const defaultView = findViewInEntities(entities, landingEntity.defaultViewId);
                     setCurrentView(defaultView);
+                    setEntityViews(landingEntity.views);
                 }
             } else {
                 setCurrentView(null);
+                setEntityViews([]);
             }
             setViewHistory([]);
             setIsLoaded(true);
         } else {
              setIsLoaded(true);
              setCurrentView(null);
+             setEntityViews([]);
         }
     }, [projectId, loadDataFromStorage]);
     
@@ -172,6 +176,7 @@ export default function InteractiveLandingViewer() {
                     setViewHistory(prev => [...prev, currentView.id]);
                 }
                 setCurrentView(newView);
+                setEntityViews(targetEntity.views);
                 setClickedSelection(null);
                 setHoveredSelectionId(null);
                 setRenderedImageRect(null);
@@ -195,11 +200,26 @@ export default function InteractiveLandingViewer() {
         
         if (previousView) {
             setCurrentView(previousView);
+            const parentEntity = entities.find(e => e.id === previousView.entityId);
+            if (parentEntity) {
+                setEntityViews(parentEntity.views);
+            }
             setViewHistory(prev => prev.slice(0, -1));
         } else {
             alert(`The previous view "${previousViewId}" could not be found.`);
             setViewHistory(prev => prev.slice(0, -1));
         }
+        setClickedSelection(null);
+        setHoveredSelectionId(null);
+        setRenderedImageRect(null);
+        setTimeout(calculateRect, 0);
+    };
+
+    const handleViewSelect = (view: View) => {
+        if (currentView?.id === view.id || !currentView?.entityId) return;
+
+        const newFullView: FullView = { ...view, entityId: currentView.entityId };
+        setCurrentView(newFullView);
         setClickedSelection(null);
         setHoveredSelectionId(null);
         setRenderedImageRect(null);
@@ -284,7 +304,7 @@ export default function InteractiveLandingViewer() {
             )}
 
             {clickedSelection?.details && (
-                <div className="absolute top-4 right-4 z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
+                <div className="absolute top-4 right-4 lg:right-[13rem] z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
                     <Card className="pointer-events-auto bg-black/60 backdrop-blur-sm text-white border-yellow-500 w-72 shadow-2xl animate-in fade-in-50 slide-in-from-right-5">
                         <CardHeader className="flex-row items-start justify-between pb-2">
                             <CardTitle className="text-base leading-tight pr-2">{clickedSelection.details.title}</CardTitle>
@@ -315,6 +335,35 @@ export default function InteractiveLandingViewer() {
                 </div>
             )}
             
+            {entityViews.length > 1 && (
+                <div className="absolute top-1/2 -translate-y-1/2 right-4 h-auto max-h-[calc(100%-8rem)] w-48 z-30 hidden lg:block">
+                    <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
+                        <div className="max-h-[calc(100vh-10rem)] overflow-y-auto space-y-2">
+                             {entityViews.map(view => (
+                                <div
+                                    key={view.id}
+                                    onClick={(e) => { e.stopPropagation(); handleViewSelect(view); }}
+                                    className={cn(
+                                        "rounded-lg overflow-hidden cursor-pointer border-2 hover:border-yellow-500 transition-colors group",
+                                        currentView?.id === view.id ? "border-yellow-500" : "border-transparent"
+                                    )}
+                                >
+                                    <div className="aspect-video relative">
+                                        {view.imageUrl ? (
+                                            <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
+                                        )}
+                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                                    </div>
+                                    <p className="text-xs text-white p-2 truncate font-medium bg-black/50">{view.name}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {filteredSelections.length > 0 && (
                 <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent pointer-events-none">
                     <div className="pointer-events-auto overflow-x-auto pb-2 -mb-2 flex justify-center">
