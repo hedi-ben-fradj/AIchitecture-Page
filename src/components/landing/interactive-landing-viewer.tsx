@@ -131,6 +131,12 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
 
     const handleNavigate = (viewName: string) => {
         const viewId = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        
+        if (currentView && currentView.id === viewId) {
+            setClickedSelection(null);
+            return;
+        }
+
         const newView = loadView(viewId);
         if (newView) {
             if (currentView) {
