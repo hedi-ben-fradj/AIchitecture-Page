@@ -64,6 +64,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
             views: entity.views.map(view => ({
               id: view.id,
               name: view.name,
+              defaultViewId: (entity as any).defaultViewId, // Keep defaultViewId for entity
             }))
           }))
         };
@@ -83,17 +84,22 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         
         if (projectDataStr) {
           const projectData: ProjectMetadata = JSON.parse(projectDataStr);
-          loadedLandingId = projectData.landingPageEntityId || null;
           
-          loadedEntities = projectData.entities.map(entityMeta => ({
-            ...entityMeta,
-            views: entityMeta.views.map(viewMeta => {
-              const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${viewMeta.id}`)) || undefined;
-              const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${viewMeta.id}`));
-              const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
-              return { ...viewMeta, imageUrl, selections };
-            })
-          }));
+          if (projectData && Array.isArray(projectData.entities)) {
+            loadedLandingId = projectData.landingPageEntityId || null;
+            
+            loadedEntities = projectData.entities.map(entityMeta => ({
+              ...entityMeta,
+              views: entityMeta.views.map(viewMeta => {
+                const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${viewMeta.id}`)) || undefined;
+                const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${viewMeta.id}`));
+                const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
+                return { ...viewMeta, imageUrl, selections };
+              })
+            }));
+          } else {
+             console.warn("Project data in localStorage is malformed. Resetting state.", projectData);
+          }
         }
         setEntities(loadedEntities);
         setLandingPageEntityIdState(loadedLandingId);
