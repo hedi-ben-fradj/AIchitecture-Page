@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, type ReactNode, useEffect } from 'react';
@@ -212,9 +213,15 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     let newViewHref = '';
 
     setEntities(prevEntities => {
-      const allViewIds = prevEntities.flatMap(e => e.views.map(v => v.id));
-      if (!slug || allViewIds.includes(slug)) {
-        alert(`A view with name "${viewName}" already exists in the project or the name is invalid. Please choose a unique name.`);
+      const targetEntity = prevEntities.find(e => e.id === entityId);
+      if (!targetEntity) {
+        console.error(`Entity with id "${entityId}" not found.`);
+        return prevEntities;
+      }
+      
+      const entityViewIds = targetEntity.views.map(v => v.id);
+      if (!slug || entityViewIds.includes(slug)) {
+        alert(`A view with name "${viewName}" already exists in this entity. Please choose a unique name.`);
         return prevEntities;
       }
       
