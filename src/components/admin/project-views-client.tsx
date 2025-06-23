@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Check, Eye } from 'lucide-react';
+import { Plus, Trash2, Check, Eye, ArrowLeft } from 'lucide-react';
 import { useProjectData, type Entity } from '@/contexts/views-context';
 import {
   AlertDialog,
@@ -98,6 +98,11 @@ export default function ProjectEntitiesClient({ projectName, projectId }: { proj
         <div className="flex flex-col h-full bg-[#313131]">
              <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 border-b border-neutral-700 bg-[#3c3c3c]">
                 <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="icon" asChild className="hover:bg-neutral-700">
+                        <Link href="/admin">
+                            <ArrowLeft className="h-5 w-5 text-white" />
+                        </Link>
+                    </Button>
                     <h1 className="text-xl font-semibold text-white">{projectName} / Entities</h1>
                 </div>
             </header>

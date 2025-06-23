@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Save } from 'lucide-react';
+import { Upload, Save, ArrowLeft } from 'lucide-react';
 import ImageEditor, { type ImageEditorRef } from '@/components/admin/image-editor';
 import { useProjectData } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
@@ -118,7 +119,14 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   return (
     <div className="flex flex-col h-full bg-[#313131]">
       <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 border-b border-neutral-700 bg-[#3c3c3c]">
-        <h1 className="text-xl font-semibold text-white">{viewName} Editor</h1>
+        <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild className="hover:bg-neutral-700">
+                <Link href={`/admin/projects/${projectId}/entities/${entityId}`}>
+                   <ArrowLeft className="h-5 w-5 text-white" />
+                </Link>
+            </Button>
+            <h1 className="text-xl font-semibold text-white">{viewName} Editor</h1>
+        </div>
         {imageToEdit && (
           <div className="flex gap-2">
             <Button onClick={triggerFileInput} variant="outline">
