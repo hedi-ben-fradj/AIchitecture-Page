@@ -1,16 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Entity } from '@/contexts/views-context';
-import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye } from 'lucide-react';
+import type { Entity, View } from '@/contexts/views-context';
+import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Camera } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePathname, useParams } from 'next/navigation';
 
 // Minimal type for sidebar display
+interface SidebarView {
+  id: string;
+  name: string;
+}
+
 interface SidebarEntity {
   id: string;
   name: string;
+  views: SidebarView[];
 }
 
 const mainNavItems = [
@@ -42,8 +48,12 @@ export default function AdminLayout({
         const projectDataStr = localStorage.getItem(`project-${projectId}-data`);
         if (projectDataStr) {
           const projectData = JSON.parse(projectDataStr);
-          // We only need id and name for the sidebar links
-          const entitiesForSidebar = projectData.entities?.map((e: Entity) => ({ id: e.id, name: e.name })) || [];
+          // Map entities and their views for the sidebar
+          const entitiesForSidebar = projectData.entities?.map((e: Entity) => ({
+            id: e.id,
+            name: e.name,
+            views: e.views?.map((v: View) => ({ id: v.id, name: v.name })) || []
+          })) || [];
           setEntities(entitiesForSidebar);
         } else {
           setEntities([]);
@@ -92,19 +102,42 @@ export default function AdminLayout({
                       <div className="pl-7 pt-1 space-y-1">
                           <h3 className="px-3 text-xs font-bold text-neutral-500 tracking-wider uppercase mb-2">ENTITIES</h3>
                           {entities.map(entity => {
-                              const href = `/admin/projects/${projectId}/entities/${entity.id}`;
+                              const entityHref = `/admin/projects/${projectId}/entities/${entity.id}`;
+                              const isEntityActive = pathname.startsWith(entityHref);
                               return (
-                                  <Link
-                                      key={entity.id}
-                                      href={href}
-                                      className={cn(
-                                          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
-                                          pathname.startsWith(href) && "bg-neutral-600 text-white"
+                                  <div key={entity.id}>
+                                      <Link
+                                          href={entityHref}
+                                          className={cn(
+                                              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
+                                              isEntityActive && "bg-neutral-600 text-white"
+                                          )}
+                                      >
+                                          <Eye className="h-4 w-4" />
+                                          {entity.name}
+                                      </Link>
+                                      {isEntityActive && entity.views.length > 0 && (
+                                          <div className="pl-7 pt-1 space-y-1">
+                                              {entity.views.map(view => {
+                                                  const viewHref = `/admin/projects/${projectId}/entities/${entity.id}/views/${view.id}`;
+                                                  const isViewActive = pathname === viewHref;
+                                                  return (
+                                                      <Link
+                                                          key={view.id}
+                                                          href={viewHref}
+                                                          className={cn(
+                                                              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
+                                                              isViewActive && "bg-neutral-700 text-white"
+                                                          )}
+                                                      >
+                                                          <Camera className="h-4 w-4" />
+                                                          {view.name}
+                                                      </Link>
+                                                  );
+                                              })}
+                                          </div>
                                       )}
-                                  >
-                                      <Eye className="h-4 w-4" />
-                                      {entity.name}
-                                  </Link>
+                                  </div>
                               );
                           })}
                       </div>
