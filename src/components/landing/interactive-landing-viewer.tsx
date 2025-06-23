@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Navigation, X, ArrowLeft } from 'lucide-react';
 import type { View, Polygon } from '@/contexts/views-context';
+import { cn } from '@/lib/utils';
 
 interface RenderedImageRect {
     x: number;
@@ -18,6 +19,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     const [currentView, setCurrentView] = useState<View | null>(null);
     const [viewHistory, setViewHistory] = useState<string[]>([]);
     const [clickedSelection, setClickedSelection] = useState<Polygon | null>(null);
+    const [hoveredSelectionId, setHoveredSelectionId] = useState<number | null>(null);
     const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
     const [isLoaded, setIsLoaded] = useState(false);
     const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
@@ -79,6 +81,8 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         if (!imageRef.current || !containerRef.current) return;
         
         const { naturalWidth, naturalHeight } = imageRef.current;
+        if (naturalWidth === 0 || naturalHeight === 0) return;
+
         const { width: containerWidth, height: containerHeight } = containerRef.current.getBoundingClientRect();
         
         const imageAspectRatio = naturalWidth / naturalHeight;
@@ -110,13 +114,21 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     useEffect(() => {
         const resizeObserver = new ResizeObserver(calculateRect);
         const container = containerRef.current;
+        const image = imageRef.current;
+
         if (container) {
             resizeObserver.observe(container);
+        }
+        if (image) {
+            image.addEventListener('load', calculateRect);
         }
         
         return () => {
             if (container) {
                 resizeObserver.unobserve(container);
+            }
+            if (image) {
+                image.removeEventListener('load', calculateRect);
             }
         };
     }, [calculateRect]);
@@ -125,7 +137,14 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         e.stopPropagation();
         if (selection.details) {
             setClickedSelection(selection);
-            setCardPosition({ x: e.clientX, y: e.clientY });
+            const containerBounds = containerRef.current?.getBoundingClientRect();
+            if (containerBounds) {
+                const clickX = e.clientX - containerBounds.left;
+                const clickY = e.clientY - containerBounds.top;
+                setCardPosition({ x: clickX, y: clickY });
+            } else {
+                 setCardPosition({ x: e.clientX, y: e.clientY });
+            }
         }
     };
 
@@ -143,6 +162,10 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                 setViewHistory(prev => [...prev, currentView.id]);
             }
             setCurrentView(newView);
+            setClickedSelection(null);
+            setHoveredSelectionId(null);
+            setRenderedImageRect(null);
+            setTimeout(calculateRect, 0);
         } else {
             alert(`The view "${viewName}" could not be found. It may have been deleted or not yet configured.`);
         }
@@ -160,10 +183,12 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
             setViewHistory(prev => prev.slice(0, -1));
         } else {
             alert(`The previous view "${previousViewId}" could not be found.`);
-            // still pop from history to prevent getting stuck
             setViewHistory(prev => prev.slice(0, -1));
         }
         setClickedSelection(null);
+        setHoveredSelectionId(null);
+        setRenderedImageRect(null);
+        setTimeout(calculateRect, 0);
     };
 
     if (!isLoaded) {
@@ -183,12 +208,12 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     }
     
     return (
-        <div ref={containerRef} className="relative h-full w-full">
+        <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={() => setClickedSelection(null)}>
             {viewHistory.length > 0 && (
                 <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="absolute top-4 left-4 z-20 h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" 
+                    className="absolute top-4 left-4 z-30 h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" 
                     onClick={handleBack}
                     aria-label="Go back to previous view"
                 >
@@ -204,34 +229,41 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                 objectFit="contain"
                 onLoad={calculateRect}
                 key={currentView.id}
+                className="transition-opacity duration-500"
+                style={{ opacity: renderedImageRect ? 1 : 0 }}
             />
             
             {renderedImageRect && currentView.selections && currentView.selections.length > 0 && (
                  <svg 
-                    className="absolute top-0 left-0 w-full h-full"
+                    className="absolute top-0 left-0 w-full h-full z-10"
                     style={{
                         transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`,
                         width: renderedImageRect.width,
                         height: renderedImageRect.height,
                     }}
-                    onClick={() => setClickedSelection(null)}
                 >
                     {currentView.selections.map(selection => (
                         <polygon
                             key={selection.id}
                             points={selection.points.map(p => `${p.x * renderedImageRect.width},${p.y * renderedImageRect.height}`).join(' ')}
-                            className="fill-yellow-400/20 hover:fill-yellow-400/40 stroke-yellow-500 stroke-2 transition-all cursor-pointer"
+                            className={cn(
+                                "stroke-yellow-500 stroke-2 transition-all cursor-pointer",
+                                hoveredSelectionId === selection.id ? "fill-yellow-400/40" : "fill-yellow-400/20",
+                                "hover:fill-yellow-400/40"
+                            )}
                             onClick={(e) => handlePolygonClick(e, selection)}
                         />
                     ))}
                 </svg>
             )}
 
-
             {clickedSelection?.details && (
                 <div
-                    className="absolute pointer-events-none z-10"
-                    style={{ top: cardPosition.y + 20, left: cardPosition.x + 20 }}
+                    className="absolute z-30 pointer-events-none"
+                    style={{ 
+                        top: Math.min(cardPosition.y + 10, (containerRef.current?.clientHeight || 0) - 200),
+                        left: Math.min(cardPosition.x + 10, (containerRef.current?.clientWidth || 0) - 270)
+                    }}
                 >
                     <Card className="pointer-events-auto bg-black/80 backdrop-blur-sm text-white border-yellow-500 w-64 shadow-2xl animate-in fade-in-50">
                         <CardHeader className="flex-row items-start justify-between pb-2">
@@ -260,6 +292,39 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                             </CardFooter>
                         )}
                     </Card>
+                </div>
+            )}
+            
+            {currentView?.selections && currentView.selections.some(s => s.details) && (
+                <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent pointer-events-none">
+                    <div className="pointer-events-auto overflow-x-auto pb-2 -mb-2">
+                        <div className="flex gap-4 w-max">
+                            {currentView.selections.filter(s => s.details).map((selection) => (
+                                <Card
+                                    key={selection.id}
+                                    className={cn(
+                                        "w-56 bg-black/70 backdrop-blur-sm text-white border-neutral-700 transition-colors shrink-0",
+                                        selection.details?.makeAsView && "cursor-pointer hover:border-yellow-500",
+                                        hoveredSelectionId === selection.id && "border-yellow-500"
+                                    )}
+                                    onMouseEnter={() => setHoveredSelectionId(selection.id)}
+                                    onMouseLeave={() => setHoveredSelectionId(null)}
+                                    onClick={() => selection.details?.makeAsView && handleNavigate(selection.details!.title)}
+                                >
+                                    <CardHeader className="p-4">
+                                        <CardTitle className="text-base truncate">{selection.details?.title}</CardTitle>
+                                    </CardHeader>
+                                    {selection.details?.description && (
+                                        <CardContent className="p-4 pt-0">
+                                            <p className="text-xs text-neutral-400 line-clamp-2">
+                                                {selection.details.description}
+                                            </p>
+                                        </CardContent>
+                                    )}
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
