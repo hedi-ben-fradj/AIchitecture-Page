@@ -6,37 +6,36 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, Save } from 'lucide-react';
 import ImageEditor, { type ImageEditorRef } from '@/components/admin/image-editor';
-import { useViews } from '@/contexts/views-context';
+import { useProjectData } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
 
 interface ViewEditorClientProps {
   projectId: string;
+  entityId: string;
   viewId: string;
 }
 
-export default function ViewEditorClient({ projectId, viewId }: ViewEditorClientProps) {
-  const { getView, updateViewImage, updateViewSelections, addView } = useViews();
+export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEditorClientProps) {
+  const { getView, updateViewImage, updateViewSelections, addView } = useProjectData();
   const router = useRouter();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<ImageEditorRef>(null);
 
-  const view = getView(viewId);
+  const view = getView(entityId, viewId);
 
   useEffect(() => {
-    // If the view doesn't exist (e.g., after deletion or bad URL), redirect.
     if (!view) {
-      router.replace(`/admin/projects/${projectId}`);
+      router.replace(`/admin/projects/${projectId}/entities/${entityId}`);
       return;
     }
     if (view.imageUrl) {
       setImageToEdit(view.imageUrl);
     } else {
-      setImageToEdit(null); // Reset if navigating to a view without an image
+      setImageToEdit(null);
     }
-  }, [view, router, projectId]);
+  }, [view, router, projectId, entityId]);
 
-  // If view is not found yet, show a loading state or return null to avoid errors.
   if (!view) {
     return (
         <div className="flex flex-col h-full bg-[#313131] items-center justify-center text-white">
@@ -50,12 +49,9 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // 6MB limit as a safeguard against very large files crashing the browser.
       if (file.size > 6 * 1024 * 1024) { 
         alert("File size exceeds 6MB. Please choose a smaller image.");
-        if(fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
+        if(fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
 
@@ -91,29 +87,20 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
           }
           ctx.drawImage(img, 0, 0, width, height);
           
-          // Use JPEG with quality 0.9 for efficient compression.
           const resizedImageUrl = canvas.toDataURL('image/jpeg', 0.9);
-
           setImageToEdit(resizedImageUrl);
-          updateViewImage(viewId, resizedImageUrl);
+          updateViewImage(entityId, viewId, resizedImageUrl);
         };
-        img.onerror = () => {
-            alert("Failed to load the image file. It may be corrupt or in an unsupported format.");
-        };
+        img.onerror = () => alert("Failed to load the image file.");
         img.src = imageUrl;
       };
       reader.readAsDataURL(file);
     }
-    // Always reset the file input after a file is selected.
-    // This allows the user to select the same file again if they need to.
-    if (event.target) {
-        event.target.value = '';
-    }
+    if (event.target) event.target.value = '';
   };
 
   const handleMakeView = (newViewName: string) => {
-    addView(newViewName);
-    // No longer navigating, so the user stays on the editor page.
+    addView(entityId, newViewName);
   };
 
   const triggerFileInput = () => {
@@ -123,11 +110,10 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
   const handleSaveAndExit = () => {
     const currentPolygons = editorRef.current?.getRelativePolygons();
     if (view && currentPolygons) {
-        updateViewSelections(view.id, currentPolygons);
-        router.push(`/admin/projects/${projectId}`);
+        updateViewSelections(entityId, view.id, currentPolygons);
+        router.push(`/admin/projects/${projectId}/entities/${entityId}`);
     }
   };
-
 
   return (
     <div className="flex flex-col h-full bg-[#313131]">
@@ -158,7 +144,6 @@ export default function ViewEditorClient({ projectId, viewId }: ViewEditorClient
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <Upload className="w-8 h-8 mb-4 text-neutral-400" />
                     <p className="mb-2 text-sm text-neutral-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-
                     <p className="text-xs text-neutral-500">PNG, JPG, or WEBP (MAX. 6MB)</p>
                   </div>
                 </label>
