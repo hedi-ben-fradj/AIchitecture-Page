@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Check, Eye, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Eye, ArrowLeft } from 'lucide-react';
 import { useProjectData, type View } from '@/contexts/views-context';
 import {
   AlertDialog,
@@ -20,6 +20,7 @@ import { AddViewModal } from '@/components/admin/add-view-modal';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 function ViewCard({ view, onDelete, isDefaultView, onSetDefaultView, projectId, entityId }: { view: View, onDelete: (viewId: string) => void, isDefaultView: boolean, onSetDefaultView: (viewId: string) => void, projectId: string, entityId: string }) {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -54,16 +55,26 @@ function ViewCard({ view, onDelete, isDefaultView, onSetDefaultView, projectId, 
             </AlertDialog>
             <div className="group relative">
                 <Link href={href}>
-                    <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors min-h-[240px]">
-                        <CardHeader className="flex flex-row items-center gap-4">
-                            <Eye className="h-8 w-8 text-yellow-500" />
-                            <CardTitle className="text-lg font-medium">{view.name}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-neutral-400">
-                                {view.imageUrl ? `Contains ${view.selections?.length || 0} selections.` : 'No image uploaded yet.'}
+                    <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors flex flex-col min-h-[240px] overflow-hidden">
+                        <div className="relative flex-grow bg-neutral-800">
+                            {view.imageUrl ? (
+                                <>
+                                    <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full p-4 text-neutral-500">
+                                    <Eye className="h-12 w-12" />
+                                    <p className="mt-2 text-sm">No image uploaded</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-neutral-700 shrink-0">
+                            <CardTitle className="text-lg font-medium truncate">{view.name}</CardTitle>
+                            <p className="text-sm text-neutral-400 mt-1">
+                                {`Contains ${view.selections?.length || 0} selections.`}
                             </p>
-                        </CardContent>
+                        </div>
                     </Card>
                 </Link>
                 <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
