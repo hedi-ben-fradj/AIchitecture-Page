@@ -10,9 +10,10 @@ import { Label } from '@/components/ui/label';
 interface AddEntityModalProps {
     isOpen: boolean;
     onClose: () => void;
+    parentId?: string | null;
 }
 
-export function AddEntityModal({ isOpen, onClose }: AddEntityModalProps) {
+export function AddEntityModal({ isOpen, onClose, parentId = null }: AddEntityModalProps) {
     const [entityName, setEntityName] = useState('');
     const { addEntity } = useProjectData();
 
@@ -20,7 +21,7 @@ export function AddEntityModal({ isOpen, onClose }: AddEntityModalProps) {
         if (!entityName.trim()) {
             return;
         }
-        addEntity(entityName);
+        addEntity(entityName, parentId);
         onClose();
         setEntityName('');
     };
@@ -29,8 +30,13 @@ export function AddEntityModal({ isOpen, onClose }: AddEntityModalProps) {
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-[425px] bg-[#2a2a2a] border-neutral-700 text-white">
                 <DialogHeader>
-                    <DialogTitle>Add New Entity</DialogTitle>
-                    <DialogDescription>Enter a name for your new entity. You can change this later.</DialogDescription>
+                    <DialogTitle>{parentId ? 'Add New Child Entity' : 'Add New Top-Level Entity'}</DialogTitle>
+                    <DialogDescription>
+                        {parentId 
+                            ? "Enter a name for your new child entity. This will be nested under the current entity."
+                            : "Enter a name for your new top-level entity. You can change this later."
+                        }
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
