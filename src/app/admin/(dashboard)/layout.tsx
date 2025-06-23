@@ -54,7 +54,7 @@ const EntitySidebarNode = ({
                     {entity.views.length > 0 && (
                         <div className="pt-2 space-y-1">
                             {entity.views.map(view => {
-                                const viewHref = `/admin/projects/${projectId}/entities/${entity.id}/views/${view.id}`;
+                                const viewHref = `/admin/projects/${projectId}/entities/${entity.id}/views/${encodeURIComponent(view.id)}`;
                                 const isViewActive = pathname === viewHref;
                                 return (
                                     <Link
