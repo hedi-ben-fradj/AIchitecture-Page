@@ -255,10 +255,10 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
 
             {clickedSelection?.details && (
                 <div
-                    className="absolute top-0 right-0 z-30 h-full p-4 flex items-center pointer-events-none"
+                    className="absolute top-20 left-4 z-30 pointer-events-none"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <Card className="pointer-events-auto bg-black/80 backdrop-blur-sm text-white border-yellow-500 w-72 shadow-2xl animate-in fade-in-50 slide-in-from-right-5">
+                    <Card className="pointer-events-auto bg-black/60 backdrop-blur-sm text-white border-yellow-500 w-72 shadow-2xl animate-in fade-in-50 slide-in-from-left-5">
                         <CardHeader className="flex-row items-start justify-between pb-2">
                             <CardTitle className="text-base leading-tight pr-2">{clickedSelection.details.title}</CardTitle>
                             <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-neutral-400 hover:text-white" onClick={() => setClickedSelection(null)}>
