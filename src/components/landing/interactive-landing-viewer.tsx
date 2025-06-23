@@ -43,6 +43,12 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
             if (!projectDataStr) return { entities: [], landingPageEntityId: null };
 
             const projectData = JSON.parse(projectDataStr);
+
+            if (!projectData || !Array.isArray(projectData.entities)) {
+                console.warn("Project data in localStorage is malformed. Resetting state.", projectData);
+                return { entities: [], landingPageEntityId: null };
+            }
+
             const loadedEntities = projectData.entities.map((entityMeta: any) => ({
                 ...entityMeta,
                 views: entityMeta.views.map((viewMeta: any) => {
@@ -261,7 +267,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
             )}
 
             {clickedSelection?.details && (
-                <div className="absolute top-20 right-4 z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
+                <div className="absolute top-4 right-4 z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
                     <Card className="pointer-events-auto bg-black/60 backdrop-blur-sm text-white border-yellow-500 w-72 shadow-2xl animate-in fade-in-50 slide-in-from-right-5">
                         <CardHeader className="flex-row items-start justify-between pb-2">
                             <CardTitle className="text-base leading-tight pr-2">{clickedSelection.details.title}</CardTitle>
