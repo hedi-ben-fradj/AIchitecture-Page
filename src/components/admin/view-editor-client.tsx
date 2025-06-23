@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Save } from 'lucide-react';
+import { Upload, Save, ArrowLeft } from 'lucide-react';
 import ImageEditor, { type ImageEditorRef } from '@/components/admin/image-editor';
 import { useProjectData } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
@@ -16,7 +16,7 @@ interface ViewEditorClientProps {
 }
 
 export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEditorClientProps) {
-  const { getView, updateViewImage, updateViewSelections, addView } = useProjectData();
+  const { getView, updateViewImage, updateViewSelections, addEntity } = useProjectData();
   const router = useRouter();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,8 +99,8 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     if (event.target) event.target.value = '';
   };
 
-  const handleMakeView = (newViewName: string) => {
-    addView(entityId, newViewName);
+  const handleMakeEntity = (newEntityName: string) => {
+    addEntity(newEntityName);
   };
 
   const triggerFileInput = () => {
@@ -122,6 +122,10 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       {!imageToEdit ? (
         <Card className="max-w-2xl mx-auto bg-[#2a2a2a] border-neutral-700 text-white">
           <CardContent className="p-6">
+            <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+                <ArrowLeft className="mr-2 h-4 w-4"/>
+                Back to Entity
+            </Button>
             <h2 className="text-lg font-semibold mb-4 text-center">Upload Image for {viewName}</h2>
             <div className="flex items-center justify-center w-full">
               <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-neutral-600 border-dashed rounded-lg cursor-pointer bg-[#313131] hover:bg-neutral-700">
@@ -150,7 +154,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
            <ImageEditor
               ref={editorRef}
               imageUrl={imageToEdit}
-              onMakeView={handleMakeView}
+              onMakeEntity={handleMakeEntity}
               initialPolygons={view?.selections}
            />
          </div>

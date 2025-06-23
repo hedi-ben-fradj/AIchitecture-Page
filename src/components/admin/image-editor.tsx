@@ -20,7 +20,7 @@ export interface Polygon {
     description?: string;
     width: number;
     height: number;
-    makeAsView?: boolean;
+    makeAsEntity?: boolean;
   };
 }
 
@@ -34,7 +34,7 @@ interface DragInfo {
 
 interface ImageEditorProps {
     imageUrl: string;
-    onMakeView?: (viewName: string) => void;
+    onMakeEntity?: (entityName: string) => void;
     initialPolygons?: Polygon[]; // These are expected to be in relative (0-1) format
 }
 
@@ -54,7 +54,7 @@ function distToSegmentSquared(p: Point, v: Point, w: Point): number {
 }
 
 const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
-  ({ imageUrl, onMakeView, initialPolygons = [] }, ref) => {
+  ({ imageUrl, onMakeEntity, initialPolygons = [] }, ref) => {
   // `polygons` state is for internal use and stores coordinates in ABSOLUTE pixels for easier editing.
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [history, setHistory] = useState<Polygon[][]>([[]]);
@@ -176,8 +176,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   const handleSaveDetails = (data: Polygon['details']) => {
     if (!selectedPolygonId || !data) return;
 
-    if (data.makeAsView && data.title && onMakeView) {
-        onMakeView(data.title);
+    if (data.makeAsEntity && data.title && onMakeEntity) {
+        onMakeEntity(data.title);
     }
 
     const newPolygons = polygons.map(p => {

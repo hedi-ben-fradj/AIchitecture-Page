@@ -17,7 +17,7 @@ const selectionDetailsSchema = z.object({
     description: z.string().optional(),
     width: z.coerce.number().positive('Width must be a positive number.'),
     height: z.coerce.number().positive('Height must be a positive number.'),
-    makeAsView: z.boolean().default(false).optional(),
+    makeAsEntity: z.boolean().default(false).optional(),
 });
 
 type SelectionDetailsFormValues = z.infer<typeof selectionDetailsSchema>;
@@ -37,7 +37,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
             description: '',
             width: 0,
             height: 0,
-            makeAsView: false,
+            makeAsEntity: false,
         },
     });
     
@@ -50,7 +50,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
             description: '',
             width: 0,
             height: 0,
-            makeAsView: false,
+            makeAsEntity: false,
           });
         }
     }, [selectionData, form]);
@@ -125,13 +125,13 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
                         </div>
                         <FormField
                             control={form.control}
-                            name="makeAsView"
+                            name="makeAsEntity"
                             render={({ field }) => (
                                 <FormItem className="flex flex-row items-center justify-between rounded-lg border border-neutral-600 p-3 shadow-sm mt-4 bg-[#313131]">
                                     <div className="space-y-0.5">
-                                        <FormLabel>Make View</FormLabel>
+                                        <FormLabel>Make Entity</FormLabel>
                                         <FormDescription className="text-neutral-400">
-                                            Create a new navigable view from this selection.
+                                            Create a new navigable entity from this selection.
                                         </FormDescription>
                                     </div>
                                     <FormControl>
