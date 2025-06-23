@@ -4,7 +4,7 @@ import { useState, useEffect, type MouseEvent, useRef, useCallback } from 'react
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Navigation, X } from 'lucide-react';
+import { Navigation, X, ArrowLeft } from 'lucide-react';
 import type { View, Polygon } from '@/contexts/views-context';
 
 interface RenderedImageRect {
@@ -16,6 +16,7 @@ interface RenderedImageRect {
 
 export default function InteractiveLandingViewer({ projectId }: { projectId: string }) {
     const [currentView, setCurrentView] = useState<View | null>(null);
+    const [viewHistory, setViewHistory] = useState<string[]>([]);
     const [clickedSelection, setClickedSelection] = useState<Polygon | null>(null);
     const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
     const [isLoaded, setIsLoaded] = useState(false);
@@ -66,6 +67,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                 if (landingViewId) {
                     const view = loadView(landingViewId);
                     setCurrentView(view);
+                    setViewHistory([]);
                 }
             }
             setIsLoaded(true);
@@ -131,9 +133,29 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         const viewId = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         const newView = loadView(viewId);
         if (newView) {
+            if (currentView) {
+                setViewHistory(prev => [...prev, currentView.id]);
+            }
             setCurrentView(newView);
         } else {
             alert(`The view "${viewName}" could not be found. It may have been deleted or not yet configured.`);
+        }
+        setClickedSelection(null);
+    };
+
+    const handleBack = () => {
+        if (viewHistory.length === 0) return;
+
+        const previousViewId = viewHistory[viewHistory.length - 1];
+        const previousView = loadView(previousViewId);
+        
+        if (previousView) {
+            setCurrentView(previousView);
+            setViewHistory(prev => prev.slice(0, -1));
+        } else {
+            alert(`The previous view "${previousViewId}" could not be found.`);
+            // still pop from history to prevent getting stuck
+            setViewHistory(prev => prev.slice(0, -1));
         }
         setClickedSelection(null);
     };
@@ -156,6 +178,18 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     
     return (
         <div ref={containerRef} className="relative h-full w-full">
+            {viewHistory.length > 0 && (
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute top-4 left-4 z-20 h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" 
+                    onClick={handleBack}
+                    aria-label="Go back to previous view"
+                >
+                    <ArrowLeft className="h-5 w-5" />
+                </Button>
+            )}
+
             <Image
                 ref={imageRef}
                 src={currentView.imageUrl}
