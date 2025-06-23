@@ -32,6 +32,7 @@ export default function InteractiveLandingViewer() {
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [appliedFilters, setAppliedFilters] = useState<Partial<Filters>>({});
     const [projectId, setProjectId] = useState<string | null>(null);
+    const [detailsPosition, setDetailsPosition] = useState<React.CSSProperties>({ opacity: 0 });
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
@@ -113,6 +114,10 @@ export default function InteractiveLandingViewer() {
         }
     }, [projectId, loadDataFromStorage]);
     
+    const closeDetails = useCallback(() => {
+        setClickedSelection(null);
+        setDetailsPosition({ opacity: 0 }); // For fade-out transition
+    }, []);
 
     const calculateRect = useCallback(() => {
         if (!imageRef.current || !containerRef.current) return;
@@ -160,6 +165,39 @@ export default function InteractiveLandingViewer() {
         e.stopPropagation();
         if (selection.details) {
             setClickedSelection(selection);
+
+            if (renderedImageRect && containerRef.current) {
+                const { x: imgX, y: imgY, width: imgWidth, height: imgHeight } = renderedImageRect;
+                const { clientWidth: containerWidth } = containerRef.current;
+
+                const xCoords = selection.points.map(p => p.x);
+                const yCoords = selection.points.map(p => p.y);
+                const minX = Math.min(...xCoords);
+                const maxX = Math.max(...xCoords);
+                const minY = Math.min(...yCoords);
+
+                const relativeCenterX = (minX + maxX) / 2;
+                
+                const selectionTop = imgY + minY * imgHeight;
+                const selectionLeftEdge = imgX + minX * imgWidth;
+                const selectionRightEdge = imgX + maxX * imgWidth;
+
+                const position: React.CSSProperties = {
+                    position: 'absolute',
+                    top: `${selectionTop}px`,
+                    opacity: 1,
+                    transition: 'opacity 0.3s ease, top 0.3s ease, left 0.3s ease, right 0.3s ease',
+                };
+                
+                if (relativeCenterX > 0.5) {
+                    // Selection is on the right, so panel appears on the left
+                    position.right = `${containerWidth - selectionLeftEdge + 16}px`;
+                } else {
+                    // Selection is on the left, so panel appears on the right
+                    position.left = `${selectionRightEdge + 16}px`;
+                }
+                setDetailsPosition(position);
+            }
         }
     };
 
@@ -177,17 +215,17 @@ export default function InteractiveLandingViewer() {
                 }
                 setCurrentView(newView);
                 setEntityViews(targetEntity.views);
-                setClickedSelection(null);
+                closeDetails();
                 setHoveredSelectionId(null);
                 setRenderedImageRect(null);
                 setTimeout(calculateRect, 0);
             } else {
                  alert(`The default view for entity "${entityName}" could not be found.`);
-                 setClickedSelection(null);
+                 closeDetails();
             }
         } else {
             alert(`The entity "${entityName}" or its default view could not be found.`);
-            setClickedSelection(null);
+            closeDetails();
         }
     };
 
@@ -209,7 +247,7 @@ export default function InteractiveLandingViewer() {
             alert(`The previous view "${previousViewId}" could not be found.`);
             setViewHistory(prev => prev.slice(0, -1));
         }
-        setClickedSelection(null);
+        closeDetails();
         setHoveredSelectionId(null);
         setRenderedImageRect(null);
         setTimeout(calculateRect, 0);
@@ -220,7 +258,7 @@ export default function InteractiveLandingViewer() {
 
         const newFullView: FullView = { ...view, entityId: currentView.entityId };
         setCurrentView(newFullView);
-        setClickedSelection(null);
+        closeDetails();
         setHoveredSelectionId(null);
         setRenderedImageRect(null);
         setTimeout(calculateRect, 0);
@@ -270,7 +308,7 @@ export default function InteractiveLandingViewer() {
     }
     
     return (
-        <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={() => setClickedSelection(null)}>
+        <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={closeDetails}>
             <div className={cn("absolute top-0 left-0 h-full z-40 w-72 transition-transform duration-300 ease-in-out", isFilterOpen ? "translate-x-0" : "-translate-x-full")}>
                 <FilterSidebar onApplyFilters={handleApplyFilters} onResetFilters={handleResetFilters} />
             </div>
@@ -304,11 +342,11 @@ export default function InteractiveLandingViewer() {
             )}
 
             {clickedSelection?.details && (
-                <div className="absolute top-4 right-4 lg:right-[13rem] z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
-                    <Card className="pointer-events-auto bg-black/60 backdrop-blur-sm text-white border-yellow-500 w-72 shadow-2xl animate-in fade-in-50 slide-in-from-right-5">
+                <div style={detailsPosition} className="z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
+                    <Card className="pointer-events-auto bg-black/60 backdrop-blur-sm text-white border-yellow-500 w-72 shadow-2xl animate-in fade-in-50">
                         <CardHeader className="flex-row items-start justify-between pb-2">
                             <CardTitle className="text-base leading-tight pr-2">{clickedSelection.details.title}</CardTitle>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-neutral-400 hover:text-white" onClick={() => setClickedSelection(null)}>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-neutral-400 hover:text-white" onClick={closeDetails}>
                                 <X className="h-4 w-4" />
                             </Button>
                         </CardHeader>
