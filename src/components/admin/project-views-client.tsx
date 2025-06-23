@@ -25,7 +25,7 @@ function EntityCardRecursive({
     entity, 
     allEntities, 
     onDelete, 
-    isLandingEntity, 
+    landingPageEntityId,
     onSetLandingEntity, 
     projectId, 
     level = 0 
@@ -33,7 +33,7 @@ function EntityCardRecursive({
     entity: Entity, 
     allEntities: Entity[],
     onDelete: (entityId: string) => void, 
-    isLandingEntity: boolean, 
+    landingPageEntityId: string | null,
     onSetLandingEntity: (entityId: string | null) => void, 
     projectId: string, 
     level?: number 
@@ -41,6 +41,7 @@ function EntityCardRecursive({
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     
     const children = useMemo(() => allEntities.filter(e => e.parentId === entity.id), [allEntities, entity.id]);
+    const isLandingEntity = landingPageEntityId === entity.id;
 
     const handleDelete = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -108,7 +109,7 @@ function EntityCardRecursive({
                                 entity={child}
                                 allEntities={allEntities}
                                 onDelete={onDelete}
-                                isLandingEntity={landingPageEntityId === child.id}
+                                landingPageEntityId={landingPageEntityId}
                                 onSetLandingEntity={onSetLandingEntity}
                                 projectId={projectId}
                                 level={level + 1}
@@ -141,7 +142,7 @@ export default function ProjectEntitiesClient({ projectName, projectId }: { proj
                   entity={entity}
                   allEntities={entities}
                   onDelete={deleteEntity}
-                  isLandingEntity={landingPageEntityId === entity.id}
+                  landingPageEntityId={landingPageEntityId}
                   onSetLandingEntity={handleSetLanding}
                   projectId={projectId}
                 />
