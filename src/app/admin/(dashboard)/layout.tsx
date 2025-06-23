@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Entity, View } from '@/contexts/views-context';
 import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Camera } from 'lucide-react';
 import Link from 'next/link';
@@ -13,11 +13,74 @@ interface SidebarView {
   name: string;
 }
 
-interface SidebarEntity {
-  id: string;
-  name: string;
-  views: SidebarView[];
+interface SidebarEntity extends Entity {
+  // Use the full Entity type now
 }
+
+// New recursive component for the sidebar
+const EntitySidebarNode = ({ entity, allEntities, projectId, pathname }: { entity: SidebarEntity, allEntities: SidebarEntity[], projectId: string, pathname: string }) => {
+    const children = useMemo(() => allEntities.filter(e => e.parentId === entity.id), [allEntities, entity.id]);
+    const entityHref = `/admin/projects/${projectId}/entities/${entity.id}`;
+    const isEntityActive = pathname.startsWith(entityHref);
+
+    return (
+        <div>
+            <Link
+                href={entityHref}
+                className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
+                    isEntityActive && "bg-neutral-600 text-white"
+                )}
+            >
+                <Eye className="h-4 w-4" />
+                {entity.name}
+            </Link>
+            
+            {/* Render children and views if the entity is active */}
+            {isEntityActive && (
+                 <div className="pl-4 border-l border-neutral-700 ml-5">
+                    {/* Views */}
+                    {entity.views.length > 0 && (
+                        <div className="pt-2 space-y-1">
+                            {entity.views.map(view => {
+                                const viewHref = `/admin/projects/${projectId}/entities/${entity.id}/views/${view.id}`;
+                                const isViewActive = pathname === viewHref;
+                                return (
+                                    <Link
+                                        key={view.id}
+                                        href={viewHref}
+                                        className={cn(
+                                            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
+                                            isViewActive && "bg-neutral-700 text-white"
+                                        )}
+                                    >
+                                        <Camera className="h-4 w-4" />
+                                        {view.name}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
+                    {/* Child Entities */}
+                    {children.length > 0 && (
+                        <div className="pt-2 space-y-1">
+                            {children.map(child => (
+                                <EntitySidebarNode
+                                    key={child.id}
+                                    entity={child}
+                                    allEntities={allEntities}
+                                    projectId={projectId}
+                                    pathname={pathname}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 
 const mainNavItems = [
   { title: 'Home', href: '#', icon: LayoutGrid },
@@ -48,10 +111,9 @@ export default function AdminLayout({
         const projectDataStr = localStorage.getItem(`project-${projectId}-data`);
         if (projectDataStr) {
           const projectData = JSON.parse(projectDataStr);
-          // Map entities and their views for the sidebar
+          // Just load the full entities
           const entitiesForSidebar = projectData.entities?.map((e: Entity) => ({
-            id: e.id,
-            name: e.name,
+            ...e,
             views: e.views?.map((v: View) => ({ id: v.id, name: v.name })) || []
           })) || [];
           setEntities(entitiesForSidebar);
@@ -66,6 +128,8 @@ export default function AdminLayout({
       setEntities([]);
     }
   }, [projectId]);
+
+  const rootEntities = useMemo(() => entities.filter(e => !e.parentId), [entities]);
 
   return (
     <div className="bg-neutral-900 text-foreground min-h-screen flex">
@@ -92,54 +156,23 @@ export default function AdminLayout({
                       href="/admin"
                       className={cn(
                           "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
-                          pathname.startsWith('/admin') && "bg-neutral-700 text-white"
+                          pathname.startsWith('/admin') && !projectId && "bg-neutral-700 text-white"
                       )}
                   >
                       <FolderKanban className="h-4 w-4" />
                       <span>Projects</span>
                   </Link>
-                  {projectId && entities.length > 0 && (
-                      <div className="pl-7 pt-1 space-y-1">
-                          <h3 className="px-3 text-xs font-bold text-neutral-500 tracking-wider uppercase mb-2">ENTITIES</h3>
-                          {entities.map(entity => {
-                              const entityHref = `/admin/projects/${projectId}/entities/${entity.id}`;
-                              const isEntityActive = pathname.startsWith(entityHref);
-                              return (
-                                  <div key={entity.id}>
-                                      <Link
-                                          href={entityHref}
-                                          className={cn(
-                                              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
-                                              isEntityActive && "bg-neutral-600 text-white"
-                                          )}
-                                      >
-                                          <Eye className="h-4 w-4" />
-                                          {entity.name}
-                                      </Link>
-                                      {isEntityActive && entity.views.length > 0 && (
-                                          <div className="pl-7 pt-1 space-y-1">
-                                              {entity.views.map(view => {
-                                                  const viewHref = `/admin/projects/${projectId}/entities/${entity.id}/views/${view.id}`;
-                                                  const isViewActive = pathname === viewHref;
-                                                  return (
-                                                      <Link
-                                                          key={view.id}
-                                                          href={viewHref}
-                                                          className={cn(
-                                                              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
-                                                              isViewActive && "bg-neutral-700 text-white"
-                                                          )}
-                                                      >
-                                                          <Camera className="h-4 w-4" />
-                                                          {view.name}
-                                                      </Link>
-                                                  );
-                                              })}
-                                          </div>
-                                      )}
-                                  </div>
-                              );
-                          })}
+                  {projectId && (
+                      <div className="pl-4 pt-1 space-y-1 border-l border-neutral-700 ml-5">
+                          {rootEntities.map(entity => (
+                             <EntitySidebarNode 
+                                key={entity.id}
+                                entity={entity}
+                                allEntities={entities}
+                                projectId={projectId}
+                                pathname={pathname}
+                             />
+                          ))}
                       </div>
                   )}
                 </div>

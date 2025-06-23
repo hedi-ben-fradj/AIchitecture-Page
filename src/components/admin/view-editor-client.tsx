@@ -100,7 +100,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   };
 
   const handleMakeEntity = (newEntityName: string) => {
-    addEntity(newEntityName);
+    addEntity(newEntityName, entityId);
   };
 
   const triggerFileInput = () => {

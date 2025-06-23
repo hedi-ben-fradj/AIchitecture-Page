@@ -15,6 +15,7 @@ export interface View {
 export interface Entity {
   id: string;
   name: string;
+  parentId?: string | null;
   views: View[];
   defaultViewId: string | null;
 }
@@ -24,7 +25,7 @@ interface ProjectContextType {
   landingPageEntityId: string | null;
   
   // Entity methods
-  addEntity: (entityName: string) => void;
+  addEntity: (entityName: string, parentId?: string | null) => void;
   deleteEntity: (entityId: string) => void;
   getEntity: (entityId: string) => Entity | undefined;
   setLandingPageEntityId: (entityId: string | null) => void;
@@ -62,6 +63,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
           entities: updatedEntities.map(entity => ({
             id: entity.id,
             name: entity.name,
+            parentId: entity.parentId,
             defaultViewId: entity.defaultViewId,
             views: entity.views.map(view => ({
               id: view.id,
@@ -123,7 +125,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     return entity?.views.find(v => v.id === viewId);
   }, [getEntity]);
 
-  const addEntity = useCallback((entityName: string) => {
+  const addEntity = useCallback((entityName: string, parentId: string | null = null) => {
     setEntities(prevEntities => {
       const slug = entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       if (!slug || prevEntities.some(e => e.id === slug)) {
@@ -133,6 +135,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       const newEntity: Entity = {
         id: slug,
         name: entityName,
+        parentId: parentId,
         views: [],
         defaultViewId: null,
       };
@@ -144,20 +147,42 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
   const deleteEntity = useCallback((entityId: string) => {
     const updatedLandingId = landingPageEntityId === entityId ? null : landingPageEntityId;
+    
     setEntities(prevEntities => {
-      const entityToDelete = prevEntities.find(e => e.id === entityId);
-      if (entityToDelete) {
-        // Clean up associated view data from localStorage
-        entityToDelete.views.forEach(view => {
-          try {
-            window.localStorage.removeItem(getStorageKey(`view-image-${view.id}`));
-            window.localStorage.removeItem(getStorageKey(`view-selections-${view.id}`));
-          } catch (error) {
-            console.error(`Failed to remove data for view ${view.id}:`, error);
+      const entitiesToDelete = new Set<string>([entityId]);
+      let changed = true;
+      // Find all children, grandchildren, etc.
+      while(changed) {
+        changed = false;
+        const currentSize = entitiesToDelete.size;
+        prevEntities.forEach(e => {
+          if (e.parentId && entitiesToDelete.has(e.parentId)) {
+            entitiesToDelete.add(e.id);
           }
         });
+        if (entitiesToDelete.size > currentSize) {
+          changed = true;
+        }
       }
-      const updatedEntities = prevEntities.filter(e => e.id !== entityId);
+
+      const entitiesToDeleteArray = Array.from(entitiesToDelete);
+
+      // Clean up associated view data from localStorage
+      entitiesToDeleteArray.forEach(idToDelete => {
+        const entityToDelete = prevEntities.find(e => e.id === idToDelete);
+        if (entityToDelete) {
+          entityToDelete.views.forEach(view => {
+            try {
+              window.localStorage.removeItem(getStorageKey(`view-image-${view.id}`));
+              window.localStorage.removeItem(getStorageKey(`view-selections-${view.id}`));
+            } catch (error) {
+              console.error(`Failed to remove data for view ${view.id}:`, error);
+            }
+          });
+        }
+      });
+      
+      const updatedEntities = prevEntities.filter(e => !entitiesToDelete.has(e.id));
       saveMetadata(updatedEntities, updatedLandingId);
       return updatedEntities;
     });

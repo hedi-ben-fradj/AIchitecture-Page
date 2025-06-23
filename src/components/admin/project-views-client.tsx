@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -20,8 +20,27 @@ import { AddEntityModal } from '@/components/admin/add-entity-modal';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
-function EntityCard({ entity, onDelete, isLandingEntity, onSetLandingEntity, projectId }: { entity: Entity, onDelete: (entityId: string) => void, isLandingEntity: boolean, onSetLandingEntity: (entityId: string | null) => void, projectId: string }) {
+// New recursive component
+function EntityCardRecursive({ 
+    entity, 
+    allEntities, 
+    onDelete, 
+    isLandingEntity, 
+    onSetLandingEntity, 
+    projectId, 
+    level = 0 
+}: { 
+    entity: Entity, 
+    allEntities: Entity[],
+    onDelete: (entityId: string) => void, 
+    isLandingEntity: boolean, 
+    onSetLandingEntity: (entityId: string | null) => void, 
+    projectId: string, 
+    level?: number 
+}) {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    
+    const children = useMemo(() => allEntities.filter(e => e.parentId === entity.id), [allEntities, entity.id]);
 
     const handleDelete = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -41,7 +60,7 @@ function EntityCard({ entity, onDelete, isLandingEntity, onSetLandingEntity, pro
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the "{entity.name}" entity and all its views.
+                            This action cannot be undone. This will permanently delete the "{entity.name}" entity and all its children and associated views.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -50,34 +69,53 @@ function EntityCard({ entity, onDelete, isLandingEntity, onSetLandingEntity, pro
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <div className="group relative">
-                <Link href={`/admin/projects/${projectId}/entities/${entity.id}`}>
-                    <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors min-h-[240px]">
-                        <CardHeader className="flex flex-row items-center gap-4">
-                            <Eye className="h-8 w-8 text-yellow-500" />
-                            <CardTitle className="text-lg font-medium">{entity.name}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-neutral-400">
-                                Contains {entity.views?.length || 0} views.
-                            </p>
-                        </CardContent>
-                    </Card>
-                </Link>
-                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-neutral-600" onClick={handleDelete}>
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
+            <div className="w-full">
+                <div className="group relative">
+                    <Link href={`/admin/projects/${projectId}/entities/${entity.id}`}>
+                        <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg cursor-pointer hover:border-yellow-500 transition-colors">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                  <Eye className="h-8 w-8 text-yellow-500" />
+                                  <CardTitle className="text-lg font-medium">{entity.name}</CardTitle>
+                                </div>
+                                <div className="text-sm text-neutral-400">
+                                    Contains {entity.views?.length || 0} views.
+                                </div>
+                            </CardHeader>
+                        </Card>
+                    </Link>
+                    <div className="absolute top-1/2 -translate-y-1/2 right-4 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <div className="flex items-center gap-2">
+                            <Label htmlFor={`landing-${entity.id}`} className="text-xs text-neutral-400 select-none">Use on Landing</Label>
+                            <Switch
+                              id={`landing-${entity.id}`}
+                              checked={isLandingEntity}
+                              onCheckedChange={(checked) => onSetLandingEntity(checked ? entity.id : null)}
+                              disabled={!entity.defaultViewId}
+                            />
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-neutral-600" onClick={handleDelete}>
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                    </div>
                 </div>
-                 <div className="absolute bottom-4 right-4 flex items-center gap-2">
-                    <Label htmlFor={`landing-${entity.id}`} className="text-xs text-neutral-400 select-none">Use on Landing</Label>
-                    <Switch
-                      id={`landing-${entity.id}`}
-                      checked={isLandingEntity}
-                      onCheckedChange={(checked) => onSetLandingEntity(checked ? entity.id : null)}
-                      disabled={!entity.defaultViewId}
-                    />
-                </div>
+
+                {children.length > 0 && (
+                    <div className="pl-8 pt-4 border-l-2 border-neutral-700 ml-4 space-y-4">
+                        {children.map(child => (
+                            <EntityCardRecursive
+                                key={child.id}
+                                entity={child}
+                                allEntities={allEntities}
+                                onDelete={onDelete}
+                                isLandingEntity={landingPageEntityId === child.id}
+                                onSetLandingEntity={onSetLandingEntity}
+                                projectId={projectId}
+                                level={level + 1}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
         </>
     );
@@ -90,15 +128,18 @@ export default function ProjectEntitiesClient({ projectName, projectId }: { proj
     const handleSetLanding = (entityId: string | null) => {
         setLandingPageEntityId(entityId);
     };
+    
+    const rootEntities = useMemo(() => entities.filter(e => !e.parentId), [entities]);
 
     return (
         <>
         <AddEntityModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {entities.map((entity) => (
-                <EntityCard
+        <div className="space-y-6">
+            {rootEntities.map((entity) => (
+                <EntityCardRecursive
                   key={entity.id}
                   entity={entity}
+                  allEntities={entities}
                   onDelete={deleteEntity}
                   isLandingEntity={landingPageEntityId === entity.id}
                   onSetLandingEntity={handleSetLanding}
@@ -107,11 +148,11 @@ export default function ProjectEntitiesClient({ projectName, projectId }: { proj
             ))}
              <Card 
                 onClick={() => setIsAddModalOpen(true)}
-                className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg border-2 border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 cursor-pointer transition-colors"
+                className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[150px] rounded-lg border-2 border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 cursor-pointer transition-colors"
              >
                 <CardHeader className="items-center text-center p-4">
                     <Plus className="h-8 w-8 mb-2" />
-                    <CardTitle className="text-lg font-medium">Add New Entity</CardTitle>
+                    <CardTitle className="text-lg font-medium">Add New Top-Level Entity</CardTitle>
                 </CardHeader>
             </Card>
         </div>
