@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Entity } from '@/contexts/views-context';
-import { LayoutGrid, FolderKanban, AppWindow, MapPin, User, Settings, LogOut, Eye } from 'lucide-react';
+import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePathname, useParams } from 'next/navigation';
@@ -16,8 +16,6 @@ interface SidebarEntity {
 const mainNavItems = [
   { title: 'Home', href: '#', icon: LayoutGrid },
   // Projects is handled dynamically below
-  { title: 'Apps', href: '#', icon: AppWindow },
-  { title: 'POIs', href: '#', icon: MapPin },
 ];
 
 const bottomNavItems = [
