@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, type MouseEvent, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
@@ -6,6 +7,7 @@ import { Plus, Trash2, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SelectionDetailsModal from './selection-details-modal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { EntityType } from '@/contexts/views-context';
 
 interface Point {
   x: number;
@@ -21,6 +23,7 @@ export interface Polygon {
     width: number;
     height: number;
     makeAsEntity?: boolean;
+    entityType?: EntityType;
   };
 }
 
@@ -34,7 +37,7 @@ interface DragInfo {
 
 interface ImageEditorProps {
     imageUrl: string;
-    onMakeEntity?: (entityName: string) => void;
+    onMakeEntity?: (entityName: string, entityType: EntityType) => void;
     initialPolygons?: Polygon[]; // These are expected to be in relative (0-1) format
 }
 
@@ -176,8 +179,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   const handleSaveDetails = (data: Polygon['details']) => {
     if (!selectedPolygonId || !data) return;
 
-    if (data.makeAsEntity && data.title && onMakeEntity) {
-        onMakeEntity(data.title);
+    if (data.makeAsEntity && data.title && data.entityType && onMakeEntity) {
+        onMakeEntity(data.title, data.entityType);
     }
 
     const newPolygons = polygons.map(p => {

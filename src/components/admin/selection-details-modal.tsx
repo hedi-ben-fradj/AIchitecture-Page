@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect } from 'react';
@@ -11,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import type { Polygon } from './image-editor';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { entityTypes, type EntityType } from '@/contexts/views-context';
 
 const selectionDetailsSchema = z.object({
     title: z.string().min(1, 'Title is required.'),
@@ -18,6 +21,7 @@ const selectionDetailsSchema = z.object({
     width: z.coerce.number().positive('Width must be a positive number.'),
     height: z.coerce.number().positive('Height must be a positive number.'),
     makeAsEntity: z.boolean().default(false).optional(),
+    entityType: z.enum(entityTypes).optional(),
 });
 
 type SelectionDetailsFormValues = z.infer<typeof selectionDetailsSchema>;
@@ -38,9 +42,12 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
             width: 0,
             height: 0,
             makeAsEntity: false,
+            entityType: entityTypes[2], // Default to Apartment
         },
     });
     
+    const makeAsEntity = form.watch('makeAsEntity');
+
     useEffect(() => {
         if (selectionData?.details) {
           form.reset(selectionData.details);
@@ -51,6 +58,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
             width: 0,
             height: 0,
             makeAsEntity: false,
+            entityType: entityTypes[2],
           });
         }
     }, [selectionData, form]);
@@ -143,6 +151,31 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
                                 </FormItem>
                             )}
                         />
+
+                        {makeAsEntity && (
+                           <FormField
+                                control={form.control}
+                                name="entityType"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>New Entity Type</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger className="bg-[#313131] border-neutral-600">
+                                                    <SelectValue placeholder="Select a type" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent className="bg-[#2a2a2a] border-neutral-700 text-white">
+                                                {entityTypes.map(type => (
+                                                    <SelectItem key={type} value={type} className="capitalize hover:bg-neutral-700">{type}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
 
                         <DialogFooter className="pt-4">
                             <Button type="button" variant="ghost" onClick={onClose} className="hover:bg-neutral-700">Cancel</Button>

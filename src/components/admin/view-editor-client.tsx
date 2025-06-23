@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, Save, ArrowLeft } from 'lucide-react';
 import ImageEditor, { type ImageEditorRef } from '@/components/admin/image-editor';
-import { useProjectData } from '@/contexts/views-context';
+import { useProjectData, type EntityType } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
 
 interface ViewEditorClientProps {
@@ -99,8 +100,8 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     if (event.target) event.target.value = '';
   };
 
-  const handleMakeEntity = (newEntityName: string) => {
-    addEntity(newEntityName, entityId);
+  const handleMakeEntity = (newEntityName: string, newEntityType: EntityType) => {
+    addEntity(newEntityName, newEntityType, entityId);
   };
 
   const triggerFileInput = () => {

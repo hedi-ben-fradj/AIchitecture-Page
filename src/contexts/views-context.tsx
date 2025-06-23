@@ -5,6 +5,16 @@ import React, { createContext, useContext, useState, useCallback, type ReactNode
 import { Eye, type LucideIcon } from 'lucide-react';
 import type { Polygon } from '@/components/admin/image-editor';
 
+// Entity Types
+export const entityTypes = [
+  'residential compound',
+  'residential building',
+  'Apartment',
+  'house',
+] as const;
+
+export type EntityType = (typeof entityTypes)[number];
+
 // Interfaces
 export interface View {
   id: string;
@@ -16,6 +26,7 @@ export interface View {
 export interface Entity {
   id: string;
   name: string;
+  entityType: EntityType;
   parentId?: string | null;
   views: View[];
   defaultViewId: string | null;
@@ -26,7 +37,7 @@ interface ProjectContextType {
   landingPageEntityId: string | null;
   
   // Entity methods
-  addEntity: (entityName: string, parentId?: string | null) => void;
+  addEntity: (entityName: string, entityType: EntityType, parentId?: string | null) => void;
   deleteEntity: (entityId: string) => void;
   getEntity: (entityId: string) => Entity | undefined;
   setLandingPageEntityId: (entityId: string | null) => void;
@@ -64,6 +75,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
           entities: updatedEntities.map(entity => ({
             id: entity.id,
             name: entity.name,
+            entityType: entity.entityType,
             parentId: entity.parentId,
             defaultViewId: entity.defaultViewId,
             views: entity.views.map(view => ({
@@ -94,6 +106,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
             
             loadedEntities = projectData.entities.map((entityMeta: any) => ({
               ...entityMeta,
+              entityType: entityMeta.entityType || 'Apartment', // Default for legacy data
               views: entityMeta.views.map((viewMeta: any) => {
                 const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${viewMeta.id}`)) || undefined;
                 const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${viewMeta.id}`));
@@ -126,7 +139,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     return entity?.views.find(v => v.id === viewId);
   }, [getEntity]);
 
-  const addEntity = useCallback((entityName: string, parentId: string | null = null) => {
+  const addEntity = useCallback((entityName: string, entityType: EntityType, parentId: string | null = null) => {
     setEntities(prevEntities => {
       const slug = entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       if (!slug || prevEntities.some(e => e.id === slug)) {
@@ -136,6 +149,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       const newEntity: Entity = {
         id: slug,
         name: entityName,
+        entityType: entityType,
         parentId: parentId,
         views: [],
         defaultViewId: null,

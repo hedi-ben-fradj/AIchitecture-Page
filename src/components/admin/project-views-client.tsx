@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Building } from 'lucide-react';
@@ -74,13 +75,18 @@ function EntityCardRecursive({
                 <div className="group relative">
                     <Link href={`/admin/projects/${projectId}/entities/${entity.id}`}>
                         <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg cursor-pointer hover:border-yellow-500 transition-colors">
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                  <Building className="h-8 w-8 text-yellow-500" />
-                                  <CardTitle className="text-lg font-medium">{entity.name}</CardTitle>
-                                </div>
-                                <div className="text-sm text-neutral-400">
-                                    Contains {entity.views?.length || 0} views.
+                            <CardHeader>
+                                <div className="flex flex-row items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                      <Building className="h-8 w-8 text-yellow-500" />
+                                      <div>
+                                          <CardTitle className="text-lg font-medium">{entity.name}</CardTitle>
+                                          <p className="text-sm text-neutral-400 capitalize">{entity.entityType}</p>
+                                      </div>
+                                    </div>
+                                    <div className="text-sm text-neutral-400">
+                                        {`Contains ${entity.views?.length || 0} views`}
+                                    </div>
                                 </div>
                             </CardHeader>
                         </Card>

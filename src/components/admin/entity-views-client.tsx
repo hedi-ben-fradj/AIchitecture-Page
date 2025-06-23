@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, Eye, ArrowLeft, Building } from 'lucide-react';
@@ -11,7 +12,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -139,8 +139,8 @@ function EntityCard({ entity, onDelete, projectId }: { entity: Entity, onDelete:
                        </div>
                        <div className="p-4 border-t border-neutral-700 shrink-0">
                             <CardTitle className="text-lg font-medium truncate">{entity.name}</CardTitle>
-                            <p className="text-sm text-neutral-400 mt-1">
-                                {`Contains ${entity.views?.length || 0} views, ${childCount} children.`}
+                            <p className="text-sm text-neutral-400 mt-1 capitalize">
+                                {entity.entityType} &middot; {`Contains ${entity.views?.length || 0} views, ${childCount} children.`}
                             </p>
                         </div>
                     </Card>
