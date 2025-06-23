@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Check, Eye, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Eye } from 'lucide-react';
 import { useProjectData, type Entity } from '@/contexts/views-context';
 import {
   AlertDialog,
@@ -87,7 +87,6 @@ export default function ProjectEntitiesClient({ projectName, projectId }: { proj
     const { entities, deleteEntity, landingPageEntityId, setLandingPageEntityId } = useProjectData();
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    // This component now manages the selected landing entity ID directly
     const handleSetLanding = (entityId: string | null) => {
         setLandingPageEntityId(entityId);
     };
@@ -95,40 +94,26 @@ export default function ProjectEntitiesClient({ projectName, projectId }: { proj
     return (
         <>
         <AddEntityModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-        <div className="flex flex-col h-full bg-[#313131]">
-             <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 border-b border-neutral-700 bg-[#3c3c3c]">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" asChild className="hover:bg-neutral-700">
-                        <Link href="/admin">
-                            <ArrowLeft className="h-5 w-5 text-white" />
-                        </Link>
-                    </Button>
-                    <h1 className="text-xl font-semibold text-white">{projectName} / Entities</h1>
-                </div>
-            </header>
-            <div className="flex-1 p-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {entities.map((entity) => (
-                        <EntityCard
-                          key={entity.id}
-                          entity={entity}
-                          onDelete={deleteEntity}
-                          isLandingEntity={landingPageEntityId === entity.id}
-                          onSetLandingEntity={handleSetLanding}
-                          projectId={projectId}
-                        />
-                    ))}
-                     <Card 
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg border-2 border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 cursor-pointer transition-colors"
-                     >
-                        <CardHeader className="items-center text-center p-4">
-                            <Plus className="h-8 w-8 mb-2" />
-                            <CardTitle className="text-lg font-medium">Add New Entity</CardTitle>
-                        </CardHeader>
-                    </Card>
-                </div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {entities.map((entity) => (
+                <EntityCard
+                  key={entity.id}
+                  entity={entity}
+                  onDelete={deleteEntity}
+                  isLandingEntity={landingPageEntityId === entity.id}
+                  onSetLandingEntity={handleSetLanding}
+                  projectId={projectId}
+                />
+            ))}
+             <Card 
+                onClick={() => setIsAddModalOpen(true)}
+                className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg border-2 border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 cursor-pointer transition-colors"
+             >
+                <CardHeader className="items-center text-center p-4">
+                    <Plus className="h-8 w-8 mb-2" />
+                    <CardTitle className="text-lg font-medium">Add New Entity</CardTitle>
+                </CardHeader>
+            </Card>
         </div>
         </>
     );

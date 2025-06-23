@@ -105,41 +105,27 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
     return (
         <>
         <AddViewModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} entityId={entityId} />
-        <div className="flex flex-col h-full bg-[#313131]">
-             <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 border-b border-neutral-700 bg-[#3c3c3c]">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" asChild className="hover:bg-neutral-700">
-                        <Link href={`/admin/projects/${projectId}`}>
-                           <ArrowLeft className="h-5 w-5 text-white" />
-                        </Link>
-                    </Button>
-                    <h1 className="text-xl font-semibold text-white">{entity.name} / Views</h1>
-                </div>
-            </header>
-            <div className="flex-1 p-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {entity.views.map((view) => (
-                        <ViewCard
-                          key={view.id}
-                          view={view}
-                          onDelete={(viewId) => deleteView(entityId, viewId)}
-                          isDefaultView={entity.defaultViewId === view.id}
-                          onSetDefaultView={(viewId) => setDefaultViewId(entityId, viewId)}
-                          projectId={projectId}
-                          entityId={entityId}
-                        />
-                    ))}
-                     <Card 
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg border-2 border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 cursor-pointer transition-colors"
-                     >
-                        <CardHeader className="items-center text-center p-4">
-                            <Plus className="h-8 w-8 mb-2" />
-                            <CardTitle className="text-lg font-medium">Add New View</CardTitle>
-                        </CardHeader>
-                    </Card>
-                </div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {entity.views.map((view) => (
+                <ViewCard
+                  key={view.id}
+                  view={view}
+                  onDelete={(viewId) => deleteView(entityId, viewId)}
+                  isDefaultView={entity.defaultViewId === view.id}
+                  onSetDefaultView={(viewId) => setDefaultViewId(entityId, viewId)}
+                  projectId={projectId}
+                  entityId={entityId}
+                />
+            ))}
+             <Card 
+                onClick={() => setIsAddModalOpen(true)}
+                className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg border-2 border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 cursor-pointer transition-colors"
+             >
+                <CardHeader className="items-center text-center p-4">
+                    <Plus className="h-8 w-8 mb-2" />
+                    <CardTitle className="text-lg font-medium">Add New View</CardTitle>
+                </CardHeader>
+            </Card>
         </div>
         </>
     );
