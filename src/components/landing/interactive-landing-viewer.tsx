@@ -20,7 +20,6 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     const [viewHistory, setViewHistory] = useState<string[]>([]);
     const [clickedSelection, setClickedSelection] = useState<Polygon | null>(null);
     const [hoveredSelectionId, setHoveredSelectionId] = useState<number | null>(null);
-    const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
     const [isLoaded, setIsLoaded] = useState(false);
     const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
 
@@ -133,18 +132,10 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         };
     }, [calculateRect]);
 
-    const handlePolygonClick = (e: MouseEvent, selection: Polygon) => {
+    const handleSelectionClick = (e: MouseEvent, selection: Polygon) => {
         e.stopPropagation();
         if (selection.details) {
             setClickedSelection(selection);
-            const containerBounds = containerRef.current?.getBoundingClientRect();
-            if (containerBounds) {
-                const clickX = e.clientX - containerBounds.left;
-                const clickY = e.clientY - containerBounds.top;
-                setCardPosition({ x: clickX, y: clickY });
-            } else {
-                 setCardPosition({ x: e.clientX, y: e.clientY });
-            }
         }
     };
 
@@ -247,11 +238,16 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                             key={selection.id}
                             points={selection.points.map(p => `${p.x * renderedImageRect.width},${p.y * renderedImageRect.height}`).join(' ')}
                             className={cn(
-                                "stroke-yellow-500 stroke-2 transition-all cursor-pointer",
-                                hoveredSelectionId === selection.id ? "fill-yellow-400/40" : "fill-yellow-400/20",
+                                "stroke-2 transition-all cursor-pointer",
+                                clickedSelection?.id === selection.id
+                                  ? "stroke-yellow-400 fill-yellow-400/50"
+                                  : "stroke-yellow-500 fill-yellow-400/20",
+                                hoveredSelectionId === selection.id && clickedSelection?.id !== selection.id && "fill-yellow-400/40",
                                 "hover:fill-yellow-400/40"
                             )}
-                            onClick={(e) => handlePolygonClick(e, selection)}
+                            onClick={(e) => handleSelectionClick(e, selection)}
+                            onMouseEnter={() => setHoveredSelectionId(selection.id)}
+                            onMouseLeave={() => setHoveredSelectionId(null)}
                         />
                     ))}
                 </svg>
@@ -259,13 +255,10 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
 
             {clickedSelection?.details && (
                 <div
-                    className="absolute z-30 pointer-events-none"
-                    style={{ 
-                        top: Math.min(cardPosition.y + 10, (containerRef.current?.clientHeight || 0) - 200),
-                        left: Math.min(cardPosition.x + 10, (containerRef.current?.clientWidth || 0) - 270)
-                    }}
+                    className="absolute top-0 right-0 z-30 h-full p-4 flex items-center pointer-events-none"
+                    onClick={(e) => e.stopPropagation()}
                 >
-                    <Card className="pointer-events-auto bg-black/80 backdrop-blur-sm text-white border-yellow-500 w-64 shadow-2xl animate-in fade-in-50">
+                    <Card className="pointer-events-auto bg-black/80 backdrop-blur-sm text-white border-yellow-500 w-72 shadow-2xl animate-in fade-in-50 slide-in-from-right-5">
                         <CardHeader className="flex-row items-start justify-between pb-2">
                             <CardTitle className="text-base leading-tight pr-2">{clickedSelection.details.title}</CardTitle>
                             <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-neutral-400 hover:text-white" onClick={() => setClickedSelection(null)}>
@@ -304,12 +297,15 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                                     key={selection.id}
                                     className={cn(
                                         "w-56 bg-black/70 backdrop-blur-sm text-white border-neutral-700 transition-colors shrink-0",
-                                        selection.details?.makeAsView && "cursor-pointer hover:border-yellow-500",
-                                        hoveredSelectionId === selection.id && "border-yellow-500"
+                                        "cursor-pointer hover:border-yellow-500",
+                                        (hoveredSelectionId === selection.id || clickedSelection?.id === selection.id) && "border-yellow-500"
                                     )}
                                     onMouseEnter={() => setHoveredSelectionId(selection.id)}
                                     onMouseLeave={() => setHoveredSelectionId(null)}
-                                    onClick={() => selection.details?.makeAsView && handleNavigate(selection.details!.title)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSelectionClick(e, selection);
+                                    }}
                                 >
                                     <CardHeader className="p-4">
                                         <CardTitle className="text-base truncate">{selection.details?.title}</CardTitle>
