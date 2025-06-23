@@ -241,7 +241,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       }
 
       const alreadyExists = targetEntity.views.some(v => {
-          const existingSlug = v.id.split('/').pop();
+          const existingSlug = v.id.split('__').pop();
           return existingSlug === viewSlug;
       });
       
@@ -266,7 +266,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       };
       
       const entityPath = getEntityPath(entityId, prevEntities);
-      const newViewId = [...entityPath, viewSlug].join('/');
+      const newViewId = [...entityPath, viewSlug].join('__');
 
       const newView: View = { id: newViewId, name: viewName };
       newViewHref = `/admin/projects/${projectId}/entities/${entityId}/views/${encodeURIComponent(newViewId)}`;
