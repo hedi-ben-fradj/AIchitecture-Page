@@ -143,30 +143,31 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         }
     };
 
-    const handleNavigate = (viewName: string) => {
-        const viewId = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const handleNavigate = (entityName: string) => {
+        const entityId = entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         
-        if (currentView && currentView.id === viewId) {
-            setClickedSelection(null);
-            return;
-        }
-
         const { entities } = loadDataFromStorage();
-        const newView = findViewInEntities(entities, viewId);
+        const targetEntity = entities.find(e => e.id === entityId);
         
-        if (newView) {
-            if (currentView) {
-                setViewHistory(prev => [...prev, currentView.id]);
+        if (targetEntity && targetEntity.defaultViewId) {
+            const newView = findViewInEntities(entities, targetEntity.defaultViewId);
+            if (newView) {
+                if (currentView) {
+                    setViewHistory(prev => [...prev, currentView.id]);
+                }
+                setCurrentView(newView);
+                setClickedSelection(null);
+                setHoveredSelectionId(null);
+                setRenderedImageRect(null);
+                setTimeout(calculateRect, 0);
+            } else {
+                 alert(`The default view for entity "${entityName}" could not be found.`);
+                 setClickedSelection(null);
             }
-            setCurrentView(newView);
-            setClickedSelection(null);
-            setHoveredSelectionId(null);
-            setRenderedImageRect(null);
-            setTimeout(calculateRect, 0);
         } else {
-            alert(`The view "${viewName}" could not be found.`);
+            alert(`The entity "${entityName}" or its default view could not be found.`);
+            setClickedSelection(null);
         }
-        setClickedSelection(null);
     };
 
     const handleBack = () => {
@@ -286,7 +287,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                                 <span className="font-mono">{clickedSelection.details.height}m</span>
                             </div>
                         </CardContent>
-                         {clickedSelection.details.makeAsView && clickedSelection.details.title && (
+                         {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
                             <CardFooter>
                                 <Button className="w-full bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedSelection.details!.title)}>
                                     <Navigation className="mr-2 h-4 w-4" />

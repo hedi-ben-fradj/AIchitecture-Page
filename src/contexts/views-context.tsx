@@ -43,7 +43,7 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 // Storage a single key for all metadata, and separate keys for large data (images)
 type ProjectMetadata = {
   landingPageEntityId: string | null;
-  entities: Entity[];
+  entities: Omit<Entity, 'views'> & { views: Omit<View, 'imageUrl' | 'selections'>[] };
 };
 
 export function ViewsProvider({ children, projectId }: { children: ReactNode; projectId: string }) {
@@ -56,17 +56,18 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   const saveMetadata = useCallback((updatedEntities: Entity[], updatedLandingId: string | null) => {
     if (typeof window !== 'undefined') {
       try {
-        const metadata: ProjectMetadata = {
+        const metadata = {
           landingPageEntityId: updatedLandingId,
           // Strip large data fields before saving metadata
           entities: updatedEntities.map(entity => ({
-            ...entity,
+            id: entity.id,
+            name: entity.name,
+            defaultViewId: entity.defaultViewId,
             views: entity.views.map(view => ({
               id: view.id,
               name: view.name,
-              defaultViewId: (entity as any).defaultViewId, // Keep defaultViewId for entity
-            }))
-          }))
+            })),
+          })),
         };
         window.localStorage.setItem(getStorageKey('data'), JSON.stringify(metadata));
       } catch (error) {
@@ -83,14 +84,14 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         let loadedLandingId: string | null = null;
         
         if (projectDataStr) {
-          const projectData: ProjectMetadata = JSON.parse(projectDataStr);
+          const projectData = JSON.parse(projectDataStr);
           
           if (projectData && Array.isArray(projectData.entities)) {
             loadedLandingId = projectData.landingPageEntityId || null;
             
-            loadedEntities = projectData.entities.map(entityMeta => ({
+            loadedEntities = projectData.entities.map((entityMeta: any) => ({
               ...entityMeta,
-              views: entityMeta.views.map(viewMeta => {
+              views: entityMeta.views.map((viewMeta: any) => {
                 const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${viewMeta.id}`)) || undefined;
                 const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${viewMeta.id}`));
                 const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
