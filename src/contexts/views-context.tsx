@@ -233,16 +233,20 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         console.error(`Entity with id "${entityId}" not found.`);
         return prevEntities;
       }
-
-      const hasDuplicateName = targetEntity.views.some(v => v.name.toLowerCase() === viewName.toLowerCase());
-      if (hasDuplicateName) {
-        alert(`A view with the name "${viewName}" already exists in this entity. Please choose a different name.`);
+      
+      const viewSlug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      if (!viewSlug) {
+        alert("Invalid view name. The name must contain alphanumeric characters.");
         return prevEntities;
       }
 
-      const viewSlug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      if (!viewSlug) {
-        alert("Invalid view name.");
+      const alreadyExists = targetEntity.views.some(v => {
+          const existingSlug = v.id.split('/').pop();
+          return existingSlug === viewSlug;
+      });
+      
+      if (alreadyExists) {
+        alert(`A view with a name that generates the same URL slug ("${viewSlug}") already exists in this entity. Please choose a different name.`);
         return prevEntities;
       }
 
