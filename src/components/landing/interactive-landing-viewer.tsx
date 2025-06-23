@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo } from 'react';
@@ -313,7 +314,7 @@ export default function InteractiveLandingViewer() {
                 <FilterSidebar onApplyFilters={handleApplyFilters} onResetFilters={handleResetFilters} />
             </div>
             
-            <div className="absolute top-4 left-4 z-50 flex gap-2">
+            <div className={cn("absolute top-4 z-50 flex gap-2 transition-all duration-300 ease-in-out", isFilterOpen ? "left-[19rem]" : "left-4")}>
                  <Button variant="ghost" size="icon" className="h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" onClick={() => setIsFilterOpen(!isFilterOpen)} aria-label={isFilterOpen ? "Close filters" : "Open filters"}>
                     {isFilterOpen ? <X className="h-5 w-5" /> : <SlidersHorizontal className="h-5 w-5" />}
                 </Button>
