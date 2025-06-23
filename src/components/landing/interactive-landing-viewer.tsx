@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, type MouseEvent, useRef, useCallback } from 'react';
+import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Navigation, X, ArrowLeft } from 'lucide-react';
+import { Navigation, X, ArrowLeft, SlidersHorizontal } from 'lucide-react';
 import type { View, Polygon } from '@/contexts/views-context';
 import { cn } from '@/lib/utils';
+import FilterSidebar, { type Filters } from './filter-sidebar';
 
 interface RenderedImageRect {
     x: number;
@@ -22,6 +23,8 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     const [hoveredSelectionId, setHoveredSelectionId] = useState<number | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [appliedFilters, setAppliedFilters] = useState<Partial<Filters>>({});
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
@@ -182,6 +185,44 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         setTimeout(calculateRect, 0);
     };
 
+    const filteredSelections = useMemo(() => {
+        if (!currentView?.selections) return [];
+
+        const selectionsWithDetails = currentView.selections.filter(s => s.details);
+
+        const hasFilters = Object.values(appliedFilters).some(val => val !== '' && val !== undefined);
+
+        if (!hasFilters) {
+            return selectionsWithDetails;
+        }
+
+        return selectionsWithDetails.filter(selection => {
+            const { width, height } = selection.details!;
+            const { minWidth, maxWidth, minHeight, maxHeight } = appliedFilters;
+
+            const widthPass = 
+                (minWidth === undefined || minWidth === '' || width >= Number(minWidth)) &&
+                (maxWidth === undefined || maxWidth === '' || width <= Number(maxWidth));
+            
+            const heightPass =
+                (minHeight === undefined || minHeight === '' || height >= Number(minHeight)) &&
+                (maxHeight === undefined || maxHeight === '' || height <= Number(maxHeight));
+            
+            return widthPass && heightPass;
+        });
+    }, [currentView?.selections, appliedFilters]);
+
+    const handleApplyFilters = (filters: Filters) => {
+        setAppliedFilters(filters);
+        setIsFilterOpen(false);
+    };
+
+    const handleResetFilters = () => {
+        setAppliedFilters({});
+        setIsFilterOpen(false);
+    };
+
+
     if (!isLoaded) {
         return (
              <div className="h-full w-full flex items-center justify-center bg-neutral-900">
@@ -200,17 +241,35 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     
     return (
         <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={() => setClickedSelection(null)}>
-            {viewHistory.length > 0 && (
-                <Button 
+            <div className={cn(
+                "absolute top-0 left-0 h-full z-40 w-72 transition-transform duration-300 ease-in-out",
+                isFilterOpen ? "translate-x-0" : "-translate-x-full"
+            )}>
+                <FilterSidebar onApplyFilters={handleApplyFilters} onResetFilters={handleResetFilters} />
+            </div>
+            
+            <div className="absolute top-4 left-4 z-50 flex gap-2">
+                 <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="absolute top-4 left-4 z-30 h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" 
-                    onClick={handleBack}
-                    aria-label="Go back to previous view"
+                    className="h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" 
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    aria-label={isFilterOpen ? "Close filters" : "Open filters"}
                 >
-                    <ArrowLeft className="h-5 w-5" />
+                    {isFilterOpen ? <X className="h-5 w-5" /> : <SlidersHorizontal className="h-5 w-5" />}
                 </Button>
-            )}
+                {viewHistory.length > 0 && (
+                     <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" 
+                        onClick={handleBack}
+                        aria-label="Go back to previous view"
+                    >
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                )}
+            </div>
 
             <Image
                 ref={imageRef}
@@ -224,7 +283,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                 style={{ opacity: renderedImageRect ? 1 : 0 }}
             />
             
-            {renderedImageRect && currentView.selections && currentView.selections.length > 0 && (
+            {renderedImageRect && (
                  <svg 
                     className="absolute top-0 left-0 w-full h-full z-10"
                     style={{
@@ -233,7 +292,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                         height: renderedImageRect.height,
                     }}
                 >
-                    {currentView.selections.map(selection => (
+                    {filteredSelections.map(selection => (
                         <polygon
                             key={selection.id}
                             points={selection.points.map(p => `${p.x * renderedImageRect.width},${p.y * renderedImageRect.height}`).join(' ')}
@@ -288,11 +347,11 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                 </div>
             )}
             
-            {currentView?.selections && currentView.selections.some(s => s.details) && (
+            {filteredSelections.length > 0 && (
                 <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent pointer-events-none">
-                    <div className="pointer-events-auto overflow-x-auto pb-2 -mb-2">
+                    <div className="pointer-events-auto overflow-x-auto pb-2 -mb-2 flex justify-center">
                         <div className="flex gap-4 w-max">
-                            {currentView.selections.filter(s => s.details).map((selection) => (
+                            {filteredSelections.map((selection) => (
                                 <Card
                                     key={selection.id}
                                     className={cn(
