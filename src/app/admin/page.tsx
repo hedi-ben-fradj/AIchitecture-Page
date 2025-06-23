@@ -1,4 +1,2 @@
-// This page is intentionally left blank to delegate rendering to the (dashboard) route group page, resolving a route conflict.
-export default function AdminRootPage() {
-  return null;
-}
+// This file re-exports the page from the (dashboard) route group to resolve the routing conflict.
+export { default } from './(dashboard)/page';

@@ -1,6 +1,2 @@
-import type { ReactNode } from 'react';
-
-// This layout is intentionally minimal to delegate rendering to the (dashboard) route group layout, resolving a route conflict.
-export default function AdminRootLayout({ children }: { children: ReactNode }) {
-  return <>{children}</>;
-}
+// This file re-exports the layout from the (dashboard) route group to resolve the routing conflict.
+export { default } from './(dashboard)/layout';
