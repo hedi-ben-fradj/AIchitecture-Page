@@ -21,7 +21,7 @@ interface FullView extends View {
     entityId: string;
 }
 
-export default function InteractiveLandingViewer({ projectId }: { projectId: string }) {
+export default function InteractiveLandingViewer() {
     const [currentView, setCurrentView] = useState<FullView | null>(null);
     const [viewHistory, setViewHistory] = useState<string[]>([]); // Stores view IDs
     const [clickedSelection, setClickedSelection] = useState<Polygon | null>(null);
@@ -30,14 +30,18 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [appliedFilters, setAppliedFilters] = useState<Partial<Filters>>({});
+    const [projectId, setProjectId] = useState<string | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
 
-    const getStorageKey = useCallback((key: string) => `project-${projectId}-${key}`, [projectId]);
+    const getStorageKey = useCallback((key: string) => {
+        if (!projectId) return '';
+        return `project-${projectId}-${key}`;
+    }, [projectId]);
 
     const loadDataFromStorage = useCallback(() => {
-        if (typeof window === 'undefined') return { entities: [], landingPageEntityId: null };
+        if (typeof window === 'undefined' || !projectId) return { entities: [], landingPageEntityId: null };
         try {
             const projectDataStr = localStorage.getItem(getStorageKey('data'));
             if (!projectDataStr) return { entities: [], landingPageEntityId: null };
@@ -64,7 +68,7 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
             console.error("Failed to load project data from storage", error);
             return { entities: [], landingPageEntityId: null };
         }
-    }, [getStorageKey]);
+    }, [getStorageKey, projectId]);
 
     const findViewInEntities = (entities: Entity[], viewId: string): FullView | null => {
         for (const entity of entities) {
@@ -78,6 +82,13 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
     
     useEffect(() => {
         if (typeof window !== 'undefined') {
+            const landingProjectId = window.localStorage.getItem('landing_project_id');
+            setProjectId(landingProjectId);
+        }
+    }, []);
+    
+    useEffect(() => {
+        if (typeof window !== 'undefined' && projectId) {
             setIsLoaded(false);
             const { entities, landingPageEntityId } = loadDataFromStorage();
             
@@ -87,9 +98,14 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
                     const defaultView = findViewInEntities(entities, landingEntity.defaultViewId);
                     setCurrentView(defaultView);
                 }
+            } else {
+                setCurrentView(null);
             }
             setViewHistory([]);
             setIsLoaded(true);
+        } else {
+             setIsLoaded(true);
+             setCurrentView(null);
         }
     }, [projectId, loadDataFromStorage]);
     
@@ -229,8 +245,8 @@ export default function InteractiveLandingViewer({ projectId }: { projectId: str
         return <div className="h-full w-full flex items-center justify-center bg-neutral-900"><p className="text-muted-foreground animate-pulse">Loading View...</p></div>;
     }
 
-    if (!currentView || !currentView.imageUrl) {
-        return <div className="h-full w-full flex items-center justify-center bg-muted"><p className="text-muted-foreground">No interactive view has been configured.</p></div>;
+    if (!projectId || !currentView || !currentView.imageUrl) {
+        return <div className="h-full w-full flex items-center justify-center bg-muted"><p className="text-muted-foreground">No interactive view has been configured for the landing page.</p></div>;
     }
     
     return (

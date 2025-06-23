@@ -170,7 +170,17 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   const setLandingPageEntityId = useCallback((entityId: string | null) => {
     setLandingPageEntityIdState(entityId);
     saveMetadata(entities, entityId);
-  }, [entities, saveMetadata]);
+     if (typeof window !== 'undefined') {
+        if (entityId) {
+            window.localStorage.setItem('landing_project_id', projectId);
+        } else {
+            const currentLandingProject = window.localStorage.getItem('landing_project_id');
+            if (currentLandingProject === projectId) {
+                window.localStorage.removeItem('landing_project_id');
+            }
+        }
+    }
+  }, [entities, saveMetadata, projectId]);
 
   const addView = useCallback((entityId: string, viewName: string) => {
     const slug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
