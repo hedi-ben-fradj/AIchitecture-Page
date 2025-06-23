@@ -1,30 +1,101 @@
+'use client';
+
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface Project {
+    id: string;
+    name: string;
+    description: string;
+}
 
 export default function AdminProjectsPage() {
+    const [projects, setProjects] = useState<Project[]>([
+        { id: 'porto-montenegro', name: 'Porto Montenegro', description: 'description placeholder' }
+    ]);
+    const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+
+    const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setProjectToDelete(project);
+    };
+
+    const confirmDelete = () => {
+        if (!projectToDelete) return;
+
+        // Remove from localStorage
+        if (typeof window !== 'undefined') {
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith(`project-${projectToDelete.id}-`)) {
+                    localStorage.removeItem(key);
+                }
+            });
+        }
+
+        // Remove from state
+        setProjects(projects.filter(p => p.id !== projectToDelete.id));
+        setProjectToDelete(null);
+    };
+
     return (
         <>
+            <AlertDialog open={!!projectToDelete} onOpenChange={() => setProjectToDelete(null)}>
+                <AlertDialogContent className="bg-[#2a2a2a] border-neutral-700 text-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the "{projectToDelete?.name}" project and all of its associated data.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="hover:bg-neutral-700" onClick={() => setProjectToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             <header className="h-16 flex items-center px-6 border-b border-neutral-700 bg-[#2a2a2a] flex-shrink-0">
                 <h1 className="text-xl font-semibold text-white">Projects</h1>
             </header>
             <main className="flex-1 p-8 bg-[#313131]">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    <Link href="/admin/projects/porto-montenegro">
-                        <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors flex flex-col justify-between min-h-[240px]">
-                            <div>
-                                <CardHeader>
-                                    <CardTitle className="text-lg font-medium">Porto Montenegro</CardTitle>
-                                </CardHeader>
-                                <CardContent className="pt-2">
-                                    <p className="text-sm text-neutral-400">
-                                        description placeholder
-                                    </p>
-                                </CardContent>
+                    {projects.map(project => (
+                        <div key={project.id} className="group relative">
+                            <Link href={`/admin/projects/${project.id}`} className="block h-full">
+                                <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors flex flex-col justify-between min-h-[240px]">
+                                    <div>
+                                        <CardHeader>
+                                            <CardTitle className="text-lg font-medium">{project.name}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="pt-2">
+                                            <p className="text-sm text-neutral-400">
+                                                {project.description}
+                                            </p>
+                                        </CardContent>
+                                    </div>
+                                </Card>
+                            </Link>
+                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-neutral-600 text-red-500 hover:text-red-400" onClick={(e) => handleDeleteClick(e, project)}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
                             </div>
-                        </Card>
-                    </Link>
+                        </div>
+                    ))}
 
                     <Card className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg">
                         <CardHeader className="items-center text-center p-4">
