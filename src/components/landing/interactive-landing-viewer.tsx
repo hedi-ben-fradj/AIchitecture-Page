@@ -310,11 +310,17 @@ export default function InteractiveLandingViewer() {
     
     return (
         <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={closeDetails}>
-            <div className={cn("absolute top-0 left-0 h-full z-40 w-72 transition-transform duration-300 ease-in-out", isFilterOpen ? "translate-x-0" : "-translate-x-full")}>
+            <div
+                className={cn("absolute top-0 left-0 h-full z-40 w-72 transition-transform duration-300 ease-in-out", isFilterOpen ? "translate-x-0" : "-translate-x-full")}
+                onClick={(e) => e.stopPropagation()}
+            >
                 <FilterSidebar onApplyFilters={handleApplyFilters} onResetFilters={handleResetFilters} />
             </div>
             
-            <div className={cn("absolute top-4 z-50 flex gap-2 transition-all duration-300 ease-in-out", isFilterOpen ? "left-[19rem]" : "left-4")}>
+            <div
+                className={cn("absolute top-4 z-50 flex gap-2 transition-all duration-300 ease-in-out", isFilterOpen ? "left-[19rem]" : "left-4")}
+                onClick={(e) => e.stopPropagation()}
+            >
                  <Button variant="ghost" size="icon" className="h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" onClick={() => setIsFilterOpen(!isFilterOpen)} aria-label={isFilterOpen ? "Close filters" : "Open filters"}>
                     {isFilterOpen ? <X className="h-5 w-5" /> : <SlidersHorizontal className="h-5 w-5" />}
                 </Button>

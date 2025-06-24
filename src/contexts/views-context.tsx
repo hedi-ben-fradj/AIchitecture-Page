@@ -20,6 +20,7 @@ export interface View {
   id: string;
   name: string;
   imageUrl?: string;
+  type?: "2d" | "360";
   selections?: Polygon[];
 }
 
@@ -114,7 +115,8 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
                 const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewMeta.id)}`));
                 const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
                 return { ...viewMeta, imageUrl, selections };
-              })
+              }),
+ defaultViewId: entityMeta.defaultViewId || (entityMeta.views.length > 0 ? entityMeta.views[0].id : null) // Add defaultViewId here
             }));
           } else {
              console.warn("Project data in localStorage is malformed. Resetting state.", projectData);
@@ -268,7 +270,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       const entityPath = getEntityPath(entityId, prevEntities);
       const newViewId = [...entityPath, viewSlug].join('__');
 
-      const newView: View = { id: newViewId, name: viewName };
+      const newView: View = { id: newViewId, name: viewName, type: '2d' }; // Default to '2d'
       newViewHref = `/admin/projects/${projectId}/entities/${entityId}/views/${encodeURIComponent(newViewId)}`;
 
       const updatedEntities = prevEntities.map(entity => {

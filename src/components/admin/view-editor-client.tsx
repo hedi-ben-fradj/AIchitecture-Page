@@ -50,8 +50,8 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 6 * 1024 * 1024) { 
-        alert("File size exceeds 6MB. Please choose a smaller image.");
+      if (file.size > 10 * 1024 * 1024) { 
+        alert("File size exceeds 10MB. Please choose a smaller image.");
         if(fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
@@ -133,7 +133,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <Upload className="w-8 h-8 mb-4 text-neutral-400" />
                   <p className="mb-2 text-sm text-neutral-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                  <p className="text-xs text-neutral-500">PNG, JPG, or WEBP (MAX. 6MB)</p>
+                  <p className="text-xs text-neutral-500">PNG, JPG, or WEBP (MAX. 10MB)</p>
                 </div>
               </label>
             </div>
