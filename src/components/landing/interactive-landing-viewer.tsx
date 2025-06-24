@@ -5,7 +5,7 @@ import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo } fr
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Navigation, X, ArrowLeft, SlidersHorizontal, Eye } from 'lucide-react';
+import { Navigation, X, ArrowLeft, SlidersHorizontal, Info } from 'lucide-react';
 import type { View, Polygon, Entity } from '@/contexts/views-context';
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
@@ -329,16 +329,53 @@ export default function InteractiveLandingViewer() {
             
             {renderedImageRect && (
                  <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>
-                    {filteredSelections.map(selection => (
-                        <polygon
-                            key={selection.id}
-                            points={selection.points.map(p => `${p.x * renderedImageRect.width},${p.y * renderedImageRect.height}`).join(' ')}
-                            className={cn("stroke-2 transition-all cursor-pointer", clickedSelection?.id === selection.id ? "stroke-yellow-400 fill-yellow-400/50" : "stroke-yellow-500 fill-yellow-400/20", hoveredSelectionId === selection.id && clickedSelection?.id !== selection.id && "fill-yellow-400/40", "hover:fill-yellow-400/40")}
-                            onClick={(e) => handleSelectionClick(e, selection)}
-                            onMouseEnter={() => setHoveredSelectionId(selection.id)}
-                            onMouseLeave={() => setHoveredSelectionId(null)}
-                        />
-                    ))}
+                    {filteredSelections.map(selection => {
+                        const absPoints = selection.points.map(p => ({
+                            x: p.x * renderedImageRect.width,
+                            y: p.y * renderedImageRect.height,
+                        }));
+
+                        const xCoords = absPoints.map(p => p.x);
+                        const yCoords = absPoints.map(p => p.y);
+                        const minX = Math.min(...xCoords);
+                        const maxX = Math.max(...xCoords);
+                        const minY = Math.min(...yCoords);
+                        const maxY = Math.max(...yCoords);
+
+                        const centerX = (minX + maxX) / 2;
+                        const centerY = (minY + maxY) / 2;
+                        
+                        const isHighlighted = clickedSelection?.id === selection.id || hoveredSelectionId === selection.id;
+
+                        return (
+                            <g
+                                key={selection.id}
+                                onClick={(e) => handleSelectionClick(e, selection)}
+                                onMouseEnter={() => setHoveredSelectionId(selection.id)}
+                                onMouseLeave={() => setHoveredSelectionId(null)}
+                                className="cursor-pointer"
+                            >
+                                <polygon
+                                    points={absPoints.map(p => `${p.x},${p.y}`).join(' ')}
+                                    className={cn(
+                                        "stroke-2 transition-all",
+                                        clickedSelection?.id === selection.id
+                                            ? "stroke-yellow-400 fill-yellow-400/50"
+                                            : hoveredSelectionId === selection.id
+                                                ? "stroke-yellow-500 fill-yellow-400/20"
+                                                : "stroke-transparent fill-transparent"
+                                    )}
+                                />
+                                {!isHighlighted && (
+                                     <foreignObject x={centerX - 16} y={centerY - 16} width="32" height="32" className="pointer-events-none">
+                                        <div className="bg-black/60 rounded-full w-8 h-8 flex items-center justify-center backdrop-blur-sm">
+                                            <Info className="h-5 w-5 text-white" />
+                                        </div>
+                                    </foreignObject>
+                                )}
+                            </g>
+                        )
+                    })}
                 </svg>
             )}
 
@@ -426,3 +463,5 @@ export default function InteractiveLandingViewer() {
         </div>
     );
 }
+
+    
