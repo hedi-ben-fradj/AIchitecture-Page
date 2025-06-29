@@ -5,6 +5,7 @@ import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo } fr
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {ReactPhotoSphereViewer} from 'react-photo-sphere-viewer'
 import { Navigation, X, ArrowLeft, SlidersHorizontal, Info } from 'lucide-react';
 import type { View, Polygon, Entity } from '@/contexts/views-context';
 import { cn } from '@/lib/utils';
@@ -331,7 +332,16 @@ export default function InteractiveLandingViewer() {
                 )}
             </div>
 
-            <Image ref={imageRef} src={currentView.imageUrl} alt={currentView.name} layout="fill" objectFit="contain" onLoad={calculateRect} key={currentView.id} className="transition-opacity duration-500" style={{ opacity: renderedImageRect ? 1 : 0 }} />
+            {currentView.type == '2d' ? 
+                <Image ref={imageRef} src={currentView.imageUrl} alt={currentView.name} layout="fill" objectFit="contain" onLoad={calculateRect} key={currentView.id} className="transition-opacity duration-500" style={{ opacity: renderedImageRect ? 1 : 0 }} />
+                :
+                <ReactPhotoSphereViewer
+                  src={currentView.imageUrl} // Path to your 360 image
+                  alt={currentView.name}
+                  width="100%"
+                  height="100%"
+                />
+            }
             
             {renderedImageRect && (
                  <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>

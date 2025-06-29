@@ -44,7 +44,7 @@ interface ProjectContextType {
   setLandingPageEntityId: (entityId: string | null) => void;
 
   // View methods
-  addView: (entityId: string, viewName: string) => string;
+ addView: (entityId: string, viewName: string, viewType: View['type']) => string;
   deleteView: (entityId: string, viewId: string) => void;
   getView: (entityId: string, viewId: string) => View | undefined;
   updateViewImage: (entityId: string, viewId: string, imageUrl: string) => void;
@@ -84,6 +84,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
             views: entity.views.map(view => ({
               id: view.id,
               name: view.name,
+              type: view.type
             })),
           })),
         };
@@ -226,8 +227,9 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     }
   }, [entities, saveMetadata, projectId]);
 
-  const addView = useCallback((entityId: string, viewName: string) => {
+ const addView = useCallback((entityId: string, viewName: string, viewType: View['type']) => {
     let newViewHref = '';
+    console.log(viewType)
 
     setEntities(prevEntities => {
       const targetEntity = prevEntities.find(e => e.id === entityId);
@@ -270,7 +272,8 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       const entityPath = getEntityPath(entityId, prevEntities);
       const newViewId = [...entityPath, viewSlug].join('__');
 
-      const newView: View = { id: newViewId, name: viewName, type: '2d' }; // Default to '2d'
+ const newView: View = { id: newViewId, name: viewName, type: viewType };
+ console.log(newView)
       newViewHref = `/admin/projects/${projectId}/entities/${entityId}/views/${encodeURIComponent(newViewId)}`;
 
       const updatedEntities = prevEntities.map(entity => {
