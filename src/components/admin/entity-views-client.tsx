@@ -24,6 +24,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { Separator } from '@/components/ui/separator';
 
 
 function ViewCard({ view, onDelete, isDefaultView, onSetDefaultView, projectId, entityId }: { view: View, onDelete: (viewId: string) => void, isDefaultView: boolean, onSetDefaultView: (viewId: string) => void, projectId: string, entityId: string }) {
@@ -196,27 +197,25 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
     const isProperty = entity.entityType === 'Apartment' || entity.entityType === 'house';
 
     return (
-        <div className="space-y-12">
+        <div className="space-y-8">
             <AddViewModal isOpen={isAddViewModalOpen} onClose={() => setIsAddViewModalOpen(false)} entityId={entityId} />
             <AddEntityModal isOpen={isAddEntityModalOpen} onClose={() => setIsAddEntityModalOpen(false)} parentId={entityId} />
             <EditEntityModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} entity={entity} onUpdate={updateEntity} />
             
-            <div className="flex justify-between items-start">
-              <div>
-                  <h2 className="text-2xl font-semibold text-white">{entity.name}</h2>
-                  <p className="text-neutral-400 capitalize">{entity.entityType}</p>
-              </div>
-              <Button onClick={() => setIsEditModalOpen(true)} variant="outline">
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-              </Button>
-            </div>
-
-            {isProperty && (
-                <div>
-                    <h3 className="text-xl font-semibold text-white mb-4">Property Details</h3>
-                    <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
-                       <CardContent className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {isProperty ? (
+                <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
+                    <CardHeader className="flex flex-row items-start justify-between">
+                        <div>
+                            <CardTitle className="text-2xl">{entity.name}</CardTitle>
+                            <p className="text-neutral-400 capitalize">{entity.entityType}</p>
+                        </div>
+                        <Button onClick={() => setIsEditModalOpen(true)} variant="outline">
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                             <DetailItem icon={Euro} label="Price" value={entity.price ? `€ ${entity.price.toLocaleString()}`: 'N/A'} />
                             <DetailItem icon={Ruler} label="Status" value={entity.status} />
                             <DetailItem icon={Calendar} label="Available Date" value={entity.availableDate} />
@@ -231,21 +230,30 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
                             
                             <DetailItem icon={Building} label="Floors" value={entity.floors} />
                             <DetailItem icon={Bed} label="Rooms" value={entity.rooms} />
-                       </CardContent>
-                    </Card>
-                </div>
-            )}
+                        </div>
 
-            {entity.detailedRooms && entity.detailedRooms.length > 0 && (
-                <div>
-                    <h3 className="text-xl font-semibold text-white mb-4">Room Specifications</h3>
-                    <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
-                       <CardContent className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            {entity.detailedRooms.map((room) => (
-                                <DetailItem key={room.id} icon={Bed} label={room.name} value={room.size ? `${room.size} m²` : 'N/A'} />
-                            ))}
-                       </CardContent>
-                    </Card>
+                        {entity.detailedRooms && entity.detailedRooms.length > 0 && (
+                            <>
+                                <Separator className="my-4 bg-neutral-600" />
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+                                    {entity.detailedRooms.map((room) => (
+                                        <DetailItem key={room.id} icon={Bed} label={room.name} value={room.size ? `${room.size} m²` : 'N/A'} />
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h2 className="text-2xl font-semibold text-white">{entity.name}</h2>
+                        <p className="text-neutral-400 capitalize">{entity.entityType}</p>
+                    </div>
+                    <Button onClick={() => setIsEditModalOpen(true)} variant="outline">
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                    </Button>
                 </div>
             )}
 
