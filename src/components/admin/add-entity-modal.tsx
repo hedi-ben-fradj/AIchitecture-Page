@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useProjectData, entityTypes, type EntityType } from '@/contexts/views-context';
+import { useProjectData, type EntityType } from '@/contexts/views-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,8 +17,8 @@ interface AddEntityModalProps {
 
 export function AddEntityModal({ isOpen, onClose, parentId = null }: AddEntityModalProps) {
     const [entityName, setEntityName] = useState('');
-    const [entityType, setEntityType] = useState<EntityType>(entityTypes[2]); // Default to Apartment
-    const { addEntity } = useProjectData();
+    const { addEntity, entityTypes } = useProjectData();
+    const [entityType, setEntityType] = useState<EntityType>(entityTypes.includes('Apartment') ? 'Apartment' : entityTypes[0]);
 
     const handleCreate = () => {
         if (!entityName.trim()) {

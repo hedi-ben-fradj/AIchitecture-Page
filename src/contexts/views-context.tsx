@@ -2,20 +2,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, type ReactNode, useEffect } from 'react';
-import { Eye, type LucideIcon } from 'lucide-react';
 import type { Polygon } from '@/components/admin/image-editor';
 
-// Entity Types
-export const entityTypes = [
-  'residential compound',
-  'residential building',
-  'Apartment',
- 'Floor',
- 'Room',
-  'house',
-] as const;
-
-export type EntityType = (typeof entityTypes)[number];
+export type EntityType = string;
 
 // Interfaces
 export interface View {
@@ -54,6 +43,7 @@ export interface Entity {
 interface ProjectContextType {
   entities: Entity[];
   landingPageEntityId: string | null;
+  entityTypes: EntityType[];
   
   // Entity methods
   addEntity: (entityName: string, entityType: EntityType, parentId?: string | null) => void;
@@ -63,33 +53,101 @@ interface ProjectContextType {
   setLandingPageEntityId: (entityId: string | null) => void;
 
   // View methods
- addView: (entityId: string, viewName: string, viewType: View['type']) => string;
+  addView: (entityId: string, viewName: string, viewType: View['type']) => string;
   deleteView: (entityId: string, viewId: string) => void;
   getView: (entityId: string, viewId: string) => View | undefined;
   updateViewImage: (entityId: string, viewId: string, imageUrl: string) => void;
   updateViewSelections: (entityId: string, viewId: string, selections: Polygon[]) => void;
   setDefaultViewId: (entityId: string, viewId: string) => void;
+
+  // Entity Type methods
+  addEntityType: (typeName: string) => void;
+  deleteEntityType: (typeName: string) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-// Storage a single key for all metadata, and separate keys for large data (images)
-type ProjectMetadata = {
-  landingPageEntityId: string | null;
-  entities: Omit<Entity, 'views'> & { views: Omit<View, 'imageUrl' | 'selections'>[] };
-};
+const defaultEntityTypes: EntityType[] = [
+    'residential compound',
+    'residential building',
+    'Apartment',
+    'Floor',
+    'Room',
+    'house',
+];
+const ENTITY_TYPES_STORAGE_KEY = 'entity_types_list';
 
-export function ViewsProvider({ children, projectId }: { children: ReactNode; projectId: string }) {
-  const getStorageKey = useCallback((key: string) => `project-${projectId}-${key}`, [projectId]);
-  const getStorageSafeViewId = (viewId: string) => viewId.replace(/\//g, '__');
 
-
+export function ViewsProvider({ children, projectId }: { children: ReactNode; projectId?: string }) {
   const [isMounted, setIsMounted] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [landingPageEntityId, setLandingPageEntityIdState] = useState<string | null>(null);
+  const [entityTypes, setEntityTypes] = useState<EntityType[]>(defaultEntityTypes);
+
+  const getStorageKey = useCallback((key: string) => {
+    if (!projectId) return '';
+    return `project-${projectId}-${key}`
+  }, [projectId]);
+  const getStorageSafeViewId = (viewId: string) => viewId.replace(/\//g, '__');
+  
+  // Project-specific data loading
+  useEffect(() => {
+    if (typeof window !== 'undefined' && projectId) {
+      try {
+        const projectDataStr = window.localStorage.getItem(getStorageKey('data'));
+        let loadedEntities: Entity[] = [];
+        let loadedLandingId: string | null = null;
+        
+        if (projectDataStr) {
+          const projectData = JSON.parse(projectDataStr);
+          
+          if (projectData && Array.isArray(projectData.entities)) {
+            loadedLandingId = projectData.landingPageEntityId || null;
+            
+            loadedEntities = projectData.entities.map((entityMeta: any) => ({
+              ...entityMeta,
+              views: entityMeta.views.map((viewMeta: any) => {
+                const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${getStorageSafeViewId(viewMeta.id)}`)) || undefined;
+                const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewMeta.id)}`));
+                const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
+                return { ...viewMeta, imageUrl, selections };
+              }),
+              defaultViewId: entityMeta.defaultViewId || (entityMeta.views.length > 0 ? entityMeta.views[0].id : null)
+            }));
+          } else {
+             console.warn("Project data in localStorage is malformed. Resetting state.", projectData);
+          }
+        }
+        setEntities(loadedEntities);
+        setLandingPageEntityIdState(loadedLandingId);
+      } catch (error) {
+        console.error("Failed to load project data from storage", error);
+        setEntities([]);
+        setLandingPageEntityIdState(null);
+      }
+    }
+  }, [projectId, getStorageKey]);
+
+  // Global data loading (entity types)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+        try {
+            const storedTypes = window.localStorage.getItem(ENTITY_TYPES_STORAGE_KEY);
+            if (storedTypes) {
+                setEntityTypes(JSON.parse(storedTypes));
+            } else {
+                window.localStorage.setItem(ENTITY_TYPES_STORAGE_KEY, JSON.stringify(defaultEntityTypes));
+            }
+        } catch (error) {
+            console.error("Failed to load entity types from storage", error);
+            setEntityTypes(defaultEntityTypes);
+        }
+        setIsMounted(true);
+    }
+  }, []);
 
   const saveMetadata = useCallback((updatedEntities: Entity[], updatedLandingId: string | null) => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && projectId) {
       try {
         const metadata = {
           landingPageEntityId: updatedLandingId,
@@ -120,46 +178,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         console.error("Failed to save project metadata to storage", error);
       }
     }
-  }, [getStorageKey]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const projectDataStr = window.localStorage.getItem(getStorageKey('data'));
-        let loadedEntities: Entity[] = [];
-        let loadedLandingId: string | null = null;
-        
-        if (projectDataStr) {
-          const projectData = JSON.parse(projectDataStr);
-          
-          if (projectData && Array.isArray(projectData.entities)) {
-            loadedLandingId = projectData.landingPageEntityId || null;
-            
-            loadedEntities = projectData.entities.map((entityMeta: any) => ({
-              ...entityMeta,
-              entityType: entityMeta.entityType || 'Apartment', // Default for legacy data
-              views: entityMeta.views.map((viewMeta: any) => {
-                const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${getStorageSafeViewId(viewMeta.id)}`)) || undefined;
-                const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewMeta.id)}`));
-                const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
-                return { ...viewMeta, imageUrl, selections };
-              }),
- defaultViewId: entityMeta.defaultViewId || (entityMeta.views.length > 0 ? entityMeta.views[0].id : null) // Add defaultViewId here
-            }));
-          } else {
-             console.warn("Project data in localStorage is malformed. Resetting state.", projectData);
-          }
-        }
-        setEntities(loadedEntities);
-        setLandingPageEntityIdState(loadedLandingId);
-      } catch (error) {
-        console.error("Failed to load project data from storage", error);
-        setEntities([]);
-        setLandingPageEntityIdState(null);
-      }
-      setIsMounted(true);
-    }
-  }, [getStorageKey]);
+  }, [projectId, getStorageKey]);
 
 
   const getEntity = useCallback((entityId: string) => {
@@ -172,6 +191,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, [getEntity]);
 
   const addEntity = useCallback((entityName: string, entityType: EntityType, parentId: string | null = null) => {
+    if (!projectId) {
+        console.error("Cannot add an entity without a project context.");
+        return;
+    }
     setEntities(prevEntities => {
       const slug = entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       if (!slug || prevEntities.some(e => e.id === slug)) {
@@ -197,9 +220,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       saveMetadata(updatedEntities, landingPageEntityId);
       return updatedEntities;
     });
-  }, [landingPageEntityId, saveMetadata]);
+  }, [projectId, landingPageEntityId, saveMetadata]);
 
   const updateEntity = useCallback((entityId: string, data: Partial<Entity>) => {
+    if (!projectId) {
+        console.error("Cannot update an entity without a project context.");
+        return;
+    }
     setEntities(prevEntities => {
         const updatedEntities = prevEntities.map(entity => {
             if (entity.id === entityId) {
@@ -210,9 +237,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         saveMetadata(updatedEntities, landingPageEntityId);
         return updatedEntities;
     });
-  }, [landingPageEntityId, saveMetadata]);
+  }, [projectId, landingPageEntityId, saveMetadata]);
 
   const deleteEntity = useCallback((entityId: string) => {
+    if (!projectId) {
+        console.error("Cannot delete an entity without a project context.");
+        return;
+    }
     const updatedLandingId = landingPageEntityId === entityId ? null : landingPageEntityId;
     
     setEntities(prevEntities => {
@@ -257,9 +288,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     if (landingPageEntityId === entityId) {
       setLandingPageEntityIdState(null);
     }
-  }, [landingPageEntityId, saveMetadata, getStorageKey]);
+  }, [projectId, landingPageEntityId, saveMetadata, getStorageKey]);
 
   const setLandingPageEntityId = useCallback((entityId: string | null) => {
+    if (!projectId) return;
     setLandingPageEntityIdState(entityId);
     saveMetadata(entities, entityId);
      if (typeof window !== 'undefined') {
@@ -272,11 +304,14 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
             }
         }
     }
-  }, [entities, saveMetadata, projectId]);
+  }, [projectId, entities, saveMetadata]);
 
  const addView = useCallback((entityId: string, viewName: string, viewType: View['type']) => {
+    if (!projectId) {
+        console.error("Cannot add a view without a project context.");
+        return '';
+    }
     let newViewHref = '';
-    console.log(viewType)
 
     setEntities(prevEntities => {
       const targetEntity = prevEntities.find(e => e.id === entityId);
@@ -319,8 +354,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       const entityPath = getEntityPath(entityId, prevEntities);
       const newViewId = [...entityPath, viewSlug].join('__');
 
- const newView: View = { id: newViewId, name: viewName, type: viewType };
- console.log(newView)
+      const newView: View = { id: newViewId, name: viewName, type: viewType };
       newViewHref = `/admin/projects/${projectId}/entities/${entityId}/views/${encodeURIComponent(newViewId)}`;
 
       const updatedEntities = prevEntities.map(entity => {
@@ -340,6 +374,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, [projectId, landingPageEntityId, saveMetadata]);
 
   const deleteView = useCallback((entityId: string, viewId: string) => {
+    if (!projectId) return;
     setEntities(prevEntities => {
       const updatedEntities = prevEntities.map(entity => {
         if (entity.id === entityId) {
@@ -362,9 +397,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     } catch (error) {
       console.error(`Failed to remove data for view ${viewId}:`, error);
     }
-  }, [landingPageEntityId, saveMetadata, getStorageKey]);
+  }, [projectId, landingPageEntityId, saveMetadata, getStorageKey]);
 
   const updateViewImage = useCallback((entityId: string, viewId: string, imageUrl: string) => {
+    if (!projectId) return;
     setEntities(prev => prev.map(entity => 
       entity.id === entityId 
         ? { ...entity, views: entity.views.map(view => view.id === viewId ? { ...view, imageUrl } : view) }
@@ -376,9 +412,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       console.error(`Failed to save image for view ${viewId}:`, error);
       alert("Error: Could not save image due to browser storage limits. Your changes are visible now but won't be saved. Please try a smaller image or clear some space by removing other views.");
     }
-  }, [getStorageKey]);
+  }, [projectId, getStorageKey]);
 
   const updateViewSelections = useCallback((entityId: string, viewId: string, selections: Polygon[]) => {
+    if (!projectId) return;
     setEntities(prev => prev.map(entity => 
       entity.id === entityId
         ? { ...entity, views: entity.views.map(view => view.id === viewId ? { ...view, selections } : view) }
@@ -389,9 +426,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     } catch (error) {
       console.error(`Failed to save selections for view ${viewId}:`, error);
     }
-  }, [getStorageKey]);
+  }, [projectId, getStorageKey]);
 
   const setDefaultViewId = useCallback((entityId: string, viewId: string) => {
+    if (!projectId) return;
     setEntities(prev => {
       const updated = prev.map(entity => 
         entity.id === entityId ? { ...entity, defaultViewId: viewId } : entity
@@ -399,11 +437,34 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       saveMetadata(updated, landingPageEntityId);
       return updated;
     });
-  }, [landingPageEntityId, saveMetadata]);
+  }, [projectId, landingPageEntityId, saveMetadata]);
+
+  const addEntityType = useCallback((typeName: string) => {
+    setEntityTypes(prevTypes => {
+        if (prevTypes.map(t => t.toLowerCase()).includes(typeName.toLowerCase())) {
+            alert('This entity type already exists.');
+            return prevTypes;
+        }
+        const updatedTypes = [...prevTypes, typeName];
+        window.localStorage.setItem(ENTITY_TYPES_STORAGE_KEY, JSON.stringify(updatedTypes));
+        return updatedTypes;
+    });
+  }, []);
+
+  const deleteEntityType = useCallback((typeName: string) => {
+    // Ideally, we would check if this type is in use across all projects.
+    // That's a complex operation, so for now we'll just delete it.
+    setEntityTypes(prevTypes => {
+        const updatedTypes = prevTypes.filter(t => t !== typeName);
+        window.localStorage.setItem(ENTITY_TYPES_STORAGE_KEY, JSON.stringify(updatedTypes));
+        return updatedTypes;
+    });
+  }, []);
 
   const value = { 
     entities, 
     landingPageEntityId, 
+    entityTypes,
     getEntity, 
     getView,
     addEntity,
@@ -414,10 +475,12 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     deleteView,
     updateViewImage,
     updateViewSelections,
-    setDefaultViewId
+    setDefaultViewId,
+    addEntityType,
+    deleteEntityType
   };
 
-  if (!isMounted) return null;
+  if (!isMounted && projectId) return null; // Only pause rendering for project-specific contexts
 
   return (
     <ProjectContext.Provider value={value}>

@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import type { Polygon } from './image-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { entityTypes, type EntityType } from '@/contexts/views-context';
+import { useProjectData, type EntityType } from '@/contexts/views-context';
 
 const selectionDetailsSchema = z.object({
     title: z.string().min(1, 'Title is required.'),
@@ -23,7 +23,7 @@ const selectionDetailsSchema = z.object({
     height: z.coerce.number().positive('Height must be a positive number.').optional().or(z.literal('')),
     area: z.coerce.number().positive('Area must be a positive number.').optional().or(z.literal('')),
     makeAsEntity: z.boolean().default(false).optional(),
-    entityType: z.enum(entityTypes).optional(),
+    entityType: z.string().optional(),
 });
 
 type SelectionDetailsFormValues = z.infer<typeof selectionDetailsSchema>;
@@ -37,6 +37,7 @@ interface SelectionDetailsModalProps {
 }
 
 export default function SelectionDetailsModal({ isOpen, onClose, onSave, selectionData, parentEntityType }: SelectionDetailsModalProps) {
+    const { entityTypes } = useProjectData();
     const form = useForm<SelectionDetailsFormValues>({
         resolver: zodResolver(selectionDetailsSchema),
         defaultValues: {
@@ -47,7 +48,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
             height: '',
             area: '',
             makeAsEntity: false,
-            entityType: entityTypes[2], // Default to Apartment
+            entityType: 'Apartment',
         },
     });
     

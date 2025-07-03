@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -6,6 +7,7 @@ import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Building, Databa
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePathname, useParams } from 'next/navigation';
+import { ViewsProvider } from '@/contexts/views-context';
 
 // Minimal type for sidebar display
 interface SidebarView {
@@ -159,80 +161,82 @@ export default function AdminLayout({
   }, [entityId, entities]);
 
   return (
-    <div className="bg-neutral-900 text-foreground min-h-screen flex">
-      <aside className="w-80 bg-[#212121] flex flex-col border-r border-neutral-700 flex-shrink-0">
-        <div className="h-16 flex items-center px-6">
-           <h1 className="text-xl font-semibold text-white">Dashboard</h1>
-        </div>
-        <div className="flex-1 flex flex-col justify-between p-2 overflow-y-auto">
-            <nav className="space-y-1">
-                {mainNavItems.map((item) => (
+    <ViewsProvider>
+      <div className="bg-neutral-900 text-foreground min-h-screen flex">
+        <aside className="w-80 bg-[#212121] flex flex-col border-r border-neutral-700 flex-shrink-0">
+          <div className="h-16 flex items-center px-6">
+            <h1 className="text-xl font-semibold text-white">Dashboard</h1>
+          </div>
+          <div className="flex-1 flex flex-col justify-between p-2 overflow-y-auto">
+              <nav className="space-y-1">
+                  {mainNavItems.map((item) => (
+                      <Link
+                          key={item.title}
+                          href={item.href}
+                          className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white"
+                      >
+                          <item.icon className="h-4 w-4" />
+                          {item.title}
+                      </Link>
+                  ))}
+                  
+                  {/* DYNAMIC PROJECTS SECTION */}
+                  <div className="space-y-1">
                     <Link
-                        key={item.title}
-                        href={item.href}
-                        className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white"
+                        href="/admin"
+                        className={cn(
+                            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
+                            (pathname.startsWith('/admin/projects') || pathname === '/admin') && "bg-neutral-700 text-white"
+                        )}
                     >
-                        <item.icon className="h-4 w-4" />
-                        {item.title}
+                        <FolderKanban className="h-4 w-4" />
+                        <span>Projects</span>
                     </Link>
-                ))}
-                
-                {/* DYNAMIC PROJECTS SECTION */}
-                <div className="space-y-1">
-                  <Link
-                      href="/admin"
-                      className={cn(
-                          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
-                          (pathname.startsWith('/admin/projects') || pathname === '/admin') && "bg-neutral-700 text-white"
-                      )}
-                  >
-                      <FolderKanban className="h-4 w-4" />
-                      <span>Projects</span>
-                  </Link>
-                  {projectId && (
-                      <div className="pl-3 pt-1 space-y-1 border-l border-neutral-700 ml-4">
-                          {rootEntities.map(entity => (
-                             <EntitySidebarNode 
-                                key={entity.id}
-                                entity={entity}
-                                allEntities={entities}
-                                projectId={projectId}
-                                pathname={pathname}
-                                activePathIds={activePathIds}
-                             />
-                          ))}
-                      </div>
-                  )}
-                </div>
+                    {projectId && (
+                        <div className="pl-3 pt-1 space-y-1 border-l border-neutral-700 ml-4">
+                            {rootEntities.map(entity => (
+                              <EntitySidebarNode 
+                                  key={entity.id}
+                                  entity={entity}
+                                  allEntities={entities}
+                                  projectId={projectId}
+                                  pathname={pathname}
+                                  activePathIds={activePathIds}
+                              />
+                            ))}
+                        </div>
+                    )}
+                  </div>
 
-                <Link
-                  href="/admin/database"
-                  className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
-                      pathname === '/admin/database' && "bg-neutral-700 text-white"
-                  )}
-                >
-                    <Database className="h-4 w-4" />
-                    <span>Database</span>
-                </Link>
-            </nav>
-            <nav className="space-y-1">
-                 {bottomNavItems.map((item) => (
-                    <Link
-                        key={item.title}
-                        href={item.href}
-                        className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white"
-                    >
-                        <item.icon className="h-4 w-4" />
-                        {item.title}
-                    </Link>
-                ))}
-            </nav>
+                  <Link
+                    href="/admin/database"
+                    className={cn(
+                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
+                        pathname === '/admin/database' && "bg-neutral-700 text-white"
+                    )}
+                  >
+                      <Database className="h-4 w-4" />
+                      <span>Database</span>
+                  </Link>
+              </nav>
+              <nav className="space-y-1">
+                  {bottomNavItems.map((item) => (
+                      <Link
+                          key={item.title}
+                          href={item.href}
+                          className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white"
+                      >
+                          <item.icon className="h-4 w-4" />
+                          {item.title}
+                      </Link>
+                  ))}
+              </nav>
+          </div>
+        </aside>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {children}
         </div>
-      </aside>
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {children}
       </div>
-    </div>
+    </ViewsProvider>
   );
 }

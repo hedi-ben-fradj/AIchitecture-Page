@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { entityTypes, type EntityType, type Entity, type RoomDetail } from '@/contexts/views-context';
+import { useProjectData, type EntityType, type Entity, type RoomDetail } from '@/contexts/views-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,7 @@ const roomDetailSchema = z.object({
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
-    entityType: z.enum(entityTypes),
+    entityType: z.string(),
     plotArea: z.coerce.number().optional(),
     houseArea: z.coerce.number().optional(),
     price: z.coerce.number().optional(),
@@ -50,6 +50,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntityModalProps) {
     const { toast } = useToast();
+    const { entityTypes } = useProjectData();
     const [mismatchData, setMismatchData] = useState<FormValues | null>(null);
     const [newRoomName, setNewRoomName] = useState('');
     const [newRoomSize, setNewRoomSize] = useState('');
