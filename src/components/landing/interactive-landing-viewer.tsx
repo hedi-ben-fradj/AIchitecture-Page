@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo } from 'react';
@@ -517,6 +518,32 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
                         if (!hasDetails) return null;
 
+                        const entityIdForSelection = selection.details?.makeAsEntity && selection.details.title
+                            ? selection.details.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+                            : null;
+                        const entityForSelection = entityIdForSelection ? allEntities.find(e => e.id === entityIdForSelection) : null;
+                        const isProperty = entityForSelection && (entityForSelection.entityType === 'Apartment' || entityForSelection.entityType === 'house');
+
+                        const getHighlightClasses = () => {
+                            if (!isClicked && !isHovered && !isHighlighted) {
+                                return "stroke-transparent fill-transparent";
+                            }
+                        
+                            const fillOpacity = isClicked ? '50' : '20';
+                            
+                            if (isProperty) {
+                                if (entityForSelection.status === 'available') {
+                                    return `stroke-green-400 fill-green-400/${fillOpacity}`;
+                                }
+                                if (entityForSelection.status === 'sold') {
+                                    return `stroke-orange-400 fill-orange-400/${fillOpacity}`;
+                                }
+                            }
+                            
+                            // Default for non-properties or properties without status
+                            return `stroke-yellow-400 fill-yellow-400/${fillOpacity}`;
+                        };
+
                         return (
                             <g
                                 key={selection.id}
@@ -527,16 +554,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                             >
                                 <polygon
                                     points={absPoints.map(p => `${p.x},${p.y}`).join(' ')}
-                                    className={cn(
-                                        "stroke-2 transition-all",
-                                        isClicked
-                                            ? "stroke-yellow-400 fill-yellow-400/50"
-                                            : isHovered
-                                                ? "stroke-yellow-500 fill-yellow-400/20"
-                                                : isHighlighted
-                                                    ? "stroke-yellow-500 fill-yellow-400/20"
-                                                    : "stroke-transparent fill-transparent"
-                                    )}
+                                    className={cn("stroke-2 transition-all", getHighlightClasses())}
                                 />
                                 {!isClicked && !isHovered && !isFilterApplied && (
                                     <foreignObject x={centerX - 16} y={centerY - 16} width="32" height="32" className="pointer-events-none">
@@ -575,7 +593,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         </Button>
                         
                         {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') ? (
-                            <CardContent className="p-5">
+                           <CardContent className="p-4">
                                 <div className="flex items-start justify-between gap-4 p-1">
                                     <div className="flex-1">
                                         <h3 className="text-4xl font-light text-white leading-none">{clickedEntity.name}</h3>
@@ -623,7 +641,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 <div className="flex justify-center items-center mt-5 gap-4">
                                     {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') && (
                                         <Button 
-                                            className="bg-white/90 hover:bg-white text-black rounded-full px-5 h-9 text-[11px] font-semibold tracking-wide disabled:bg-neutral-600 disabled:text-neutral-200"
+                                            className="bg-white/90 hover:bg-white text-black rounded-full px-5 h-9 text-[11px] font-semibold tracking-wide disabled:bg-neutral-600 disabled:text-neutral-400"
                                             onClick={() => setActiveView('contact')} 
                                             disabled={clickedEntity.status === 'sold'}>
                                             {clickedEntity.status === 'sold' ? 'SOLD' : 'BOOK A CALL'}
