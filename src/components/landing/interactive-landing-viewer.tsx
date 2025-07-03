@@ -5,9 +5,8 @@ import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo } fr
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {ReactPhotoSphereViewer} from 'react-photo-sphere-viewer'
-import { Navigation, X, ArrowLeft, SlidersHorizontal, Info } from 'lucide-react';
-import type { View, Polygon, Entity } from '@/contexts/views-context';
+import { ReactPhotoSphereViewer } from 'react-photo-sphere-viewer'
+import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info } from 'lucide-react'; // Importing specific icons
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 
@@ -23,6 +22,11 @@ interface FullView extends View {
     entityId: string;
 }
 
+// Define types for View, Polygon, and Entity if not already imported from a central location
+interface View { id: string; name: string; imageUrl?: string; type: '2d' | '360'; selections?: Polygon[]; }
+interface Polygon { id: number; points: { x: number; y: number; }[]; details?: { title: string; description?: string; width: number; height: number; makeAsEntity?: boolean }; }
+interface Entity { id: string; name: string; defaultViewId?: string; views: View[]; }
+
 export default function InteractiveLandingViewer() {
     const [currentView, setCurrentView] = useState<FullView | null>(null);
     const [entityViews, setEntityViews] = useState<View[]>([]);
@@ -35,6 +39,7 @@ export default function InteractiveLandingViewer() {
     const [appliedFilters, setAppliedFilters] = useState<Partial<Filters>>({});
     const [projectId, setProjectId] = useState<string | null>(null);
     const [detailsPosition, setDetailsPosition] = useState<React.CSSProperties>({ opacity: 0 });
+    const [currentViewType, setCurrentViewType] = useState<'2d' | '360'>('2d');
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
@@ -101,6 +106,7 @@ export default function InteractiveLandingViewer() {
                 if (landingEntity && landingEntity.defaultViewId) {
                     const defaultView = findViewInEntities(entities, landingEntity.defaultViewId);
                     setCurrentView(defaultView);
+                    if (defaultView) setCurrentViewType(defaultView.type);
                     setEntityViews(landingEntity.views);
                 }
             } else {
@@ -215,6 +221,7 @@ export default function InteractiveLandingViewer() {
                 if (currentView) {
                     setViewHistory(prev => [...prev, currentView.id]);
                 }
+                setCurrentViewType(newView.type);
                 setCurrentView(newView);
                 setEntityViews(targetEntity.views);
                 closeDetails();
@@ -239,6 +246,7 @@ export default function InteractiveLandingViewer() {
         const previousView = findViewInEntities(entities, previousViewId);
         
         if (previousView) {
+            setCurrentViewType(previousView.type);
             setCurrentView(previousView);
             const parentEntity = entities.find(e => e.id === previousView.entityId);
             if (parentEntity) {
@@ -259,6 +267,7 @@ export default function InteractiveLandingViewer() {
         if (currentView?.id === view.id || !currentView?.entityId) return;
 
         const newFullView: FullView = { ...view, entityId: currentView.entityId };
+        setCurrentViewType(newFullView.type);
         setCurrentView(newFullView);
         closeDetails();
         setHoveredSelectionId(null);
@@ -300,6 +309,14 @@ export default function InteractiveLandingViewer() {
         setIsFilterOpen(false);
     };
 
+    const toggleViewType = () => {
+         if (!currentView || !currentView.entityId) return;
+
+        const otherViewType = currentViewType === '2d' ? '360' : '2d';
+        const targetView = entityViews.find(view => view.type === otherViewType);
+
+        if (targetView) handleViewSelect(targetView);
+    };
 
     if (!isLoaded) {
         return <div className="h-full w-full flex items-center justify-center bg-neutral-900"><p className="text-muted-foreground animate-pulse">Loading View...</p></div>;
@@ -310,7 +327,19 @@ export default function InteractiveLandingViewer() {
     }
     
     return (
-        <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={closeDetails}>
+ <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={closeDetails}>
+ {entityViews.some(view => view.type === '2d') && entityViews.some(view => view.type === '360') && (
+ <div className="absolute top-4 right-4 z-50 flex items-center bg-black/50 text-white rounded-full p-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleViewType(); }}>
+ <span className={cn("px-3 py-1 text-sm font-medium flex items-center gap-1", currentViewType === '2d' && "bg-white text-black rounded-full")}>
+ 2D image
+ </span>
+ <div className="w-px h-4 bg-white mx-1"></div>
+ <span className={cn("px-3 py-1 text-sm font-medium flex items-center gap-1", currentViewType === '360' && "bg-white text-black rounded-full")}>
+ 360 Image
+ </span>
+ </div>
+ )}
+
             <div
                 className={cn("absolute top-0 left-0 h-full z-40 w-72 transition-transform duration-300 ease-in-out", isFilterOpen ? "translate-x-0" : "-translate-x-full")}
                 onClick={(e) => e.stopPropagation()}
@@ -323,16 +352,16 @@ export default function InteractiveLandingViewer() {
                 onClick={(e) => e.stopPropagation()}
             >
                  <Button variant="ghost" size="icon" className="h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" onClick={() => setIsFilterOpen(!isFilterOpen)} aria-label={isFilterOpen ? "Close filters" : "Open filters"}>
-                    {isFilterOpen ? <X className="h-5 w-5" /> : <SlidersHorizontal className="h-5 w-5" />}
+                    {isFilterOpen ? <X size={20} /> : <SlidersHorizontal size={20} />}
                 </Button>
                 {viewHistory.length > 0 && (
                      <Button variant="ghost" size="icon" className="h-10 w-10 bg-black/50 hover:bg-black/75 text-white rounded-full" onClick={handleBack} aria-label="Go back to previous view">
-                        <ArrowLeft className="h-5 w-5" />
+                        <ArrowLeft size={20} />
                     </Button>
                 )}
             </div>
 
-            {currentView.type == '2d' ? 
+            {currentViewType == '2d' ?
                 <Image ref={imageRef} src={currentView.imageUrl} alt={currentView.name} layout="fill" objectFit="contain" onLoad={calculateRect} key={currentView.id} className="transition-opacity duration-500" style={{ opacity: renderedImageRect ? 1 : 0 }} />
                 :
                 <ReactPhotoSphereViewer
@@ -343,27 +372,29 @@ export default function InteractiveLandingViewer() {
                 />
             }
             
-            {renderedImageRect && (
-                 <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>
-                    {filteredSelections.map(selection => {
-                        const absPoints = selection.points.map(p => ({
-                            x: p.x * renderedImageRect.width,
-                            y: p.y * renderedImageRect.height,
-                        }));
+            {/* Overlay for 2D view interactions */}
+            {currentViewType === '2d' && renderedImageRect && (
+                <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>
+                    {/* ... (existing SVG content for 2D selections) ... */}
+ {filteredSelections.map(selection => {
+ const absPoints = selection.points.map(p => ({
+ x: p.x * renderedImageRect.width,
+ y: p.y * renderedImageRect.height,
+ }));
 
-                        const xCoords = absPoints.map(p => p.x);
-                        const yCoords = absPoints.map(p => p.y);
-                        const minX = Math.min(...xCoords);
-                        const maxX = Math.max(...xCoords);
-                        const minY = Math.min(...yCoords);
-                        const maxY = Math.max(...yCoords);
+ const xCoords = absPoints.map(p => p.x);
+ const yCoords = absPoints.map(p => p.y);
+ const minX = Math.min(...xCoords);
+ const maxX = Math.max(...xCoords);
+ const minY = Math.min(...yCoords);
+ const maxY = Math.max(...yCoords);
 
-                        const centerX = (minX + maxX) / 2;
-                        const centerY = (minY + maxY) / 2;
-                        
-                        const isHighlighted = clickedSelection?.id === selection.id || hoveredSelectionId === selection.id;
+ const centerX = (minX + maxX) / 2;
+ const centerY = (minY + maxY) / 2;
 
-                        return (
+ const isHighlighted = clickedSelection?.id === selection.id || hoveredSelectionId === selection.id;
+
+ return (
                             <g
                                 key={selection.id}
                                 onClick={(e) => handleSelectionClick(e, selection)}
@@ -390,11 +421,12 @@ export default function InteractiveLandingViewer() {
                                     </foreignObject>
                                 )}
                             </g>
-                        )
-                    })}
+ );
+ })}
                 </svg>
             )}
 
+            {/* Details card */}
             {clickedSelection?.details && (
                 <div style={detailsPosition} className="z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
                     <Card className="pointer-events-auto bg-black/60 backdrop-blur-sm text-white border-yellow-500 w-72 shadow-2xl animate-in fade-in-50">
@@ -418,7 +450,7 @@ export default function InteractiveLandingViewer() {
                          {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
                             <CardFooter>
                                 <Button className="w-full bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedSelection.details!.title)}>
-                                    <Navigation className="mr-2 h-4 w-4" />
+                                    <NavigationIcon className="mr-2 h-4 w-4" />
                                     Navigate to
                                 </Button>
                             </CardFooter>
@@ -427,6 +459,7 @@ export default function InteractiveLandingViewer() {
                 </div>
             )}
             
+            {/* Views list sidebar */}
             {entityViews.length > 1 && (
                 <div className="absolute top-1/2 -translate-y-1/2 right-4 h-auto max-h-[calc(100%-8rem)] w-48 z-30 hidden lg:block">
                     <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
@@ -443,14 +476,25 @@ export default function InteractiveLandingViewer() {
                                     <div className="aspect-video relative">
                                         {view.imageUrl ? (
                                             <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
-                                        ) : (
-                                            <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
-                                        )}
+ ) : (
+ <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
+ )}
                                         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
                                     </div>
                                     <p className="text-xs text-white p-2 truncate font-medium bg-black/50">{view.name}</p>
                                 </div>
                             ))}
+                            {/* Add separator if both 2D and 360 views exist */}
+                            {entityViews.some(view => view.type === '2d') && entityViews.some(view => view.type === '360') && (
+                                <div className="relative flex justify-center my-4">
+                                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                        <div className="w-full border-t border-neutral-700"></div>
+                                    </div>
+                                    <div className="relative z-0 flex justify-center">
+                                        <span className="bg-black/60 backdrop-blur-sm px-2 text-sm text-neutral-400">Views</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
