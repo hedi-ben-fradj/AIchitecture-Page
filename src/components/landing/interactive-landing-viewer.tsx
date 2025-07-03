@@ -48,6 +48,7 @@ interface Entity {
 export default function InteractiveLandingViewer({ setActiveView }: { setActiveView: (view: string) => void }) {
     const [currentView, setCurrentView] = useState<FullView | null>(null);
     const [entityViews, setEntityViews] = useState<View[]>([]);
+    const [allEntities, setAllEntities] = useState<Entity[]>([]);
     const [viewHistory, setViewHistory] = useState<string[]>([]); // Stores view IDs
     const [clickedSelection, setClickedSelection] = useState<Polygon | null>(null);
     const [clickedEntity, setClickedEntity] = useState<Entity | null>(null);
@@ -120,6 +121,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             setIsLoaded(false);
             const { entities, landingPageEntityId } = loadDataFromStorage();
             
+            setAllEntities(entities);
+
             if (landingPageEntityId) {
                 const landingEntity = entities.find(e => e.id === landingPageEntityId);
                 if (landingEntity && landingEntity.defaultViewId) {
@@ -137,6 +140,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         } else {
              setIsLoaded(true);
              setCurrentView(null);
+             setAllEntities([]);
              setEntityViews([]);
         }
     }, [projectId, loadDataFromStorage]);
@@ -311,26 +315,39 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const filteredSelections = useMemo(() => {
         if (!currentView?.selections) return [];
 
-        const selectionsWithDetails = currentView.selections.filter(s => s.details);
-        const hasFilters = Object.values(appliedFilters).some(val => val !== '' && val !== undefined);
-
+        const selectionsWithDetails = currentView.selections.filter(s => s.details?.makeAsEntity && s.details.title);
+        
+        const hasFilters = Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
         if (!hasFilters) return selectionsWithDetails;
 
         return selectionsWithDetails.filter(selection => {
-            const { width, height } = selection.details!;
-            const { minWidth, maxWidth, minHeight, maxHeight } = appliedFilters;
+            const entityId = selection.details!.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            const entity = allEntities.find(e => e.id === entityId);
+            
+            if (!entity || (entity.entityType !== 'Apartment' && entity.entityType !== 'house')) {
+                return false;
+            }
 
-            const widthPass = 
-                (minWidth === undefined || minWidth === '' || width >= Number(minWidth)) &&
-                (maxWidth === undefined || maxWidth === '' || width <= Number(maxWidth));
+            const { minPrice, maxPrice, minArea, maxArea, availability, minRooms, maxRooms } = appliedFilters;
+
+            const pricePass = 
+                (minPrice === undefined || minPrice === '' || (entity.price && entity.price >= Number(minPrice))) &&
+                (maxPrice === undefined || maxPrice === '' || (entity.price && entity.price <= Number(maxPrice)));
+
+            const areaPass =
+                (minArea === undefined || minArea === '' || (entity.houseArea && entity.houseArea >= Number(minArea))) &&
+                (maxArea === undefined || maxArea === '' || (entity.houseArea && entity.houseArea <= Number(maxArea)));
             
-            const heightPass =
-                (minHeight === undefined || minHeight === '' || height >= Number(minHeight)) &&
-                (maxHeight === undefined || maxHeight === '' || height <= Number(maxHeight));
-            
-            return widthPass && heightPass;
+            const availabilityPass =
+                (availability === 'all' || availability === undefined || (entity.status && entity.status === availability));
+
+            const roomsPass =
+                (minRooms === undefined || minRooms === '' || (entity.rooms && entity.rooms >= Number(minRooms))) &&
+                (maxRooms === undefined || maxRooms === '' || (entity.rooms && entity.rooms <= Number(maxRooms)));
+
+            return pricePass && areaPass && availabilityPass && roomsPass;
         });
-    }, [currentView?.selections, appliedFilters]);
+    }, [currentView?.selections, appliedFilters, allEntities]);
 
     const handleApplyFilters = (filters: Filters) => {
         setAppliedFilters(filters);
