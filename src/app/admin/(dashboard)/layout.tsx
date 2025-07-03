@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { Entity, View } from '@/contexts/views-context';
-import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Building } from 'lucide-react';
+import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Building, Database } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePathname, useParams } from 'next/navigation';
@@ -183,7 +183,7 @@ export default function AdminLayout({
                       href="/admin"
                       className={cn(
                           "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
-                          pathname.startsWith('/admin') && !projectId && "bg-neutral-700 text-white"
+                          (pathname.startsWith('/admin/projects') || pathname === '/admin') && "bg-neutral-700 text-white"
                       )}
                   >
                       <FolderKanban className="h-4 w-4" />
@@ -204,6 +204,17 @@ export default function AdminLayout({
                       </div>
                   )}
                 </div>
+
+                <Link
+                  href="/admin/database"
+                  className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
+                      pathname === '/admin/database' && "bg-neutral-700 text-white"
+                  )}
+                >
+                    <Database className="h-4 w-4" />
+                    <span>Database</span>
+                </Link>
             </nav>
             <nav className="space-y-1">
                  {bottomNavItems.map((item) => (
