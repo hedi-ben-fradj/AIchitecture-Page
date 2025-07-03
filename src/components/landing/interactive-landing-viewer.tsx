@@ -312,42 +312,71 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const views2d = useMemo(() => entityViews.filter(v => v.type === '2d'), [entityViews]);
     const views360 = useMemo(() => entityViews.filter(v => v.type === '360'), [entityViews]);
 
+    const entityMatchesFilters = useCallback((entity: Entity, filters: Filters): boolean => {
+        if (entity.entityType !== 'Apartment' && entity.entityType !== 'house') {
+            return false;
+        }
+
+        const { minPrice, maxPrice, minArea, maxArea, availability, minRooms, maxRooms } = filters;
+
+        const pricePass = 
+            (minPrice === undefined || minPrice === '' || (entity.price && entity.price >= Number(minPrice))) &&
+            (maxPrice === undefined || maxPrice === '' || (entity.price && entity.price <= Number(maxPrice)));
+
+        const areaPass =
+            (minArea === undefined || minArea === '' || (entity.houseArea && entity.houseArea >= Number(minArea))) &&
+            (maxArea === undefined || maxArea === '' || (entity.houseArea && entity.houseArea <= Number(maxArea)));
+        
+        const availabilityPass =
+            (availability === 'all' || availability === undefined || (entity.status && entity.status === availability));
+
+        const roomsPass =
+            (minRooms === undefined || minRooms === '' || (entity.rooms && entity.rooms >= Number(minRooms))) &&
+            (maxRooms === undefined || maxRooms === '' || (entity.rooms && entity.rooms <= Number(maxRooms)));
+
+        return pricePass && areaPass && availabilityPass && roomsPass;
+    }, []);
+
+    const hasMatchingDescendant = useCallback((entityId: string, filters: Filters, allEntities: Entity[]): boolean => {
+        const children = allEntities.filter(e => e.parentId === entityId);
+    
+        if (children.length === 0) {
+            return false;
+        }
+    
+        for (const child of children) {
+            if (entityMatchesFilters(child, filters)) {
+                return true;
+            }
+            if (hasMatchingDescendant(child.id, filters, allEntities)) {
+                return true;
+            }
+        }
+    
+        return false;
+    }, [entityMatchesFilters]);
+
     const filteredSelections = useMemo(() => {
         if (!currentView?.selections) return [];
 
         const selectionsWithDetails = currentView.selections.filter(s => s.details?.makeAsEntity && s.details.title);
         
         const hasFilters = Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
-        if (!hasFilters) return selectionsWithDetails;
+        if (!hasFilters) {
+            return selectionsWithDetails;
+        }
 
         return selectionsWithDetails.filter(selection => {
             const entityId = selection.details!.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
             const entity = allEntities.find(e => e.id === entityId);
             
-            if (!entity || (entity.entityType !== 'Apartment' && entity.entityType !== 'house')) {
+            if (!entity) {
                 return false;
             }
-
-            const { minPrice, maxPrice, minArea, maxArea, availability, minRooms, maxRooms } = appliedFilters;
-
-            const pricePass = 
-                (minPrice === undefined || minPrice === '' || (entity.price && entity.price >= Number(minPrice))) &&
-                (maxPrice === undefined || maxPrice === '' || (entity.price && entity.price <= Number(maxPrice)));
-
-            const areaPass =
-                (minArea === undefined || minArea === '' || (entity.houseArea && entity.houseArea >= Number(minArea))) &&
-                (maxArea === undefined || maxArea === '' || (entity.houseArea && entity.houseArea <= Number(maxArea)));
             
-            const availabilityPass =
-                (availability === 'all' || availability === undefined || (entity.status && entity.status === availability));
-
-            const roomsPass =
-                (minRooms === undefined || minRooms === '' || (entity.rooms && entity.rooms >= Number(minRooms))) &&
-                (maxRooms === undefined || maxRooms === '' || (entity.rooms && entity.rooms <= Number(maxRooms)));
-
-            return pricePass && areaPass && availabilityPass && roomsPass;
+            return entityMatchesFilters(entity, appliedFilters) || hasMatchingDescendant(entity.id, appliedFilters, allEntities);
         });
-    }, [currentView?.selections, appliedFilters, allEntities]);
+    }, [currentView?.selections, appliedFilters, allEntities, entityMatchesFilters, hasMatchingDescendant]);
 
     const handleApplyFilters = (filters: Filters) => {
         setAppliedFilters(filters);
