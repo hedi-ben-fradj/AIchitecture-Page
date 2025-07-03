@@ -20,7 +20,7 @@ export default function Home() {
             id="explore"
             className="relative h-screen w-full text-white overflow-hidden"
           >
-            <InteractiveLandingViewer />
+            <InteractiveLandingViewer setActiveView={setActiveView} />
           </section>
         );
       case 'features':

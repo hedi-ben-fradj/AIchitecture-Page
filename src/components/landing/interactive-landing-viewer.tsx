@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ReactPhotoSphereViewer } from 'react-photo-sphere-viewer'
-import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info } from 'lucide-react'; // Importing specific icons
+import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone } from 'lucide-react'; // Importing specific icons
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 
@@ -25,13 +25,32 @@ interface FullView extends View {
 // Define types for View, Polygon, and Entity if not already imported from a central location
 interface View { id: string; name: string; imageUrl?: string; type: '2d' | '360'; selections?: Polygon[]; }
 interface Polygon { id: number; points: { x: number; y: number; }[]; details?: { title: string; description?: string; width: number; height: number; makeAsEntity?: boolean }; }
-interface Entity { id: string; name: string; defaultViewId?: string; views: View[]; }
 
-export default function InteractiveLandingViewer() {
+type EntityType = 'residential compound' | 'residential building' | 'Apartment' | 'Floor' | 'Room' | 'Furniture/Appliance' | 'house';
+
+interface Entity {
+  id: string;
+  name: string;
+  entityType: EntityType;
+  parentId?: string | null;
+  views: View[];
+  defaultViewId: string | null;
+  plotArea?: number;
+  houseArea?: number;
+  price?: number;
+  status?: 'available' | 'sold';
+  availableDate?: string;
+  floors?: number;
+  rooms?: number;
+}
+
+
+export default function InteractiveLandingViewer({ setActiveView }: { setActiveView: (view: string) => void }) {
     const [currentView, setCurrentView] = useState<FullView | null>(null);
     const [entityViews, setEntityViews] = useState<View[]>([]);
     const [viewHistory, setViewHistory] = useState<string[]>([]); // Stores view IDs
     const [clickedSelection, setClickedSelection] = useState<Polygon | null>(null);
+    const [clickedEntity, setClickedEntity] = useState<Entity | null>(null);
     const [hoveredSelectionId, setHoveredSelectionId] = useState<number | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
@@ -62,7 +81,7 @@ export default function InteractiveLandingViewer() {
                 return { entities: [], landingPageEntityId: null };
             }
 
-            const loadedEntities = projectData.entities.map((entityMeta: any) => ({
+            const loadedEntities: Entity[] = projectData.entities.map((entityMeta: any) => ({
                 ...entityMeta,
                 views: entityMeta.views.map((viewMeta: any) => {
                     const imageUrl = localStorage.getItem(getStorageKey(`view-image-${viewMeta.id}`)) || undefined;
@@ -124,6 +143,7 @@ export default function InteractiveLandingViewer() {
     
     const closeDetails = useCallback(() => {
         setClickedSelection(null);
+        setClickedEntity(null);
         setDetailsPosition({ opacity: 0 }); // For fade-out transition
     }, []);
 
@@ -173,6 +193,16 @@ export default function InteractiveLandingViewer() {
         e.stopPropagation();
         if (selection.details) {
             setClickedSelection(selection);
+
+             if (selection.details.makeAsEntity && selection.details.title) {
+                const { entities } = loadDataFromStorage();
+                const entityId = selection.details.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                const targetEntity = entities.find((e: Entity) => e.id === entityId);
+                setClickedEntity(targetEntity || null);
+            } else {
+                setClickedEntity(null);
+            }
+
 
             if (renderedImageRect && containerRef.current) {
                 const { x: imgX, y: imgY, width: imgWidth, height: imgHeight } = renderedImageRect;
@@ -438,23 +468,48 @@ export default function InteractiveLandingViewer() {
                         </CardHeader>
                         <CardContent className="text-sm">
                             {clickedSelection.details.description && <p className="text-neutral-300 mb-4">{clickedSelection.details.description}</p>}
-                            <div className="flex justify-between text-neutral-400">
-                                <span>Width:</span>
-                                <span className="font-mono">{clickedSelection.details.width}m</span>
-                            </div>
-                            <div className="flex justify-between text-neutral-400">
-                                <span>Height:</span>
-                                <span className="font-mono">{clickedSelection.details.height}m</span>
-                            </div>
+                            
+                            {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') ? (
+                                <div className="space-y-1 mb-4">
+                                    <div className="flex justify-between text-neutral-400"><span>Price:</span><span className="font-mono">{clickedEntity.price ? `€ ${clickedEntity.price.toLocaleString()}` : 'N/A'}</span></div>
+                                    <div className="flex justify-between text-neutral-400"><span>Status:</span><span className="font-mono capitalize">{clickedEntity.status}</span></div>
+                                    <div className="flex justify-between text-neutral-400"><span>Available:</span><span className="font-mono">{clickedEntity.availableDate || 'N/A'}</span></div>
+                                    <div className="flex justify-between text-neutral-400"><span>Area:</span><span className="font-mono">{clickedEntity.houseArea ? `${clickedEntity.houseArea} m²` : 'N/A'}</span></div>
+                                    <div className="flex justify-between text-neutral-400"><span>Floors:</span><span className="font-mono">{clickedEntity.floors}</span></div>
+                                    <div className="flex justify-between text-neutral-400"><span>Rooms:</span><span className="font-mono">{clickedEntity.rooms}</span></div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex justify-between text-neutral-400">
+                                        <span>Width:</span>
+                                        <span className="font-mono">{clickedSelection.details.width}m</span>
+                                    </div>
+                                    <div className="flex justify-between text-neutral-400">
+                                        <span>Height:</span>
+                                        <span className="font-mono">{clickedSelection.details.height}m</span>
+                                    </div>
+                                </>
+                            )}
                         </CardContent>
-                         {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
-                            <CardFooter>
+                         <CardFooter className="flex flex-col gap-2">
+                             {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') && (
+                                 <Button 
+                                    className="w-full"
+                                    variant="secondary"
+                                    onClick={() => setActiveView('contact')} 
+                                    disabled={clickedEntity.status !== 'available'}>
+                                    {clickedEntity.status !== 'available' ? 'Not Available' : 'Book Call'}
+                                    <Phone className="ml-2 h-4 w-4" />
+                                 </Button>
+                             )}
+
+                             {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
                                 <Button className="w-full bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedSelection.details!.title)}>
                                     <NavigationIcon className="mr-2 h-4 w-4" />
                                     Navigate to
                                 </Button>
-                            </CardFooter>
-                        )}
+                            )}
+                        </CardFooter>
                     </Card>
                 </div>
             )}
