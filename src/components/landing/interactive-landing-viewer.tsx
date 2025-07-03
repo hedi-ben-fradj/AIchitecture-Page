@@ -27,7 +27,7 @@ export interface View {
   id: string;
   name: string;
   imageUrl?: string;
-  type: '2d' | '360';
+  type: string;
   selections?: Polygon[];
 }
 
@@ -84,7 +84,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [appliedFilters, setAppliedFilters] = useState<Partial<Filters>>({});
     const [projectId, setProjectId] = useState<string | null>(null);
     const [detailsPosition, setDetailsPosition] = useState<React.CSSProperties>({ opacity: 0 });
-    const [currentViewType, setCurrentViewType] = useState<'2d' | '360'>('2d');
+    const [currentViewType, setCurrentViewType] = useState<string>('2d');
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);

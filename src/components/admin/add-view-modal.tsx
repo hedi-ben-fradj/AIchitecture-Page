@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -10,7 +11,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Corrected path for toast
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 interface AddViewModalProps {
@@ -19,23 +20,23 @@ interface AddViewModalProps {
     entityId: string;
 }
 
+const formSchema = z.object({
+    name: z.string().min(1, 'View name is required'),
+    type: z.string({
+        required_error: "Please select a view type.",
+    }),
+});
+
 export function AddViewModal({ isOpen, onClose, entityId }: AddViewModalProps) {
-    const { addView } = useProjectData();
+    const { addView, viewTypes } = useProjectData();
     const { toast } = useToast();
     const router = useRouter();
-
-    const formSchema = z.object({
-        name: z.string().min(1, 'View name is required'),
-        type: z.enum(['2d', '360'], {
-            required_error: "Please select a view type.",
-        }),
-    });
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             name: '',
-            type: '2d',
+            type: viewTypes[0] || '',
         },
     });
 
@@ -94,8 +95,9 @@ export function AddViewModal({ isOpen, onClose, entityId }: AddViewModalProps) {
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent className="bg-[#2a2a2a] text-white border-neutral-700">
-                                            <SelectItem value="2d">2D image</SelectItem>
-                                            <SelectItem value="360">360 panoramic image</SelectItem>
+                                            {viewTypes.map(type => (
+                                                <SelectItem key={type} value={type} className="capitalize hover:bg-neutral-700">{type}</SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />

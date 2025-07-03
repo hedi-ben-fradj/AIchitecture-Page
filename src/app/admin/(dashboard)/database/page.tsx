@@ -41,9 +41,16 @@ export default function DatabasePage() {
     const [entityToEdit, setEntityToEdit] = useState<EnrichedEntity | null>(null);
     const [entityToDelete, setEntityToDelete] = useState<EnrichedEntity | null>(null);
     
-    const { entityTypes, addEntityType, deleteEntityType } = useProjectData();
+    const { 
+        entityTypes, addEntityType, deleteEntityType, 
+        viewTypes, addViewType, deleteViewType 
+    } = useProjectData();
+    
     const [entityTypeToDelete, setEntityTypeToDelete] = useState<string | null>(null);
     const [newEntityTypeName, setNewEntityTypeName] = useState('');
+    
+    const [viewTypeToDelete, setViewTypeToDelete] = useState<string | null>(null);
+    const [newViewTypeName, setNewViewTypeName] = useState('');
 
     const loadData = useCallback(() => {
         if (typeof window !== 'undefined') {
@@ -169,10 +176,22 @@ export default function DatabasePage() {
 
     const confirmDeleteEntityType = () => {
         if (entityTypeToDelete) {
-            // Note: This does not check if the type is currently in use.
-            // Deleting a type in use may cause issues in other parts of the app.
             deleteEntityType(entityTypeToDelete);
             setEntityTypeToDelete(null);
+        }
+    };
+
+    const handleAddViewType = () => {
+        if (newViewTypeName.trim()) {
+            addViewType(newViewTypeName.trim());
+            setNewViewTypeName('');
+        }
+    };
+
+    const confirmDeleteViewType = () => {
+        if (viewTypeToDelete) {
+            deleteViewType(viewTypeToDelete);
+            setViewTypeToDelete(null);
         }
     };
 
@@ -235,14 +254,30 @@ export default function DatabasePage() {
                 </AlertDialogContent>
             </AlertDialog>
             
+            <AlertDialog open={!!viewTypeToDelete} onOpenChange={() => setViewTypeToDelete(null)}>
+                <AlertDialogContent className="bg-[#2a2a2a] border-neutral-700 text-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the "{viewTypeToDelete}" type. Any views using this type may behave unexpectedly.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="hover:bg-neutral-700" onClick={() => setViewTypeToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDeleteViewType} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            
             <header className="h-16 flex items-center px-6 border-b border-neutral-700 bg-[#2a2a2a] flex-shrink-0">
                 <h1 className="text-xl font-semibold text-white">Database</h1>
             </header>
             <main className="flex-1 p-8 bg-[#313131] overflow-y-auto">
                 <Tabs defaultValue="entities" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+                    <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
                         <TabsTrigger value="entities">Entities</TabsTrigger>
                         <TabsTrigger value="types">Entity Types</TabsTrigger>
+                        <TabsTrigger value="view-types">View Types</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="entities" className="mt-6">
@@ -356,6 +391,57 @@ export default function DatabasePage() {
                                                         <TableCell className="font-medium capitalize">{type}</TableCell>
                                                         <TableCell className="text-right">
                                                             <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-neutral-600 text-red-500 hover:text-red-400" onClick={() => setEntityTypeToDelete(type)}>
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="view-types" className="mt-6">
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
+                                <CardHeader>
+                                    <CardTitle>Add New View Type</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            placeholder="e.g., floorplan"
+                                            value={newViewTypeName}
+                                            onChange={(e) => setNewViewTypeName(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleAddViewType()}
+                                            className="bg-[#313131] border-neutral-600"
+                                        />
+                                        <Button onClick={handleAddViewType} disabled={!newViewTypeName.trim()} className="bg-yellow-500 hover:bg-yellow-600 text-black">Add Type</Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
+                                <CardHeader>
+                                    <CardTitle>Manage View Types</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="rounded-md border border-neutral-700 max-h-96 overflow-y-auto">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="border-neutral-700 hover:bg-[#2a2a2a]">
+                                                    <TableHead className="text-white">Type Name</TableHead>
+                                                    <TableHead className="text-right text-white">Actions</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {viewTypes.map(type => (
+                                                    <TableRow key={type} className="border-neutral-700 hover:bg-[#313131]">
+                                                        <TableCell className="font-medium capitalize">{type}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-neutral-600 text-red-500 hover:text-red-400" onClick={() => setViewTypeToDelete(type)}>
                                                                 <Trash2 className="h-4 w-4" />
                                                             </Button>
                                                         </TableCell>

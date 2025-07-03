@@ -5,13 +5,14 @@ import React, { createContext, useContext, useState, useCallback, type ReactNode
 import type { Polygon } from '@/components/admin/image-editor';
 
 export type EntityType = string;
+export type ViewType = string;
 
 // Interfaces
 export interface View {
   id: string;
   name: string;
   imageUrl?: string;
-  type: "2d" | "360";
+  type: ViewType;
   selections?: Polygon[];
 }
 
@@ -44,6 +45,7 @@ interface ProjectContextType {
   entities: Entity[];
   landingPageEntityId: string | null;
   entityTypes: EntityType[];
+  viewTypes: ViewType[];
   
   // Entity methods
   addEntity: (entityName: string, entityType: EntityType, parentId?: string | null) => void;
@@ -53,7 +55,7 @@ interface ProjectContextType {
   setLandingPageEntityId: (entityId: string | null) => void;
 
   // View methods
-  addView: (entityId: string, viewName: string, viewType: View['type']) => string;
+  addView: (entityId: string, viewName: string, viewType: ViewType) => string;
   deleteView: (entityId: string, viewId: string) => void;
   getView: (entityId: string, viewId: string) => View | undefined;
   updateViewImage: (entityId: string, viewId: string, imageUrl: string) => void;
@@ -63,6 +65,10 @@ interface ProjectContextType {
   // Entity Type methods
   addEntityType: (typeName: string) => void;
   deleteEntityType: (typeName: string) => void;
+
+  // View Type methods
+  addViewType: (typeName: ViewType) => void;
+  deleteViewType: (typeName: ViewType) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -77,12 +83,16 @@ const defaultEntityTypes: EntityType[] = [
 ];
 const ENTITY_TYPES_STORAGE_KEY = 'entity_types_list';
 
+const defaultViewTypes: ViewType[] = ['2d', '360'];
+const VIEW_TYPES_STORAGE_KEY = 'view_types_list';
+
 
 export function ViewsProvider({ children, projectId }: { children: ReactNode; projectId?: string }) {
   const [isMounted, setIsMounted] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [landingPageEntityId, setLandingPageEntityIdState] = useState<string | null>(null);
   const [entityTypes, setEntityTypes] = useState<EntityType[]>(defaultEntityTypes);
+  const [viewTypes, setViewTypes] = useState<ViewType[]>(defaultViewTypes);
 
   const getStorageKey = useCallback((key: string) => {
     if (!projectId) return '';
@@ -128,19 +138,27 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     }
   }, [projectId, getStorageKey]);
 
-  // Global data loading (entity types)
+  // Global data loading (entity types and view types)
   useEffect(() => {
     if (typeof window !== 'undefined') {
         try {
-            const storedTypes = window.localStorage.getItem(ENTITY_TYPES_STORAGE_KEY);
-            if (storedTypes) {
-                setEntityTypes(JSON.parse(storedTypes));
+            const storedEntityTypes = window.localStorage.getItem(ENTITY_TYPES_STORAGE_KEY);
+            if (storedEntityTypes) {
+                setEntityTypes(JSON.parse(storedEntityTypes));
             } else {
                 window.localStorage.setItem(ENTITY_TYPES_STORAGE_KEY, JSON.stringify(defaultEntityTypes));
             }
+
+            const storedViewTypes = window.localStorage.getItem(VIEW_TYPES_STORAGE_KEY);
+            if (storedViewTypes) {
+                setViewTypes(JSON.parse(storedViewTypes));
+            } else {
+                window.localStorage.setItem(VIEW_TYPES_STORAGE_KEY, JSON.stringify(defaultViewTypes));
+            }
         } catch (error) {
-            console.error("Failed to load entity types from storage", error);
+            console.error("Failed to load types from storage", error);
             setEntityTypes(defaultEntityTypes);
+            setViewTypes(defaultViewTypes);
         }
         setIsMounted(true);
     }
@@ -306,7 +324,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     }
   }, [projectId, entities, saveMetadata]);
 
- const addView = useCallback((entityId: string, viewName: string, viewType: View['type']) => {
+ const addView = useCallback((entityId: string, viewName: string, viewType: ViewType) => {
     if (!projectId) {
         console.error("Cannot add a view without a project context.");
         return '';
@@ -452,11 +470,29 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, []);
 
   const deleteEntityType = useCallback((typeName: string) => {
-    // Ideally, we would check if this type is in use across all projects.
-    // That's a complex operation, so for now we'll just delete it.
     setEntityTypes(prevTypes => {
         const updatedTypes = prevTypes.filter(t => t !== typeName);
         window.localStorage.setItem(ENTITY_TYPES_STORAGE_KEY, JSON.stringify(updatedTypes));
+        return updatedTypes;
+    });
+  }, []);
+
+  const addViewType = useCallback((typeName: ViewType) => {
+    setViewTypes(prevTypes => {
+        if (prevTypes.map(t => t.toLowerCase()).includes(typeName.toLowerCase())) {
+            alert('This view type already exists.');
+            return prevTypes;
+        }
+        const updatedTypes = [...prevTypes, typeName];
+        window.localStorage.setItem(VIEW_TYPES_STORAGE_KEY, JSON.stringify(updatedTypes));
+        return updatedTypes;
+    });
+  }, []);
+
+  const deleteViewType = useCallback((typeName: ViewType) => {
+    setViewTypes(prevTypes => {
+        const updatedTypes = prevTypes.filter(t => t !== typeName);
+        window.localStorage.setItem(VIEW_TYPES_STORAGE_KEY, JSON.stringify(updatedTypes));
         return updatedTypes;
     });
   }, []);
@@ -465,6 +501,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     entities, 
     landingPageEntityId, 
     entityTypes,
+    viewTypes,
     getEntity, 
     getView,
     addEntity,
@@ -477,7 +514,9 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     updateViewSelections,
     setDefaultViewId,
     addEntityType,
-    deleteEntityType
+    deleteEntityType,
+    addViewType,
+    deleteViewType
   };
 
   if (!isMounted && projectId) return null; // Only pause rendering for project-specific contexts
