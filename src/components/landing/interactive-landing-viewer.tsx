@@ -453,10 +453,16 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     };
 
     const toggleViewType = () => {
-         if (!currentView || !currentView.entityId) return;
+        if (!currentView || !currentView.entityId) return;
 
-        const otherViewType = currentViewType === '2d' ? '360' : '2d';
-        const targetView = entityViews.find(view => view.type === otherViewType);
+        let targetView;
+        if (currentViewType === '360') {
+            // Find any non-360 view. Prefer '2d' if available.
+            targetView = entityViews.find(view => view.type === '2d') || entityViews.find(view => view.type !== '360');
+        } else {
+            // Find a 360 view
+            targetView = entityViews.find(view => view.type === '360');
+        }
 
         if (targetView) handleViewSelect(targetView);
     };
@@ -471,9 +477,9 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     
     return (
  <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={closeDetails}>
- {entityViews.some(view => view.type === '2d') && entityViews.some(view => view.type === '360') && (
+ {entityViews.some(view => view.type === '360') && entityViews.some(view => view.type !== '360') && (
  <div className="absolute top-4 right-4 z-50 flex items-center bg-black/50 text-white rounded-full p-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleViewType(); }}>
- <span className={cn("px-3 py-1 text-sm font-medium flex items-center gap-1", currentViewType === '2d' && "bg-white text-black rounded-full")}>
+ <span className={cn("px-3 py-1 text-sm font-medium flex items-center gap-1", currentViewType !== '360' && "bg-white text-black rounded-full")}>
  2D image
  </span>
  <div className="w-px h-4 bg-white mx-1"></div>
@@ -504,19 +510,19 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 )}
             </div>
 
-            {currentViewType == '2d' ?
-                <Image ref={imageRef} src={currentView.imageUrl} alt={currentView.name} layout="fill" objectFit="contain" onLoad={calculateRect} key={currentView.id} className="transition-opacity duration-500" style={{ opacity: renderedImageRect ? 1 : 0 }} />
-                :
+            {currentViewType === '360' ?
                 <ReactPhotoSphereViewer
                   src={currentView.imageUrl} // Path to your 360 image
                   alt={currentView.name}
                   width="100%"
                   height="100%"
                 />
+                :
+                <Image ref={imageRef} src={currentView.imageUrl} alt={currentView.name} layout="fill" objectFit="contain" onLoad={calculateRect} key={currentView.id} className="transition-opacity duration-500" style={{ opacity: renderedImageRect ? 1 : 0 }} />
             }
             
             {/* Overlay for 2D view interactions */}
-            {currentViewType === '2d' && renderedImageRect && (
+            {currentViewType !== '360' && renderedImageRect && (
                 <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>
                     {(isFilterApplied ? filteredSelections.map(f => f.selection) : (currentView.selections || [])).map(selection => {
                          const match = isFilterApplied ? filteredSelections.find(f => f.selection.id === selection.id) : null;
