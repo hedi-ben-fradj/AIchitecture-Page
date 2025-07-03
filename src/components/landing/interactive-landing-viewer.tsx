@@ -341,23 +341,18 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         return pricePass && areaPass && availabilityPass && roomsPass;
     }, []);
 
-    const hasMatchingDescendant = useCallback((entityId: string, filters: Filters, allEntities: Entity[]): boolean => {
+    const getMatchingDescendantCount = useCallback((entityId: string, filters: Filters, allEntities: Entity[]): number => {
+        let count = 0;
         const children = allEntities.filter(e => e.parentId === entityId);
-    
-        if (children.length === 0) {
-            return false;
-        }
     
         for (const child of children) {
             if (entityMatchesFilters(child, filters)) {
-                return true;
+                count++;
             }
-            if (hasMatchingDescendant(child.id, filters, allEntities)) {
-                return true;
-            }
+            count += getMatchingDescendantCount(child.id, filters, allEntities);
         }
     
-        return false;
+        return count;
     }, [entityMatchesFilters]);
 
     const filteredSelections = useMemo(() => {
@@ -366,20 +361,34 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         const selectionsWithDetails = currentView.selections.filter(s => s.details?.makeAsEntity && s.details.title);
         
         if (!isFilterApplied) {
-            return selectionsWithDetails;
+            return selectionsWithDetails.map(selection => ({ selection, matchCount: 0 }));
         }
 
-        return selectionsWithDetails.filter(selection => {
-            const entityId = selection.details!.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-            const entity = allEntities.find(e => e.id === entityId);
-            
-            if (!entity) {
-                return false;
-            }
-            
-            return entityMatchesFilters(entity, appliedFilters) || hasMatchingDescendant(entity.id, appliedFilters, allEntities);
-        });
-    }, [currentView?.selections, appliedFilters, allEntities, entityMatchesFilters, hasMatchingDescendant, isFilterApplied]);
+        return selectionsWithDetails
+            .map(selection => {
+                const entityId = selection.details!.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                const entity = allEntities.find(e => e.id === entityId);
+                
+                if (!entity) return null;
+
+                let totalMatches = 0;
+                if (entity.entityType === 'Apartment' || entity.entityType === 'house') {
+                    if (entityMatchesFilters(entity, appliedFilters)) {
+                        totalMatches = 1;
+                    }
+                }
+                
+                const descendantMatches = getMatchingDescendantCount(entity.id, appliedFilters, allEntities);
+                totalMatches += descendantMatches;
+                
+                if (totalMatches > 0) {
+                    return { selection, matchCount: totalMatches };
+                }
+
+                return null;
+            })
+            .filter((item): item is { selection: Polygon; matchCount: number } => item !== null);
+    }, [currentView?.selections, isFilterApplied, appliedFilters, allEntities, entityMatchesFilters, getMatchingDescendantCount]);
 
     const handleApplyFilters = (filters: Filters) => {
         setAppliedFilters(filters);
@@ -457,7 +466,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             {/* Overlay for 2D view interactions */}
             {currentViewType === '2d' && renderedImageRect && (
                 <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>
-                    {filteredSelections.map(selection => {
+                    {filteredSelections.map(({ selection, matchCount }) => {
                         const absPoints = selection.points.map(p => ({
                             x: p.x * renderedImageRect.width,
                             y: p.y * renderedImageRect.height,
@@ -492,7 +501,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                             ? "stroke-yellow-400 fill-yellow-400/50"
                                             : isHovered
                                                 ? "stroke-yellow-500 fill-yellow-400/20"
-                                                : isFilterApplied
+                                                : isFilterApplied && matchCount > 0
                                                     ? "stroke-yellow-500 fill-yellow-400/20"
                                                     : "stroke-transparent fill-transparent"
                                     )}
@@ -503,6 +512,20 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                             <Info className="h-5 w-5 text-white" />
                                         </div>
                                     </foreignObject>
+                                )}
+                                {isFilterApplied && matchCount > 0 && (
+                                    <g transform={`translate(${centerX}, ${centerY})`} className="pointer-events-none">
+                                        <circle r="16" fill="rgba(250, 204, 21, 0.9)" stroke="white" strokeWidth="1.5" />
+                                        <text
+                                            textAnchor="middle"
+                                            dy=".3em"
+                                            fill="black"
+                                            fontSize="14"
+                                            fontWeight="bold"
+                                        >
+                                            {matchCount}
+                                        </text>
+                                    </g>
                                 )}
                             </g>
                         );
@@ -633,17 +656,17 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 </div>
             )}
 
-            {filteredSelections.length > 0 && (
+            {filteredSelections.length > 0 && isFilterApplied && (
                 <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent pointer-events-none">
                     <div className="pointer-events-auto overflow-x-auto pb-2 -mb-2 flex justify-center">
                         <div className="flex gap-4 w-max">
-                            {filteredSelections.map((selection) => (
+                            {filteredSelections.map(({ selection, matchCount }) => (
                                 <Card
                                     key={selection.id}
                                     className={cn(
                                         "w-56 bg-black/70 backdrop-blur-sm text-white border-neutral-700 transition-colors shrink-0",
                                         "cursor-pointer hover:border-yellow-500",
-                                        (hoveredSelectionId === selection.id || clickedSelection?.id === selection.id || isFilterApplied) && "border-yellow-500"
+                                        (hoveredSelectionId === selection.id || clickedSelection?.id === selection.id || (isFilterApplied && matchCount > 0)) && "border-yellow-500"
                                     )}
                                     onMouseEnter={() => setHoveredSelectionId(selection.id)}
                                     onMouseLeave={() => setHoveredSelectionId(null)}
