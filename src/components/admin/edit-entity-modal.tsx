@@ -16,6 +16,7 @@ import { Separator } from '../ui/separator';
 import { Checkbox } from '../ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface EditEntityModalProps {
     isOpen: boolean;
@@ -102,6 +103,9 @@ export function EditEntityModal({ isOpen, onClose, entity }: EditEntityModalProp
         if (!entity) return;
         
         const finalData = { ...data };
+        if (finalData.entityType === 'Apartment') {
+            finalData.plotArea = undefined;
+        }
         if (!finalData.enterDetailedRoomSpecs) {
           finalData.detailedRooms = [];
         }
@@ -232,13 +236,15 @@ export function EditEntityModal({ isOpen, onClose, entity }: EditEntityModalProp
                                             <Input id="availableDate" {...form.register('availableDate')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="e.g., 3Q/2024" />
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-4 gap-4">
+                                    <div className={cn("grid gap-4", entityType === 'house' ? "grid-cols-4" : "grid-cols-3")}>
+                                        {entityType === 'house' && (
+                                            <div>
+                                                <Label htmlFor="plotArea">Plot Area (m²)</Label>
+                                                <Input id="plotArea" type="number" {...form.register('plotArea')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="900" />
+                                            </div>
+                                        )}
                                         <div>
-                                            <Label htmlFor="plotArea">Plot Area (m²)</Label>
-                                            <Input id="plotArea" type="number" {...form.register('plotArea')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="900" />
-                                        </div>
-                                        <div>
-                                            <Label htmlFor="houseArea">House Area (m²)</Label>
+                                            <Label htmlFor="houseArea">{entityType === 'house' ? 'House Area (m²)' : 'Area (m²)'}</Label>
                                             <Input id="houseArea" type="number" {...form.register('houseArea')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="150" />
                                         </div>
                                         <div>

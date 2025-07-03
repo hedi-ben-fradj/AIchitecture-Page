@@ -220,8 +220,15 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
                             <DetailItem icon={Euro} label="Price" value={entity.price ? `€ ${entity.price.toLocaleString()}`: 'N/A'} />
                             <DetailItem icon={Ruler} label="Status" value={entity.status} />
                             <DetailItem icon={Calendar} label="Available Date" value={entity.availableDate} />
-                            <DetailItem icon={Home} label="Plot Area" value={entity.plotArea ? `${entity.plotArea} m²` : null} />
-                            <DetailItem icon={Building2} label="House Area" value={entity.houseArea ? `${entity.houseArea} m²` : null} />
+                            
+                            {entity.entityType === 'house' && (
+                                <DetailItem icon={Home} label="Plot Area" value={entity.plotArea ? `${entity.plotArea} m²` : null} />
+                            )}
+                            <DetailItem 
+                                icon={Building2} 
+                                label={entity.entityType === 'house' ? 'House Area' : 'Area'} 
+                                value={entity.houseArea ? `${entity.houseArea} m²` : null} />
+                            
                             <DetailItem icon={Building} label="Floors" value={entity.floors} />
                             <DetailItem icon={Bed} label="Rooms" value={entity.rooms} />
                        </CardContent>

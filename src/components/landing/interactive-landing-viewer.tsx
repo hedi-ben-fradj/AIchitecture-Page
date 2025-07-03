@@ -598,12 +598,14 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         <h3 className="text-xl font-light text-white leading-none">{clickedEntity.name}</h3>
                                     </div>
                                     <div className="flex gap-x-4 text-left">
+                                        {clickedEntity.entityType === 'house' && (
+                                            <div>
+                                                <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Plot, M²</p>
+                                                <p className="text-lg font-light text-white mt-1">{clickedEntity.plotArea ?? '—'}</p>
+                                            </div>
+                                        )}
                                         <div>
-                                            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Plot, M²</p>
-                                            <p className="text-lg font-light text-white mt-1">{clickedEntity.plotArea ?? '—'}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">House, M²</p>
+                                            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">{clickedEntity.entityType === 'house' ? 'House, M²' : 'Area, M²'}</p>
                                             <p className="text-lg font-light text-white mt-1">{clickedEntity.houseArea ?? '—'}</p>
                                         </div>
                                         <div>
