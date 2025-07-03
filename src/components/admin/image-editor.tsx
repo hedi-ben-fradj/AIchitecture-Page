@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import SelectionDetailsModal from './selection-details-modal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { EntityType } from '@/contexts/views-context';
+import Magnifier from './magnifier';
 
 interface Point {
   x: number;
@@ -67,6 +68,10 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedPolygonId, setSelectedPolygonId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // magnifier tool
+  const [magnifierPosition, setMagnifierPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isMagnifierVisible, setIsMagnifierVisible] = useState(false);
   
   // By stringifying the initialPolygons, we create a stable dependency for the useEffect hook,
   // preventing an infinite loop if the parent component passes a new array instance on every render.
@@ -235,10 +240,11 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   };
 
   const handleMouseMove = (e: MouseEvent) => {
-    if (!dragInfo) return;
-
     const mousePos = getMousePosition(e);
-
+    setMagnifierPosition(mousePos);
+    
+    if (!dragInfo) return;
+    
     setPolygons(polys =>
       polys.map(p => {
         if (p.id !== dragInfo.polygonId) return p;
@@ -348,7 +354,13 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
         <div className="relative w-full max-w-5xl mx-auto" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
           <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600">
             <img src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
-            <svg ref={svgRef} className="absolute top-0 left-0 w-full h-full z-10" onClick={() => setSelectedPolygonId(null)}>
+            <svg ref={svgRef} 
+            className="absolute top-0 left-0 w-full h-full z-10" 
+            onClick={() => setSelectedPolygonId(null)}
+            onMouseLeave={() => { handleMouseUp(); setIsMagnifierVisible(false); }}
+            onMouseEnter={() => setIsMagnifierVisible(true)}
+            >
+              
               {polygons.map(polygon => (
                 <Tooltip key={polygon.id} delayDuration={100}>
                   <TooltipTrigger asChild>
@@ -387,6 +399,11 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
               ))}
             </svg>
           </div>
+          <Magnifier
+            imageUrl={imageUrl}
+            cursorPosition={isMagnifierVisible ? magnifierPosition : null}
+            imageSize={{ width: svgRef.current?.getBoundingClientRect().width || 0, height: svgRef.current?.getBoundingClientRect().height || 0 }}
+          />
         </div>
       </div>
     </TooltipProvider>
