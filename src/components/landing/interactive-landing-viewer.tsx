@@ -532,15 +532,15 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         
                             if (isProperty) {
                                 if (entityForSelection.status === 'available') {
-                                    return isClicked ? 'stroke-green-400 fill-green-400/50' : 'stroke-green-400 fill-green-400/20';
+                                    return 'stroke-green-400 fill-green-400/50';
                                 }
                                 if (entityForSelection.status === 'sold') {
-                                     return isClicked ? 'stroke-orange-400 fill-orange-400/50' : 'stroke-orange-400 fill-orange-400/20';
+                                     return 'stroke-orange-400 fill-orange-400/50';
                                 }
                             }
                             
                             // Default for non-properties or properties without status
-                            return isClicked ? 'stroke-yellow-400 fill-yellow-400/50' : 'stroke-yellow-400 fill-yellow-400/20';
+                            return 'stroke-yellow-400 fill-yellow-400/50';
                         };
 
                         return (
@@ -637,7 +637,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     </>
                                 )}
 
-                                <div className="flex justify-center items-center mt-5 gap-4">
+                                <div className="flex justify-end items-center mt-5 gap-4">
                                     {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') && (
                                         <Button 
                                             className="bg-white/90 hover:bg-white text-black rounded-full px-5 h-9 text-[11px] font-semibold tracking-wide disabled:bg-neutral-600 disabled:text-neutral-400"
@@ -683,10 +683,12 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 )}
                                 
                                 {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
-                                    <Button className="w-full mt-6 bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedSelection.details!.title)}>
-                                        <NavigationIcon className="mr-2 h-4 w-4" />
-                                        Navigate to
-                                    </Button>
+                                    <div className="flex justify-end mt-6">
+                                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedSelection.details!.title)}>
+                                            <NavigationIcon className="mr-2 h-4 w-4" />
+                                            Navigate to
+                                        </Button>
+                                    </div>
                                 )}
                             </CardContent>
                         )}
