@@ -656,7 +656,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 </div>
             )}
 
-            {filteredSelections.length > 0 && isFilterApplied && (
+            {filteredSelections.length > 0 && (
                 <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent pointer-events-none">
                     <div className="pointer-events-auto overflow-x-auto pb-2 -mb-2 flex justify-center">
                         <div className="flex gap-4 w-max">
