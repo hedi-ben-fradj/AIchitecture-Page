@@ -564,7 +564,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             {/* Details card */}
             {clickedSelection?.details && (
                 <div style={detailsPosition} className="z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
-                    <Card className="pointer-events-auto bg-black/70 backdrop-blur-sm text-white border-none w-auto max-w-lg shadow-2xl animate-in fade-in-50 rounded-xl">
+                    <Card className="pointer-events-auto bg-black/80 backdrop-blur-md text-white border-none w-auto max-w-2xl shadow-2xl animate-in fade-in-50 rounded-2xl">
                         
                         <Button variant="ghost" size="icon" className="absolute top-4 right-4 h-8 w-8 shrink-0 text-neutral-400 hover:text-white z-10" onClick={closeDetails}>
                             <X className="h-5 w-5" />
@@ -573,66 +573,65 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         {clickedEntity ? (
                             <CardContent className="p-6">
                                 {/* Top Row */}
-                                <div className="flex items-start justify-between gap-x-4">
-                                    <div className="flex-shrink-0 pr-4">
-                                        <h3 className="text-5xl font-light text-white leading-none tracking-tight">{clickedEntity.name}</h3>
+                                <div className="flex items-start justify-between gap-8">
+                                    <div className="flex-1 pt-1">
+                                        <h3 className="text-5xl font-light text-white leading-none">{clickedEntity.name}</h3>
                                     </div>
-                                    <div className="flex-grow grid grid-cols-3 gap-x-4">
-                                        <div className="text-left">
+                                    <div className="flex gap-x-8 text-left">
+                                        <div>
                                             <p className="text-[11px] text-neutral-400 uppercase tracking-wider">Plot, M²</p>
-                                            <p className="text-xl font-light text-white mt-1">{clickedEntity.plotArea ?? '—'}</p>
+                                            <p className="text-2xl font-light text-white mt-1">{clickedEntity.plotArea ?? '—'}</p>
                                         </div>
-                                        <div className="text-left">
+                                        <div>
                                             <p className="text-[11px] text-neutral-400 uppercase tracking-wider">House, M²</p>
-                                            <p className="text-xl font-light text-white mt-1">{clickedEntity.houseArea ?? '—'}</p>
+                                            <p className="text-2xl font-light text-white mt-1">{clickedEntity.houseArea ?? '—'}</p>
                                         </div>
-                                        <div className="text-left">
+                                        <div>
                                             <p className="text-[11px] text-neutral-400 uppercase tracking-wider">Price, EUR</p>
                                                 {clickedEntity.status === 'sold' ? (
-                                                <div className="mt-1 text-xs font-semibold uppercase bg-neutral-600 text-neutral-200 px-2 py-0.5 rounded-md inline-block">Sold</div>
+                                                <div className="mt-1 text-sm font-semibold uppercase bg-neutral-600 text-neutral-200 px-2 py-1 rounded-md inline-block">Sold</div>
                                             ) : (
-                                                <p className="text-xl font-light text-white mt-1">{clickedEntity.price ? `€${clickedEntity.price.toLocaleString()}` : 'N/A'}</p>
+                                                <p className="text-2xl font-light text-white mt-1">{clickedEntity.price ? `€${clickedEntity.price.toLocaleString()}` : 'N/A'}</p>
                                             )}
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <hr className="border-neutral-700 my-4" />
+                                {(clickedEntity.detailedRooms && clickedEntity.detailedRooms.length > 0 || clickedEntity.availableDate) && (
+                                    <>
+                                        <hr className="border-neutral-700 my-5" />
 
-                                {/* Bottom rows */}
-                                <div className="grid grid-cols-4 gap-x-4 gap-y-4">
-                                   <div className="text-left">
-                                        <p className="text-[11px] text-neutral-400 uppercase tracking-wider">Date</p>
-                                        <p className="text-xl font-light text-white mt-1">{clickedEntity.availableDate ?? '—'}</p>
-                                    </div>
+                                        <div className="grid grid-cols-4 gap-x-8">
+                                        <div className="text-left">
+                                                <p className="text-[11px] text-neutral-400 uppercase tracking-wider">Date</p>
+                                                <p className="text-2xl font-light text-white mt-1">{clickedEntity.availableDate ?? '—'}</p>
+                                            </div>
 
-                                    {clickedEntity.detailedRooms?.map(room => (
-                                        <div key={room.id} className="text-left">
-                                            <p className="text-[11px] text-neutral-400 uppercase tracking-wider">{room.name}</p>
-                                            <p className="text-xl font-light text-white mt-1">{room.size} m²</p>
+                                            {clickedEntity.detailedRooms?.map(room => (
+                                                <div key={room.id} className="text-left">
+                                                    <p className="text-[11px] text-neutral-400 uppercase tracking-wider truncate">{room.name}</p>
+                                                    <p className="text-2xl font-light text-white mt-1">{room.size} m²</p>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
+                                    </>
+                                )}
 
-                                 <hr className="border-neutral-700 my-4" />
+                                <div className="flex justify-center items-center mt-8 gap-4">
+                                    {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') && (
+                                        <Button 
+                                            className="bg-white/90 hover:bg-white text-black rounded-full px-8 h-12 text-sm font-semibold tracking-wide disabled:bg-neutral-600 disabled:text-neutral-200"
+                                            onClick={() => setActiveView('contact')} 
+                                            disabled={clickedEntity.status === 'sold'}>
+                                            {clickedEntity.status === 'sold' ? 'SOLD' : 'BOOK A CALL'}
+                                        </Button>
+                                    )}
 
-                                <div className="flex justify-end items-center mt-4">
-                                    <div className="flex items-center gap-4">
-                                         {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') && (
-                                            <Button 
-                                                className="bg-white/90 hover:bg-white text-black rounded-full px-6 py-2 text-sm font-semibold tracking-wide disabled:bg-neutral-600 disabled:text-neutral-200"
-                                                onClick={() => setActiveView('contact')} 
-                                                disabled={clickedEntity.status !== 'available'}>
-                                                {clickedEntity.status !== 'available' ? 'NOT AVAILABLE' : 'BOOK A CALL'}
-                                            </Button>
-                                        )}
-
-                                         {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
-                                            <Button className="bg-yellow-500 hover:bg-yellow-600 text-black rounded-full px-6 py-2 text-sm font-semibold" onClick={() => handleNavigate(clickedSelection.details!.title)}>
-                                                Navigate To
-                                            </Button>
-                                        )}
-                                    </div>
+                                    {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
+                                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black rounded-full px-8 h-12 text-sm font-semibold" onClick={() => handleNavigate(clickedSelection.details!.title)}>
+                                            Navigate To
+                                        </Button>
+                                    )}
                                 </div>
                             </CardContent>
                         ) : (
