@@ -23,7 +23,7 @@ export interface View {
   id: string;
   name: string;
   imageUrl?: string;
-  type?: "2d" | "360";
+  type: "2d" | "360";
   selections?: Polygon[];
 }
 
