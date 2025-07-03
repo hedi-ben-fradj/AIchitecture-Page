@@ -18,8 +18,10 @@ import { entityTypes, type EntityType } from '@/contexts/views-context';
 const selectionDetailsSchema = z.object({
     title: z.string().min(1, 'Title is required.'),
     description: z.string().optional(),
-    width: z.coerce.number().positive('Width must be a positive number.'),
-    height: z.coerce.number().positive('Height must be a positive number.'),
+    defineSize: z.boolean().default(false).optional(),
+    width: z.coerce.number().positive('Width must be a positive number.').optional().or(z.literal('')),
+    height: z.coerce.number().positive('Height must be a positive number.').optional().or(z.literal('')),
+    area: z.coerce.number().positive('Area must be a positive number.').optional().or(z.literal('')),
     makeAsEntity: z.boolean().default(false).optional(),
     entityType: z.enum(entityTypes).optional(),
 });
@@ -29,7 +31,7 @@ type SelectionDetailsFormValues = z.infer<typeof selectionDetailsSchema>;
 interface SelectionDetailsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (data: SelectionDetailsFormValues) => void;
+    onSave: (data: Polygon['details']) => void;
     selectionData?: Polygon | null;
 }
 
@@ -39,24 +41,63 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
         defaultValues: {
             title: '',
             description: '',
-            width: 0,
-            height: 0,
+            defineSize: false,
+            width: '',
+            height: '',
+            area: '',
             makeAsEntity: false,
             entityType: entityTypes[2], // Default to Apartment
         },
     });
     
     const makeAsEntity = form.watch('makeAsEntity');
+    const defineSize = form.watch('defineSize');
+    const width = form.watch('width');
+    const height = form.watch('height');
+    const { dirtyFields } = form.formState;
+
+    const dimensionsEdited = dirtyFields.width || dirtyFields.height;
+    const areaEdited = dirtyFields.area;
+
+    // Calculate area from dimensions
+    useEffect(() => {
+        if (dimensionsEdited && Number(width) > 0 && Number(height) > 0) {
+            form.setValue('area', parseFloat((Number(width) * Number(height)).toFixed(2)), {
+                shouldValidate: true,
+                shouldDirty: false, // Don't mark area as dirty when auto-calculated
+            });
+        }
+    }, [width, height, dimensionsEdited, form]);
+
+    // Clear size/area fields when checkbox is unchecked
+    useEffect(() => {
+        if (!defineSize) {
+            form.setValue('width', '');
+            form.setValue('height', '');
+            form.setValue('area', '');
+            // Reset dirty status to allow re-editing
+            form.resetField('width');
+            form.resetField('height');
+            form.resetField('area');
+        }
+    }, [defineSize, form]);
 
     useEffect(() => {
         if (selectionData?.details) {
-          form.reset(selectionData.details);
+          form.reset({
+            ...selectionData.details,
+            width: selectionData.details.width || '',
+            height: selectionData.details.height || '',
+            area: selectionData.details.area || '',
+          });
         } else {
           form.reset({
             title: '',
             description: '',
-            width: 0,
-            height: 0,
+            defineSize: false,
+            width: '',
+            height: '',
+            area: '',
             makeAsEntity: false,
             entityType: entityTypes[2],
           });
@@ -64,7 +105,13 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
     }, [selectionData, form]);
 
     const onSubmit = (data: SelectionDetailsFormValues) => {
-        onSave(data);
+        const saveData: Polygon['details'] = {
+            ...data,
+            width: data.width ? Number(data.width) : undefined,
+            height: data.height ? Number(data.height) : undefined,
+            area: data.area ? Number(data.area) : undefined,
+        };
+        onSave(saveData);
         onClose();
     };
 
@@ -103,39 +150,81 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
                                 </FormItem>
                             )}
                         />
-                         <div className="grid grid-cols-2 gap-4">
-                             <FormField
-                                control={form.control}
-                                name="width"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Width (m)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" placeholder="5.5" {...field} className="bg-[#313131] border-neutral-600" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name="height"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Height (m)</FormLabel>
-                                        <FormControl>
-                                             <Input type="number" placeholder="4.2" {...field} className="bg-[#313131] border-neutral-600" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
+                        
+                        <FormField
+                            control={form.control}
+                            name="defineSize"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-neutral-600 p-3 shadow-sm bg-[#313131]">
+                                    <div className="space-y-0.5">
+                                        <FormLabel>Define Size/Area</FormLabel>
+                                    </div>
+                                    <FormControl>
+                                        <Switch
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+
+                        {defineSize && (
+                            <div className="space-y-4 pt-2 border-t border-neutral-700/50">
+                                <div className="grid grid-cols-2 gap-4">
+                                     <FormField
+                                        control={form.control}
+                                        name="width"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Width (m)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="number" placeholder="5.5" {...field} disabled={areaEdited} className="bg-[#313131] border-neutral-600" />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                     <FormField
+                                        control={form.control}
+                                        name="height"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Height (m)</FormLabel>
+                                                <FormControl>
+                                                     <Input type="number" placeholder="4.2" {...field} disabled={areaEdited} className="bg-[#313131] border-neutral-600" />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-grow border-t border-neutral-700"></div>
+                                    <span className="text-xs text-neutral-500">OR</span>
+                                    <div className="flex-grow border-t border-neutral-700"></div>
+                                </div>
+                                <FormField
+                                    control={form.control}
+                                    name="area"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Area (m²)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" placeholder="23.1" {...field} disabled={dimensionsEdited} className="bg-[#313131] border-neutral-600" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                        )}
+
                         <FormField
                             control={form.control}
                             name="makeAsEntity"
                             render={({ field }) => (
-                                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-neutral-600 p-3 shadow-sm mt-4 bg-[#313131]">
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-neutral-600 p-3 shadow-sm bg-[#313131]">
                                     <div className="space-y-0.5">
                                         <FormLabel>Make Entity</FormLabel>
                                         <FormDescription className="text-neutral-400">

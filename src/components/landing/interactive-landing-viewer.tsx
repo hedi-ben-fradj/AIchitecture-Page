@@ -24,7 +24,7 @@ interface FullView extends View {
 
 // Define types for View, Polygon, and Entity if not already imported from a central location
 interface View { id: string; name: string; imageUrl?: string; type: '2d' | '360'; selections?: Polygon[]; }
-interface Polygon { id: number; points: { x: number; y: number; }[]; details?: { title: string; description?: string; width: number; height: number; makeAsEntity?: boolean }; }
+interface Polygon { id: number; points: { x: number; y: number; }[]; details?: { title: string; description?: string; width?: number; height?: number; area?: number; makeAsEntity?: boolean }; }
 
 type EntityType = 'residential compound' | 'residential building' | 'Apartment' | 'Floor' | 'Room' | 'Furniture/Appliance' | 'house';
 
@@ -483,14 +483,12 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 </div>
                             ) : (
                                 <>
-                                    <div className="flex justify-between text-neutral-400">
-                                        <span>Width:</span>
-                                        <span className="font-mono">{clickedSelection.details.width}m</span>
-                                    </div>
-                                    <div className="flex justify-between text-neutral-400">
-                                        <span>Height:</span>
-                                        <span className="font-mono">{clickedSelection.details.height}m</span>
-                                    </div>
+                                    {clickedSelection.details.area && (
+                                        <div className="flex justify-between text-neutral-400">
+                                            <span>Area:</span>
+                                            <span className="font-mono">{clickedSelection.details.area} m²</span>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </CardContent>
@@ -607,7 +605,3 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         </div>
     );
 }
-
-    
-
-    

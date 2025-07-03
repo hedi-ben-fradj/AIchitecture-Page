@@ -21,8 +21,10 @@ export interface Polygon {
   details?: {
     title: string;
     description?: string;
-    width: number;
-    height: number;
+    defineSize?: boolean;
+    width?: number;
+    height?: number;
+    area?: number;
     makeAsEntity?: boolean;
     entityType?: EntityType;
   };
