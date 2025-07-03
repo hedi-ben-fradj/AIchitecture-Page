@@ -34,7 +34,16 @@ export interface Entity {
   parentId?: string | null;
   views: View[];
   defaultViewId: string | null;
+  // New property-specific fields
+  plotArea?: number;
+  houseArea?: number;
+  price?: number;
+  status?: 'available' | 'sold';
+  availableDate?: string;
+  floors?: number;
+  rooms?: number;
 }
+
 
 interface ProjectContextType {
   entities: Entity[];
@@ -43,7 +52,7 @@ interface ProjectContextType {
   // Entity methods
   addEntity: (entityName: string, entityType: EntityType, parentId?: string | null) => void;
   deleteEntity: (entityId: string) => void;
-  updateEntity: (entityId: string, data: { name: string; entityType: EntityType; }) => void;
+  updateEntity: (entityId: string, data: Partial<Entity>) => void;
   getEntity: (entityId: string) => Entity | undefined;
   setLandingPageEntityId: (entityId: string | null) => void;
 
@@ -85,6 +94,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
             entityType: entity.entityType,
             parentId: entity.parentId,
             defaultViewId: entity.defaultViewId,
+            plotArea: entity.plotArea,
+            houseArea: entity.houseArea,
+            price: entity.price,
+            status: entity.status,
+            availableDate: entity.availableDate,
+            floors: entity.floors,
+            rooms: entity.rooms,
             views: entity.views.map(view => ({
               id: view.id,
               name: view.name,
@@ -163,17 +179,23 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         views: [],
         defaultViewId: null,
       };
+
+      if (entityType === 'Apartment' || entityType === 'house') {
+        newEntity.floors = 1;
+        newEntity.rooms = 1;
+        newEntity.status = 'available';
+      }
+
       const updatedEntities = [...prevEntities, newEntity];
       saveMetadata(updatedEntities, landingPageEntityId);
       return updatedEntities;
     });
   }, [landingPageEntityId, saveMetadata]);
 
-  const updateEntity = useCallback((entityId: string, data: { name: string, entityType: EntityType }) => {
+  const updateEntity = useCallback((entityId: string, data: Partial<Entity>) => {
     setEntities(prevEntities => {
         const updatedEntities = prevEntities.map(entity => {
             if (entity.id === entityId) {
-                // The entity's slug/ID is immutable, but the name can be changed.
                 return { ...entity, ...data };
             }
             return entity;

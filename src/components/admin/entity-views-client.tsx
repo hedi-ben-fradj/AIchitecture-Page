@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Eye, Building, Edit } from 'lucide-react';
+import { Plus, Trash2, Eye, Building, Edit, Home, Building2, Calendar, Euro, Ruler, Bed, Bath } from 'lucide-react';
 import { useProjectData, type View, type Entity } from '@/contexts/views-context';
 import {
   AlertDialog,
@@ -158,6 +158,20 @@ function EntityCard({ entity, onDelete, projectId }: { entity: Entity, onDelete:
     )
 }
 
+function DetailItem({ icon: Icon, label, value }: { icon: LucideIcon, label: string, value?: string | number | null }) {
+    if (value === null || value === undefined || value === '') return null;
+    return (
+        <div className="flex items-center gap-3">
+            <Icon className="h-5 w-5 text-yellow-500" />
+            <div>
+                <p className="text-sm text-neutral-400">{label}</p>
+                <p className="text-md font-semibold text-white">{value}</p>
+            </div>
+        </div>
+    );
+}
+
+
 export default function EntityViewsClient({ projectId, entityId }: { projectId: string, entityId: string }) {
     const { getEntity, deleteView, setDefaultViewId, entities, deleteEntity } = useProjectData();
     const router = useRouter();
@@ -179,6 +193,8 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
         );
     }
     
+    const isProperty = entity.entityType === 'Apartment' || entity.entityType === 'house';
+
     return (
         <div className="space-y-12">
             <AddViewModal isOpen={isAddViewModalOpen} onClose={() => setIsAddViewModalOpen(false)} entityId={entityId} />
@@ -195,6 +211,23 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
                   Edit
               </Button>
             </div>
+
+            {isProperty && (
+                <div>
+                    <h3 className="text-xl font-semibold text-white mb-4">Property Details</h3>
+                    <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
+                       <CardContent className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                            <DetailItem icon={Euro} label="Price" value={entity.price ? `€ ${entity.price.toLocaleString()}`: 'N/A'} />
+                            <DetailItem icon={Ruler} label="Status" value={entity.status} />
+                            <DetailItem icon={Calendar} label="Available Date" value={entity.availableDate} />
+                            <DetailItem icon={Home} label="Plot Area" value={entity.plotArea ? `${entity.plotArea} m²` : null} />
+                            <DetailItem icon={Building2} label="House Area" value={entity.houseArea ? `${entity.houseArea} m²` : null} />
+                            <DetailItem icon={Building} label="Floors" value={entity.floors} />
+                            <DetailItem icon={Bed} label="Rooms" value={entity.rooms} />
+                       </CardContent>
+                    </Card>
+                </div>
+            )}
 
             <div>
                 <h2 className="text-2xl font-semibold text-white mb-6">Views</h2>
