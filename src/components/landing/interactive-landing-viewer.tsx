@@ -525,23 +525,22 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         const isProperty = entityForSelection && (entityForSelection.entityType === 'Apartment' || entityForSelection.entityType === 'house');
 
                         const getHighlightClasses = () => {
-                            if (!isClicked && !isHovered && !isHighlighted) {
+                            const isInteractedWith = isClicked || isHovered || isHighlighted;
+                            if (!isInteractedWith) {
                                 return "stroke-transparent fill-transparent";
                             }
                         
-                            const fillOpacity = isClicked ? '50' : '20';
-                            
                             if (isProperty) {
                                 if (entityForSelection.status === 'available') {
-                                    return `stroke-green-400 fill-green-400/${fillOpacity}`;
+                                    return isClicked ? 'stroke-green-400 fill-green-400/50' : 'stroke-green-400 fill-green-400/20';
                                 }
                                 if (entityForSelection.status === 'sold') {
-                                    return `stroke-orange-400 fill-orange-400/${fillOpacity}`;
+                                     return isClicked ? 'stroke-orange-400 fill-orange-400/50' : 'stroke-orange-400 fill-orange-400/20';
                                 }
                             }
                             
                             // Default for non-properties or properties without status
-                            return `stroke-yellow-400 fill-yellow-400/${fillOpacity}`;
+                            return isClicked ? 'stroke-yellow-400 fill-yellow-400/50' : 'stroke-yellow-400 fill-yellow-400/20';
                         };
 
                         return (
