@@ -595,23 +595,23 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                            <CardContent className="p-4">
                                 <div className="flex items-start justify-between gap-4 p-1">
                                     <div className="flex-1">
-                                        <h3 className="text-4xl font-light text-white leading-none">{clickedEntity.name}</h3>
+                                        <h3 className="text-xl font-light text-white leading-none">{clickedEntity.name}</h3>
                                     </div>
                                     <div className="flex gap-x-4 text-left">
                                         <div>
                                             <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Plot, M²</p>
-                                            <p className="text-xl font-light text-white mt-1">{clickedEntity.plotArea ?? '—'}</p>
+                                            <p className="text-lg font-light text-white mt-1">{clickedEntity.plotArea ?? '—'}</p>
                                         </div>
                                         <div>
                                             <p className="text-[9px] text-neutral-400 uppercase tracking-wider">House, M²</p>
-                                            <p className="text-xl font-light text-white mt-1">{clickedEntity.houseArea ?? '—'}</p>
+                                            <p className="text-lg font-light text-white mt-1">{clickedEntity.houseArea ?? '—'}</p>
                                         </div>
                                         <div>
                                             <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Price, EUR</p>
                                                 {clickedEntity.status === 'sold' ? (
                                                 <div className="mt-1 text-xs font-semibold uppercase bg-neutral-600 text-neutral-200 px-2 py-1 rounded-md inline-block">SOLD</div>
                                             ) : (
-                                                <p className="text-xl font-light text-white mt-1">{clickedEntity.price ? `€${clickedEntity.price.toLocaleString()}` : 'N/A'}</p>
+                                                <p className="text-lg font-light text-white mt-1">{clickedEntity.price ? `€${clickedEntity.price.toLocaleString()}` : 'N/A'}</p>
                                             )}
                                         </div>
                                     </div>
@@ -624,13 +624,13 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         <div className="grid grid-cols-4 gap-x-4 p-1">
                                         <div className="text-left">
                                                 <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Date</p>
-                                                <p className="text-xl font-light text-white mt-1">{clickedEntity.availableDate ?? '—'}</p>
+                                                <p className="text-lg font-light text-white mt-1">{clickedEntity.availableDate ?? '—'}</p>
                                             </div>
 
                                             {clickedEntity.detailedRooms?.map(room => (
                                                 <div key={room.id} className="text-left">
                                                     <p className="text-[9px] text-neutral-400 uppercase tracking-wider truncate">{room.name}</p>
-                                                    <p className="text-xl font-light text-white mt-1">{room.size} m²</p>
+                                                    <p className="text-lg font-light text-white mt-1">{room.size} m²</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -767,14 +767,40 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                  <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent pointer-events-none">
                     <div className="pointer-events-auto overflow-x-auto pb-2 -mb-2 flex justify-center">
                         <div className="flex gap-4 w-max">
-                            {(!isFilterApplied ? currentView.selections?.filter(s => s.details?.title) || [] : filteredSelections.map(f => f.selection)).map((selection) => (
+                            {(!isFilterApplied ? currentView.selections?.filter(s => s.details?.title) || [] : filteredSelections.map(f => f.selection)).map((selection) => {
+                                const entityIdForSelection = selection.details?.makeAsEntity && selection.details.title
+                                    ? selection.details.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+                                    : null;
+                                const entityForSelection = entityIdForSelection ? allEntities.find(e => e.id === entityIdForSelection) : null;
+                                const isProperty = entityForSelection && (entityForSelection.entityType === 'Apartment' || entityForSelection.entityType === 'house');
+                                
+                                const isClicked = clickedSelection?.id === selection.id;
+                                const isFiltered = isFilterApplied && filteredSelections.some(f => f.selection.id === selection.id);
+                                const isHovered = hoveredSelectionId === selection.id;
+
+                                const isHighlighted = isClicked || isFiltered;
+
+                                let highlightClass = 'border-yellow-500';
+                                let hoverClass = 'hover:border-yellow-500';
+
+                                if (isProperty) {
+                                    if (entityForSelection.status === 'available') {
+                                        highlightClass = 'border-green-400';
+                                        hoverClass = 'hover:border-green-400';
+                                    } else if (entityForSelection.status === 'sold') {
+                                        highlightClass = 'border-orange-400';
+                                        hoverClass = 'hover:border-orange-400';
+                                    }
+                                }
+
+                                return (
                                 <Card
                                     key={selection.id}
                                     className={cn(
                                         "w-56 bg-black/70 backdrop-blur-sm text-white border-neutral-700 transition-colors shrink-0",
-                                        "cursor-pointer hover:border-yellow-500",
-                                        (hoveredSelectionId === selection.id || clickedSelection?.id === selection.id) && "border-yellow-500",
-                                        isFilterApplied && filteredSelections.some(f => f.selection.id === selection.id) && "border-yellow-500"
+                                        "cursor-pointer",
+                                        hoverClass,
+                                        (isHighlighted || isHovered) && highlightClass
                                     )}
                                     onMouseEnter={() => setHoveredSelectionId(selection.id)}
                                     onMouseLeave={() => setHoveredSelectionId(null)}
@@ -783,7 +809,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     <CardHeader className="p-4"><CardTitle className="text-base truncate">{selection.details?.title}</CardTitle></CardHeader>
                                     {selection.details?.description && ( <CardContent className="p-4 pt-0"><p className="text-xs text-neutral-400 line-clamp-2">{selection.details.description}</p></CardContent> )}
                                 </Card>
-                            ))}
+                            )})}
                         </div>
                     </div>
                 </div>
