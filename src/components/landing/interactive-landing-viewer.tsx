@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo } from 'react';
@@ -387,8 +386,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         const selectionsWithDetails = currentView.selections.filter(s => s.details?.makeAsEntity && s.details.title);
         
         if (!isFilterApplied) {
-            // When no filter is applied, show all selections with a detail title
-            return selectionsWithDetails.map(selection => ({ selection, matchCount: 0 }));
+            return [];
         }
         
         return selectionsWithDetails
@@ -493,8 +491,11 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             {/* Overlay for 2D view interactions */}
             {currentViewType === '2d' && renderedImageRect && (
                 <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>
-                    {filteredSelections.map(({ selection, matchCount }) => {
-                        const absPoints = selection.points.map(p => ({
+                    {(isFilterApplied ? filteredSelections.map(f => f.selection) : (currentView.selections || [])).map(selection => {
+                         const match = isFilterApplied ? filteredSelections.find(f => f.selection.id === selection.id) : null;
+                         const matchCount = match ? match.matchCount : 0;
+
+                         const absPoints = selection.points.map(p => ({
                             x: p.x * renderedImageRect.width,
                             y: p.y * renderedImageRect.height,
                         }));
@@ -512,6 +513,9 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         const isClicked = clickedSelection?.id === selection.id;
                         const isHovered = hoveredSelectionId === selection.id;
                         const isHighlighted = isFilterApplied && matchCount > 0;
+                        const hasDetails = !!selection.details?.title;
+
+                        if (!hasDetails) return null;
 
                         return (
                             <g
@@ -570,26 +574,25 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                             <X className="h-5 w-5" />
                         </Button>
                         
-                        {clickedEntity ? (
+                        {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') ? (
                             <CardContent className="p-5">
-                                {/* Top Row */}
-                                <div className="flex items-start justify-between gap-6">
-                                    <div className="flex-1 pt-1">
+                                <div className="flex items-start justify-between gap-4 p-1">
+                                    <div className="flex-1">
                                         <h3 className="text-4xl font-light text-white leading-none">{clickedEntity.name}</h3>
                                     </div>
-                                    <div className="flex gap-x-6 text-left">
+                                    <div className="flex gap-x-4 text-left">
                                         <div>
-                                            <p className="text-[10px] text-neutral-400 uppercase tracking-wider">Plot, M²</p>
+                                            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Plot, M²</p>
                                             <p className="text-xl font-light text-white mt-1">{clickedEntity.plotArea ?? '—'}</p>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-neutral-400 uppercase tracking-wider">House, M²</p>
+                                            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">House, M²</p>
                                             <p className="text-xl font-light text-white mt-1">{clickedEntity.houseArea ?? '—'}</p>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-neutral-400 uppercase tracking-wider">Price, EUR</p>
+                                            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Price, EUR</p>
                                                 {clickedEntity.status === 'sold' ? (
-                                                <div className="mt-1 text-xs font-semibold uppercase bg-neutral-600 text-neutral-200 px-2 py-1 rounded-md inline-block">Sold</div>
+                                                <div className="mt-1 text-xs font-semibold uppercase bg-neutral-600 text-neutral-200 px-2 py-1 rounded-md inline-block">SOLD</div>
                                             ) : (
                                                 <p className="text-xl font-light text-white mt-1">{clickedEntity.price ? `€${clickedEntity.price.toLocaleString()}` : 'N/A'}</p>
                                             )}
@@ -599,17 +602,17 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 
                                 {(clickedEntity.detailedRooms && clickedEntity.detailedRooms.length > 0 || clickedEntity.availableDate) && (
                                     <>
-                                        <hr className="border-neutral-700 my-4" />
+                                        <hr className="border-neutral-700 my-3" />
 
-                                        <div className="grid grid-cols-4 gap-x-6">
+                                        <div className="grid grid-cols-4 gap-x-4 p-1">
                                         <div className="text-left">
-                                                <p className="text-[10px] text-neutral-400 uppercase tracking-wider">Date</p>
+                                                <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Date</p>
                                                 <p className="text-xl font-light text-white mt-1">{clickedEntity.availableDate ?? '—'}</p>
                                             </div>
 
                                             {clickedEntity.detailedRooms?.map(room => (
                                                 <div key={room.id} className="text-left">
-                                                    <p className="text-[10px] text-neutral-400 uppercase tracking-wider truncate">{room.name}</p>
+                                                    <p className="text-[9px] text-neutral-400 uppercase tracking-wider truncate">{room.name}</p>
                                                     <p className="text-xl font-light text-white mt-1">{room.size} m²</p>
                                                 </div>
                                             ))}
@@ -617,10 +620,10 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     </>
                                 )}
 
-                                <div className="flex justify-center items-center mt-6 gap-4">
+                                <div className="flex justify-center items-center mt-5 gap-4">
                                     {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') && (
                                         <Button 
-                                            className="bg-white/90 hover:bg-white text-black rounded-full px-6 h-10 text-xs font-semibold tracking-wide disabled:bg-neutral-600 disabled:text-neutral-200"
+                                            className="bg-white/90 hover:bg-white text-black rounded-full px-5 h-9 text-[11px] font-semibold tracking-wide disabled:bg-neutral-600 disabled:text-neutral-200"
                                             onClick={() => setActiveView('contact')} 
                                             disabled={clickedEntity.status === 'sold'}>
                                             {clickedEntity.status === 'sold' ? 'SOLD' : 'BOOK A CALL'}
@@ -628,21 +631,42 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     )}
 
                                     {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
-                                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black rounded-full px-6 h-10 text-xs font-semibold" onClick={() => handleNavigate(clickedSelection.details!.title)}>
-                                            Navigate To
+                                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black rounded-full px-5 h-9 text-[11px] font-semibold" onClick={() => handleNavigate(clickedSelection.details!.title)}>
+                                            NAVIGATE TO
                                         </Button>
                                     )}
                                 </div>
                             </CardContent>
                         ) : (
-                            // Fallback for selections that aren't linked to a property entity (e.g. a building)
-                            <CardContent className="p-6">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-xl">{clickedSelection.details.title}</CardTitle>
-                                </div>
-                                {clickedSelection.details.description && <p className="text-neutral-300 mt-2 text-sm">{clickedSelection.details.description}</p>}
+                             <CardContent className="p-6 max-w-sm">
+                                <CardTitle className="text-xl font-semibold mb-2">{clickedSelection.details.title}</CardTitle>
+                                {clickedSelection.details.description && (
+                                    <p className="text-neutral-300 mt-2 text-sm mb-4">{clickedSelection.details.description}</p>
+                                )}
+                                
+                                {(clickedSelection.details.width || clickedSelection.details.height || clickedSelection.details.area) && (
+                                    <>
+                                        <div className="border-t border-neutral-700 my-4" />
+                                        <div className="space-y-2 text-sm">
+                                            <h4 className="text-sm font-semibold text-neutral-400 mb-2">Dimensions</h4>
+                                            {clickedSelection.details.width && clickedSelection.details.height && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-neutral-400">W x H: </span>
+                                                    <span>{clickedSelection.details.width}m x {clickedSelection.details.height}m</span>
+                                                </div>
+                                            )}
+                                            {clickedSelection.details.area && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-neutral-400">Area: </span>
+                                                    <span>{clickedSelection.details.area} m²</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                                
                                 {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
-                                    <Button className="w-full mt-4 bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedSelection.details!.title)}>
+                                    <Button className="w-full mt-6 bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedSelection.details!.title)}>
                                         <NavigationIcon className="mr-2 h-4 w-4" />
                                         Navigate to
                                     </Button>
@@ -731,7 +755,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         "w-56 bg-black/70 backdrop-blur-sm text-white border-neutral-700 transition-colors shrink-0",
                                         "cursor-pointer hover:border-yellow-500",
                                         (hoveredSelectionId === selection.id || clickedSelection?.id === selection.id) && "border-yellow-500",
-                                        isFilterApplied && "border-yellow-500"
+                                        isFilterApplied && filteredSelections.some(f => f.selection.id === selection.id) && "border-yellow-500"
                                     )}
                                     onMouseEnter={() => setHoveredSelectionId(selection.id)}
                                     onMouseLeave={() => setHoveredSelectionId(null)}
