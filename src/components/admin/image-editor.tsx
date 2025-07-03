@@ -71,7 +71,6 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   
   // magnifier tool
   const [magnifierPosition, setMagnifierPosition] = useState<{ x: number; y: number } | null>(null);
-  const [isMagnifierVisible, setIsMagnifierVisible] = useState(false);
   
   // By stringifying the initialPolygons, we create a stable dependency for the useEffect hook,
   // preventing an infinite loop if the parent component passes a new array instance on every render.
@@ -357,8 +356,6 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
             <svg ref={svgRef} 
             className="absolute top-0 left-0 w-full h-full z-10" 
             onClick={() => setSelectedPolygonId(null)}
-            onMouseLeave={() => { handleMouseUp(); setIsMagnifierVisible(false); }}
-            onMouseEnter={() => setIsMagnifierVisible(true)}
             >
               
               {polygons.map(polygon => (
@@ -401,7 +398,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
           </div>
           <Magnifier
             imageUrl={imageUrl}
-            cursorPosition={isMagnifierVisible ? magnifierPosition : null}
+            cursorPosition={dragInfo?.type === 'vertex' ? magnifierPosition : null}
             imageSize={{ width: svgRef.current?.getBoundingClientRect().width || 0, height: svgRef.current?.getBoundingClientRect().height || 0 }}
           />
         </div>
