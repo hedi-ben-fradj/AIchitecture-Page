@@ -27,6 +27,12 @@ export interface View {
   selections?: Polygon[];
 }
 
+export interface RoomDetail {
+  id: string;
+  name: string;
+  size: number;
+}
+
 export interface Entity {
   id: string;
   name: string;
@@ -42,6 +48,7 @@ export interface Entity {
   availableDate?: string;
   floors?: number;
   rooms?: number;
+  detailedRooms?: RoomDetail[];
 }
 
 
@@ -101,6 +108,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
             availableDate: entity.availableDate,
             floors: entity.floors,
             rooms: entity.rooms,
+            detailedRooms: entity.detailedRooms,
             views: entity.views.map(view => ({
               id: view.id,
               name: view.name,

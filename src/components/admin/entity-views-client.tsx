@@ -229,6 +229,19 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
                 </div>
             )}
 
+            {entity.detailedRooms && entity.detailedRooms.length > 0 && (
+                <div>
+                    <h3 className="text-xl font-semibold text-white mb-4">Room Specifications</h3>
+                    <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
+                       <CardContent className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                            {entity.detailedRooms.map((room) => (
+                                <DetailItem key={room.id} icon={Bed} label={room.name} value={room.size ? `${room.size} m²` : 'N/A'} />
+                            ))}
+                       </CardContent>
+                    </Card>
+                </div>
+            )}
+
             <div>
                 <h2 className="text-2xl font-semibold text-white mb-6">Views</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
