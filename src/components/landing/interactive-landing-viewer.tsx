@@ -305,6 +305,9 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         setTimeout(calculateRect, 0);
     };
 
+    const views2d = useMemo(() => entityViews.filter(v => v.type === '2d'), [entityViews]);
+    const views360 = useMemo(() => entityViews.filter(v => v.type === '360'), [entityViews]);
+
     const filteredSelections = useMemo(() => {
         if (!currentView?.selections) return [];
 
@@ -519,7 +522,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 <div className="absolute top-1/2 -translate-y-1/2 right-4 h-auto max-h-[calc(100%-8rem)] w-48 z-30 hidden lg:block">
                     <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
                         <div className="max-h-[calc(100vh-10rem)] overflow-y-auto space-y-2">
-                             {entityViews.map(view => (
+                             {views2d.map(view => (
                                 <div
                                     key={view.id}
                                     onClick={(e) => { e.stopPropagation(); handleViewSelect(view); }}
@@ -531,17 +534,17 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     <div className="aspect-video relative">
                                         {view.imageUrl ? (
                                             <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
- ) : (
- <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
- )}
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
+                                        )}
                                         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
                                     </div>
                                     <p className="text-xs text-white p-2 truncate font-medium bg-black/50">{view.name}</p>
                                 </div>
                             ))}
-                            {/* Add separator if both 2D and 360 views exist */}
-                            {entityViews.some(view => view.type === '2d') && entityViews.some(view => view.type === '360') && (
-                                <div className="relative flex justify-center my-4">
+
+                            {views2d.length > 0 && views360.length > 0 && (
+                                <div className="relative flex justify-center my-2">
                                     <div className="absolute inset-0 flex items-center" aria-hidden="true">
                                         <div className="w-full border-t border-neutral-700"></div>
                                     </div>
@@ -550,6 +553,27 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     </div>
                                 </div>
                             )}
+
+                             {views360.map(view => (
+                                <div
+                                    key={view.id}
+                                    onClick={(e) => { e.stopPropagation(); handleViewSelect(view); }}
+                                    className={cn(
+                                        "rounded-lg overflow-hidden cursor-pointer border-2 hover:border-yellow-500 transition-colors group",
+                                        currentView?.id === view.id ? "border-yellow-500" : "border-transparent"
+                                    )}
+                                >
+                                    <div className="aspect-video relative">
+                                        {view.imageUrl ? (
+                                            <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
+                                        )}
+                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                                    </div>
+                                    <p className="text-xs text-white p-2 truncate font-medium bg-black/50">{view.name}</p>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
