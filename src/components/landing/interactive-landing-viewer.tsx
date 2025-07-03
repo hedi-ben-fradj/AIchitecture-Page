@@ -45,7 +45,7 @@ export interface Polygon {
   };
 }
 
-export type EntityType = 'residential compound' | 'residential building' | 'Apartment' | 'Floor' | 'Room' | 'Furniture/Appliance' | 'house';
+export type EntityType = 'residential compound' | 'residential building' | 'Apartment' | 'Floor' | 'Room' | 'house';
 
 export interface RoomDetail {
   id: string;

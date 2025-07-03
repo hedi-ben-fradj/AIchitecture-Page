@@ -12,7 +12,6 @@ export const entityTypes = [
   'Apartment',
  'Floor',
  'Room',
- 'Furniture/Appliance',
   'house',
 ] as const;
 
