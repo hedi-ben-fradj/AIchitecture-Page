@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -84,7 +85,7 @@ export default function DatabasePage() {
     }
 
     return (
-        <div className="flex flex-col h-full">
+        <>
             <header className="h-16 flex items-center px-6 border-b border-neutral-700 bg-[#2a2a2a] flex-shrink-0">
                 <h1 className="text-xl font-semibold text-white">Database</h1>
             </header>
@@ -141,6 +142,6 @@ export default function DatabasePage() {
                     </CardContent>
                 </Card>
             </main>
-        </div>
+        </>
     );
 }
