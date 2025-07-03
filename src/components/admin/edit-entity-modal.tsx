@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useProjectData, entityTypes, type EntityType, type Entity, type RoomDetail } from '@/contexts/views-context';
+import { entityTypes, type EntityType, type Entity, type RoomDetail } from '@/contexts/views-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ interface EditEntityModalProps {
     isOpen: boolean;
     onClose: () => void;
     entity: Entity | null;
+    onUpdate: (entityId: string, data: Partial<Entity>) => void;
 }
 
 const roomDetailSchema = z.object({
@@ -47,8 +48,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 
-export function EditEntityModal({ isOpen, onClose, entity }: EditEntityModalProps) {
-    const { updateEntity } = useProjectData();
+export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntityModalProps) {
     const { toast } = useToast();
     const [mismatchData, setMismatchData] = useState<FormValues | null>(null);
     const [newRoomName, setNewRoomName] = useState('');
@@ -82,7 +82,6 @@ export function EditEntityModal({ isOpen, onClose, entity }: EditEntityModalProp
                 detailedRooms: entity.detailedRooms || [],
             });
         }
-        // Reset local state when modal is closed or entity changes
         setNewRoomName('');
         setNewRoomSize('');
     }, [entity, form]);
@@ -102,7 +101,7 @@ export function EditEntityModal({ isOpen, onClose, entity }: EditEntityModalProp
     const processSave = (data: FormValues) => {
         if (!entity) return;
         
-        const finalData = { ...data };
+        const finalData: Partial<Entity> = { ...data };
         if (finalData.entityType === 'Apartment') {
             finalData.plotArea = undefined;
         }
@@ -110,7 +109,8 @@ export function EditEntityModal({ isOpen, onClose, entity }: EditEntityModalProp
           finalData.detailedRooms = [];
         }
 
-        updateEntity(entity.id, finalData);
+        onUpdate(entity.id, finalData);
+
         toast({
             title: 'Entity Updated',
             description: `"${data.name}" has been saved.`,

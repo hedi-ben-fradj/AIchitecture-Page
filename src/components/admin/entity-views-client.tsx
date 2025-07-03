@@ -173,7 +173,7 @@ function DetailItem({ icon: Icon, label, value }: { icon: LucideIcon, label: str
 
 
 export default function EntityViewsClient({ projectId, entityId }: { projectId: string, entityId: string }) {
-    const { getEntity, deleteView, setDefaultViewId, entities, deleteEntity } = useProjectData();
+    const { getEntity, deleteView, setDefaultViewId, entities, deleteEntity, updateEntity } = useProjectData();
     const router = useRouter();
     const [isAddViewModalOpen, setIsAddViewModalOpen] = useState(false);
     const [isAddEntityModalOpen, setIsAddEntityModalOpen] = useState(false);
@@ -199,7 +199,7 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
         <div className="space-y-12">
             <AddViewModal isOpen={isAddViewModalOpen} onClose={() => setIsAddViewModalOpen(false)} entityId={entityId} />
             <AddEntityModal isOpen={isAddEntityModalOpen} onClose={() => setIsAddEntityModalOpen(false)} parentId={entityId} />
-            <EditEntityModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} entity={entity} />
+            <EditEntityModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} entity={entity} onUpdate={updateEntity} />
             
             <div className="flex justify-between items-start">
               <div>

@@ -1,10 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { entityTypes, type Entity, type EntityType } from '@/contexts/views-context';
+import { entityTypes, type Entity, type EntityType, type View } from '@/contexts/views-context';
+import { Button } from '@/components/ui/button';
+import { Edit, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { EditEntityModal } from '@/components/admin/edit-entity-modal';
+
 
 interface Project {
     id: string;
@@ -19,6 +24,8 @@ interface EnrichedEntity extends Entity {
 }
 
 const PROJECTS_STORAGE_KEY = 'projects_list';
+const getStorageSafeViewId = (viewId: string) => viewId.replace(/\//g, '__');
+
 
 export default function DatabasePage() {
     const [allEntities, setAllEntities] = useState<EnrichedEntity[]>([]);
@@ -26,8 +33,11 @@ export default function DatabasePage() {
     const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('Apartment');
     const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
     const [isMounted, setIsMounted] = useState(false);
+    
+    const [entityToEdit, setEntityToEdit] = useState<EnrichedEntity | null>(null);
+    const [entityToDelete, setEntityToDelete] = useState<EnrichedEntity | null>(null);
 
-    useEffect(() => {
+    const loadData = useCallback(() => {
         if (typeof window !== 'undefined') {
             try {
                 const storedProjectsStr = localStorage.getItem(PROJECTS_STORAGE_KEY);
@@ -51,7 +61,6 @@ export default function DatabasePage() {
                     }
                 });
 
-                // Second pass to add parentName
                 const enrichedEntitiesWithParents = entitiesFromAllProjects.map(entity => {
                     if (entity.parentId) {
                         const parent = entitiesFromAllProjects.find(p => p.id === entity.parentId);
@@ -67,9 +76,81 @@ export default function DatabasePage() {
                 setAllEntities([]);
                 setProjects([]);
             }
-            setIsMounted(true);
         }
     }, []);
+
+    useEffect(() => {
+        loadData();
+        setIsMounted(true);
+    }, [loadData]);
+
+    const handleUpdateEntity = (entityId: string, dataToUpdate: Partial<Entity>) => {
+        const entity = allEntities.find(e => e.id === entityId);
+        if (!entity || typeof window === 'undefined') return;
+
+        const projectDataStr = localStorage.getItem(`project-${entity.projectId}-data`);
+        if (!projectDataStr) return;
+        
+        try {
+            const projectData = JSON.parse(projectDataStr);
+            const updatedEntities = projectData.entities.map((e: Entity) => 
+                e.id === entityId ? { ...e, ...dataToUpdate } : e
+            );
+            projectData.entities = updatedEntities;
+            
+            localStorage.setItem(`project-${entity.projectId}-data`, JSON.stringify(projectData));
+            loadData();
+            setEntityToEdit(null);
+        } catch(error) {
+            console.error("Failed to update entity:", error);
+        }
+    };
+    
+    const confirmDelete = () => {
+        if (!entityToDelete || typeof window === 'undefined') return;
+
+        const projectDataStr = localStorage.getItem(`project-${entityToDelete.projectId}-data`);
+        if (!projectDataStr) return;
+        
+        try {
+            const projectData = JSON.parse(projectDataStr);
+            
+            const entitiesToDelete = new Set<string>([entityToDelete.id]);
+            let changed = true;
+            while(changed) {
+                changed = false;
+                const currentSize = entitiesToDelete.size;
+                projectData.entities.forEach((e: Entity) => {
+                    if (e.parentId && entitiesToDelete.has(e.parentId)) {
+                        entitiesToDelete.add(e.id);
+                    }
+                });
+                if (entitiesToDelete.size > currentSize) {
+                    changed = true;
+                }
+            }
+            
+            const entitiesToDeleteArray = Array.from(entitiesToDelete);
+            
+            entitiesToDeleteArray.forEach(idToDelete => {
+                const entityData = projectData.entities.find((e: Entity) => e.id === idToDelete);
+                if(entityData?.views) {
+                    entityData.views.forEach((view: View) => {
+                        localStorage.removeItem(`project-${entityToDelete.projectId}-view-image-${getStorageSafeViewId(view.id)}`);
+                        localStorage.removeItem(`project-${entityToDelete.projectId}-view-selections-${getStorageSafeViewId(view.id)}`);
+                    });
+                }
+            });
+            
+            projectData.entities = projectData.entities.filter((e: Entity) => !entitiesToDelete.has(e.id));
+            
+            localStorage.setItem(`project-${entityToDelete.projectId}-data`, JSON.stringify(projectData));
+            loadData();
+            setEntityToDelete(null);
+        } catch (error) {
+            console.error("Failed to delete entity:", error);
+        }
+    };
 
     const filteredEntities = useMemo(() => {
         return allEntities
@@ -82,9 +163,9 @@ export default function DatabasePage() {
     const tableHeaders = useMemo(() => {
         const baseHeaders = ['Name', 'Parent Entity'];
         if (isPropertyType) {
-            return [...baseHeaders, 'Price (EUR)', 'Area (m²)', 'Status', 'Rooms'];
+            return [...baseHeaders, 'Price (EUR)', 'Area (m²)', 'Status', 'Rooms', 'Actions'];
         }
-        return baseHeaders;
+        return [...baseHeaders, 'Actions'];
     }, [isPropertyType]);
 
     if (!isMounted) {
@@ -93,6 +174,28 @@ export default function DatabasePage() {
 
     return (
         <div className="flex flex-col h-full">
+            <EditEntityModal
+                isOpen={!!entityToEdit}
+                onClose={() => setEntityToEdit(null)}
+                entity={entityToEdit}
+                onUpdate={handleUpdateEntity}
+            />
+
+            <AlertDialog open={!!entityToDelete} onOpenChange={() => setEntityToDelete(null)}>
+                <AlertDialogContent className="bg-[#2a2a2a] border-neutral-700 text-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the "{entityToDelete?.name}" entity and all of its associated data (including children entities and views).
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="hover:bg-neutral-700" onClick={() => setEntityToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            
             <header className="h-16 flex items-center px-6 border-b border-neutral-700 bg-[#2a2a2a] flex-shrink-0">
                 <h1 className="text-xl font-semibold text-white">Database</h1>
             </header>
@@ -143,6 +246,16 @@ export default function DatabasePage() {
                                                         <TableCell>{entity.rooms || '—'}</TableCell>
                                                     </>
                                                 )}
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-neutral-600" onClick={() => setEntityToEdit(entity)}>
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-neutral-600 text-red-500 hover:text-red-400" onClick={() => setEntityToDelete(entity)}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
