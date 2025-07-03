@@ -43,6 +43,7 @@ interface ProjectContextType {
   // Entity methods
   addEntity: (entityName: string, entityType: EntityType, parentId?: string | null) => void;
   deleteEntity: (entityId: string) => void;
+  updateEntity: (entityId: string, data: { name: string; entityType: EntityType; }) => void;
   getEntity: (entityId: string) => Entity | undefined;
   setLandingPageEntityId: (entityId: string | null) => void;
 
@@ -165,6 +166,20 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       const updatedEntities = [...prevEntities, newEntity];
       saveMetadata(updatedEntities, landingPageEntityId);
       return updatedEntities;
+    });
+  }, [landingPageEntityId, saveMetadata]);
+
+  const updateEntity = useCallback((entityId: string, data: { name: string, entityType: EntityType }) => {
+    setEntities(prevEntities => {
+        const updatedEntities = prevEntities.map(entity => {
+            if (entity.id === entityId) {
+                // The entity's slug/ID is immutable, but the name can be changed.
+                return { ...entity, ...data };
+            }
+            return entity;
+        });
+        saveMetadata(updatedEntities, landingPageEntityId);
+        return updatedEntities;
     });
   }, [landingPageEntityId, saveMetadata]);
 
@@ -364,6 +379,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     getView,
     addEntity,
     deleteEntity,
+    updateEntity,
     setLandingPageEntityId,
     addView,
     deleteView,

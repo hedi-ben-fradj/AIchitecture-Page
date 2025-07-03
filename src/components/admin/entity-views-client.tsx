@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Eye, ArrowLeft, Building } from 'lucide-react';
-import { useProjectData, type View, type Entity } from '@/contexts/views-context';
+import { Plus, Trash2, Eye, ArrowLeft, Building, Save } from 'lucide-react';
+import { useProjectData, type View, type Entity, entityTypes } from '@/contexts/views-context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,14 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+
 
 function ViewCard({ view, onDelete, isDefaultView, onSetDefaultView, projectId, entityId }: { view: View, onDelete: (viewId: string) => void, isDefaultView: boolean, onSetDefaultView: (viewId: string) => void, projectId: string, entityId: string }) {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -156,14 +164,48 @@ function EntityCard({ entity, onDelete, projectId }: { entity: Entity, onDelete:
     )
 }
 
+const entityDetailsSchema = z.object({
+  name: z.string().min(1, 'Entity name is required'),
+  entityType: z.enum(entityTypes),
+});
+
 export default function EntityViewsClient({ projectId, entityId }: { projectId: string, entityId: string }) {
-    const { getEntity, deleteView, setDefaultViewId, entities, deleteEntity } = useProjectData();
+    const { getEntity, deleteView, setDefaultViewId, entities, deleteEntity, updateEntity } = useProjectData();
     const router = useRouter();
     const [isAddViewModalOpen, setIsAddViewModalOpen] = useState(false);
     const [isAddEntityModalOpen, setIsAddEntityModalOpen] = useState(false);
+    const { toast } = useToast();
 
     const entity = getEntity(entityId);
     const childEntities = useMemo(() => entities.filter(e => e.parentId === entityId), [entities, entityId]);
+
+    const form = useForm<z.infer<typeof entityDetailsSchema>>({
+        resolver: zodResolver(entityDetailsSchema),
+        defaultValues: {
+            name: entity?.name || '',
+            entityType: entity?.entityType || 'Apartment',
+        },
+    });
+
+    useEffect(() => {
+        if (entity) {
+            form.reset({
+                name: entity.name,
+                entityType: entity.entityType,
+            });
+        }
+    }, [entity, form]);
+
+    const onSubmit = (values: z.infer<typeof entityDetailsSchema>) => {
+        if (!entity) return;
+        updateEntity(entityId, values);
+        toast({
+            title: 'Entity Updated',
+            description: `"${values.name}" has been saved.`,
+        });
+        form.reset(values);
+    };
+
 
     if (!entity) {
         // Could show a loading state or redirect
@@ -180,6 +222,61 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
             <AddViewModal isOpen={isAddViewModalOpen} onClose={() => setIsAddViewModalOpen(false)} entityId={entityId} />
             <AddEntityModal isOpen={isAddEntityModalOpen} onClose={() => setIsAddEntityModalOpen(false)} parentId={entityId} />
             
+            <div>
+                <h2 className="text-2xl font-semibold text-white mb-6">Entity Details</h2>
+                <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
+                    <CardContent className="p-6">
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Entity Name</FormLabel>
+                                                <FormControl>
+                                                    <Input className="bg-[#313131] border-neutral-600 text-white" placeholder="e.g., Apartment A-12" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="entityType"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Entity Type</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger className="bg-[#313131] border-neutral-600 text-white">
+                                                            <SelectValue placeholder="Select an entity type" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent className="bg-[#2a2a2a] text-white border-neutral-700">
+                                                        {entityTypes.map(type => (
+                                                            <SelectItem key={type} value={type} className="capitalize hover:bg-neutral-700">{type}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                                <div className="flex justify-end">
+                                    <Button type="submit" disabled={!form.formState.isDirty} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                                        <Save className="mr-2 h-4 w-4" />
+                                        Save Changes
+                                    </Button>
+                                </div>
+                            </form>
+                        </Form>
+                    </CardContent>
+                </Card>
+            </div>
+
             <div>
                 <h2 className="text-2xl font-semibold text-white mb-6">Views</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
