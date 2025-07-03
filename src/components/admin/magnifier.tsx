@@ -27,7 +27,7 @@ const Magnifier = forwardRef<HTMLDivElement, MagnifierProps>(
       imageUrl,
       cursorPosition,
       imageSize,
-      magnifierSize = 150,
+      magnifierSize = 200,
       zoomFactor = 2.5,
       activePolygon,
     },
@@ -44,7 +44,7 @@ const Magnifier = forwardRef<HTMLDivElement, MagnifierProps>(
       width: `${magnifierSize}px`,
       height: `${magnifierSize}px`,
       borderRadius: '50%',
-      border: '2px solid #fff',
+      // Removed hard border
       overflow: 'hidden',
       pointerEvents: 'none',
       zIndex: 50,
@@ -63,7 +63,13 @@ const Magnifier = forwardRef<HTMLDivElement, MagnifierProps>(
     const center = magnifierSize / 2;
 
     return (
-        <div ref={ref} style={magnifierStyle} className={cn("shadow-xl bg-black")}>
+        <div 
+          ref={ref} 
+          style={magnifierStyle} 
+          className={cn(
+            "bg-black shadow-2xl [mask-image:radial-gradient(circle,white_80%,transparent_100%)]"
+          )}
+        >
           <svg width={magnifierSize} height={magnifierSize} viewBox={`0 0 ${magnifierSize} ${magnifierSize}`}>
             <polygon
               points={activePolygon.points.map(p => {
