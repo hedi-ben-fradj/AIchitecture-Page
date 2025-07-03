@@ -562,7 +562,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         </div>
                                     </foreignObject>
                                 )}
-                                {isFilterApplied && matchCount > 0 && (
+                                {isFilterApplied && matchCount > 0 && !isProperty && (
                                     <g transform={`translate(${centerX}, ${centerY})`} className="pointer-events-none">
                                         <circle r="16" fill="rgba(250, 204, 21, 0.9)" stroke="white" strokeWidth="1.5" />
                                         <text
