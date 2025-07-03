@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Home, BadgeCheck, CircleDot } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AddProjectModal } from '@/components/admin/add-project-modal';
 import { useRouter } from 'next/navigation';
+import { Separator } from '@/components/ui/separator';
 
 interface Project {
     id: string;
@@ -24,10 +25,23 @@ interface Project {
     description: string;
 }
 
+// Minimal type for entity to avoid full context dependency
+interface ProjectEntity {
+    entityType: string;
+    status?: 'available' | 'sold';
+}
+
+interface ProjectStats {
+    totalUnits: number;
+    soldUnits: number;
+    availableUnits: number;
+}
+
 const PROJECTS_STORAGE_KEY = 'projects_list';
 
 export default function AdminProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
+    const [projectStats, setProjectStats] = useState<Record<string, ProjectStats>>({});
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     const [isMounted, setIsMounted] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -36,22 +50,48 @@ export default function AdminProjectsPage() {
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
+            let currentProjects: Project[] = [];
             try {
                 const storedProjects = localStorage.getItem(PROJECTS_STORAGE_KEY);
                 if (storedProjects) {
-                    setProjects(JSON.parse(storedProjects));
-                } else {
-                    // Initialize with a default project if nothing is stored
+                    currentProjects = JSON.parse(storedProjects);
+                }
+                
+                if (currentProjects.length === 0) {
                     const defaultProjects = [{ id: 'porto-montenegro', name: 'Porto Montenegro', description: 'description placeholder' }];
-                    setProjects(defaultProjects);
+                    currentProjects = defaultProjects;
                     localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(defaultProjects));
                 }
             } catch (error) {
                 console.error("Failed to load or parse projects from localStorage", error);
-                // Fallback to default if storage is corrupted
-                const defaultProjects = [{ id: 'porto-montenegro', name: 'Porto Montenegro', description: 'description placeholder' }];
-                setProjects(defaultProjects);
+                currentProjects = [{ id: 'porto-montenegro', name: 'Porto Montenegro', description: 'description placeholder' }];
             }
+            setProjects(currentProjects);
+
+            const stats: Record<string, ProjectStats> = {};
+            currentProjects.forEach(project => {
+                const projectDataStr = localStorage.getItem(`project-${project.id}-data`);
+                let totalUnits = 0;
+                let soldUnits = 0;
+                let availableUnits = 0;
+                if (projectDataStr) {
+                    try {
+                        const projectData = JSON.parse(projectDataStr);
+                        if (projectData && Array.isArray(projectData.entities)) {
+                            const units = projectData.entities.filter(
+                                (e: ProjectEntity) => e.entityType === 'Apartment' || e.entityType === 'house'
+                            );
+                            totalUnits = units.length;
+                            soldUnits = units.filter((u: ProjectEntity) => u.status === 'sold').length;
+                            availableUnits = units.length - soldUnits;
+                        }
+                    } catch(e) {
+                        console.error(`Error parsing data for project ${project.id}:`, e);
+                    }
+                }
+                stats[project.id] = { totalUnits, soldUnits, availableUnits };
+            });
+            setProjectStats(stats);
             setIsMounted(true);
         }
     }, []);
@@ -136,22 +176,35 @@ export default function AdminProjectsPage() {
             </AlertDialog>
 
             <header className="h-16 flex items-center px-6 border-b border-neutral-700 bg-[#2a2a2a] flex-shrink-0">
-                <h1 className="text-xl font-semibold text-white">Projects</h1>
+                <h1 className="text-xl font-semibold text-white">Projects Overview</h1>
             </header>
             <main className="flex-1 p-8 bg-[#313131]">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {projects.map(project => (
                         <div key={project.id} className="group relative">
                             <Link href={`/admin/projects/${project.id}`} className="block h-full">
-                                <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors flex flex-col justify-between min-h-[240px]">
+                                <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors flex flex-col justify-between">
                                     <div>
                                         <CardHeader>
                                             <CardTitle className="text-lg font-medium">{project.name}</CardTitle>
+                                            <CardDescription className="text-neutral-400 pt-1 text-sm">{project.description}</CardDescription>
                                         </CardHeader>
-                                        <CardContent className="pt-2">
-                                            <p className="text-sm text-neutral-400">
-                                                {project.description}
-                                            </p>
+                                        <CardContent>
+                                            <Separator className="my-2 bg-neutral-600" />
+                                            <div className="mt-4 space-y-3 text-sm">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-neutral-400 flex items-center"><Home className="mr-2 h-4 w-4" />Total Units</span>
+                                                    <span className="font-semibold text-white">{projectStats[project.id]?.totalUnits ?? 0}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-neutral-400 flex items-center"><BadgeCheck className="mr-2 h-4 w-4 text-green-500" />Sold Units</span>
+                                                    <span className="font-semibold text-white">{projectStats[project.id]?.soldUnits ?? 0}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-neutral-400 flex items-center"><CircleDot className="mr-2 h-4 w-4 text-yellow-500" />Available Units</span>
+                                                    <span className="font-semibold text-white">{projectStats[project.id]?.availableUnits ?? 0}</span>
+                                                </div>
+                                            </div>
                                         </CardContent>
                                     </div>
                                 </Card>
