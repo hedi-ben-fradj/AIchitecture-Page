@@ -17,13 +17,14 @@ interface ViewEditorClientProps {
 }
 
 export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEditorClientProps) {
-  const { getView, updateViewImage, updateViewSelections, addEntity } = useProjectData();
+  const { getView, updateViewImage, updateViewSelections, addEntity, getEntity } = useProjectData();
   const router = useRouter();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<ImageEditorRef>(null);
 
   const view = getView(entityId, viewId);
+  const entity = getEntity(entityId);
 
   useEffect(() => {
     if (!view) {
@@ -37,7 +38,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     }
   }, [view, router, projectId, entityId]);
 
-  if (!view) {
+  if (!view || !entity) {
     return (
         <div className="flex flex-col h-full bg-[#313131] items-center justify-center text-white">
             <p>Loading view...</p>
@@ -157,6 +158,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
               imageUrl={imageToEdit}
               onMakeEntity={handleMakeEntity}
               initialPolygons={view?.selections}
+              parentEntityType={entity.entityType}
            />
          </div>
       )}

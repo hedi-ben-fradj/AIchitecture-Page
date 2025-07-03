@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,9 +33,10 @@ interface SelectionDetailsModalProps {
     onClose: () => void;
     onSave: (data: Polygon['details']) => void;
     selectionData?: Polygon | null;
+    parentEntityType?: EntityType;
 }
 
-export default function SelectionDetailsModal({ isOpen, onClose, onSave, selectionData }: SelectionDetailsModalProps) {
+export default function SelectionDetailsModal({ isOpen, onClose, onSave, selectionData, parentEntityType }: SelectionDetailsModalProps) {
     const form = useForm<SelectionDetailsFormValues>({
         resolver: zodResolver(selectionDetailsSchema),
         defaultValues: {
@@ -81,6 +82,20 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
             form.resetField('area');
         }
     }, [defineSize, form]);
+    
+    const getDefaultEntityType = useCallback((): EntityType => {
+        switch (parentEntityType) {
+            case 'residential compound':
+                return 'residential building';
+            case 'residential building':
+                return 'Apartment';
+            case 'Apartment':
+            case 'house':
+                return 'Room';
+            default:
+                return 'Apartment'; // A sensible default
+        }
+    }, [parentEntityType]);
 
     useEffect(() => {
         if (selectionData?.details) {
@@ -99,10 +114,10 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
             height: '',
             area: '',
             makeAsEntity: false,
-            entityType: entityTypes[2],
+            entityType: getDefaultEntityType(),
           });
         }
-    }, [selectionData, form]);
+    }, [selectionData, form, getDefaultEntityType]);
 
     const onSubmit = (data: SelectionDetailsFormValues) => {
         const saveData: Polygon['details'] = {
@@ -248,7 +263,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, selecti
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>New Entity Type</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl>
                                                 <SelectTrigger className="bg-[#313131] border-neutral-600">
                                                     <SelectValue placeholder="Select a type" />
