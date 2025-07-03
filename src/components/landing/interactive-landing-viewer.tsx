@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo, Fragment } from 'react';
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -85,6 +85,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [projectId, setProjectId] = useState<string | null>(null);
     const [detailsPosition, setDetailsPosition] = useState<React.CSSProperties>({ opacity: 0 });
     const [currentViewType, setCurrentViewType] = useState<string>('2d');
+    const [viewTypes, setViewTypes] = useState<string[]>([]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
@@ -143,6 +144,19 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         if (typeof window !== 'undefined') {
             const landingProjectId = window.localStorage.getItem('landing_project_id');
             setProjectId(landingProjectId);
+
+            const VIEW_TYPES_STORAGE_KEY = 'view_types_list';
+            const storedViewTypes = window.localStorage.getItem(VIEW_TYPES_STORAGE_KEY);
+            if (storedViewTypes) {
+                try {
+                    setViewTypes(JSON.parse(storedViewTypes));
+                } catch (e) {
+                    console.error("Failed to parse view types from storage", e);
+                    setViewTypes(['2d', '360']);
+                }
+            } else {
+                 setViewTypes(['2d', '360']);
+            }
         }
     }, []);
     
@@ -339,8 +353,20 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         setTimeout(calculateRect, 0);
     };
 
-    const views2d = useMemo(() => entityViews.filter(v => v.type === '2d'), [entityViews]);
-    const views360 = useMemo(() => entityViews.filter(v => v.type === '360'), [entityViews]);
+    const groupedViews = useMemo(() => {
+        if (!entityViews.length || !viewTypes.length) return {};
+
+        const groups: { [key: string]: View[] } = {};
+
+        viewTypes.forEach(type => {
+            const viewsOfType = entityViews.filter(v => v.type === type);
+            if (viewsOfType.length > 0) {
+                groups[type] = viewsOfType;
+            }
+        });
+
+        return groups;
+    }, [entityViews, viewTypes]);
 
     const entityMatchesFilters = useCallback((entity: Entity, filters: Filters): boolean => {
         if (entity.entityType !== 'Apartment' && entity.entityType !== 'house') {
@@ -703,63 +729,38 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 <div className="absolute top-1/2 -translate-y-1/2 right-4 h-auto max-h-[calc(100%-8rem)] w-48 z-30 hidden lg:block">
                     <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
                         <div className="max-h-[calc(100vh-10rem)] overflow-y-auto space-y-2">
-                            {views2d.length > 0 && (
-                                <div className="space-y-2">
-                                    <h4 className="px-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider">2D View</h4>
-                                    {views2d.map(view => (
-                                        <div
-                                            key={view.id}
-                                            onClick={(e) => { e.stopPropagation(); handleViewSelect(view); }}
-                                            className={cn(
-                                                "rounded-lg overflow-hidden cursor-pointer border-2 hover:border-yellow-500 transition-colors group",
-                                                currentView?.id === view.id ? "border-yellow-500" : "border-transparent"
-                                            )}
-                                        >
-                                            <div className="aspect-video relative">
-                                                {view.imageUrl ? (
-                                                    <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
-                                                ) : (
-                                                    <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
-                                                )}
-                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                                            </div>
-                                            <p className="text-xs text-white p-2 truncate font-medium bg-black/50">{view.name}</p>
+                            {Object.entries(groupedViews).map(([type, views], index) => (
+                                <Fragment key={type}>
+                                    {index > 0 && (
+                                        <div className="py-2">
+                                            <div className="w-full border-t border-neutral-700" />
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {views2d.length > 0 && views360.length > 0 && (
-                                <div className="py-2">
-                                    <div className="w-full border-t border-neutral-700" />
-                                </div>
-                            )}
-
-                            {views360.length > 0 && (
-                                <div className="space-y-2">
-                                     <h4 className="px-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider">3D Panoramic View</h4>
-                                     {views360.map(view => (
-                                        <div
-                                            key={view.id}
-                                            onClick={(e) => { e.stopPropagation(); handleViewSelect(view); }}
-                                            className={cn(
-                                                "rounded-lg overflow-hidden cursor-pointer border-2 hover:border-yellow-500 transition-colors group",
-                                                currentView?.id === view.id ? "border-yellow-500" : "border-transparent"
-                                            )}
-                                        >
-                                            <div className="aspect-video relative">
-                                                {view.imageUrl ? (
-                                                    <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
-                                                ) : (
-                                                    <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
+                                    )}
+                                    <div className="space-y-2">
+                                        <h4 className="px-2 text-xs font-semibold text-neutral-400 uppercase tracking-wider capitalize">{type}</h4>
+                                        {views.map(view => (
+                                            <div
+                                                key={view.id}
+                                                onClick={(e) => { e.stopPropagation(); handleViewSelect(view); }}
+                                                className={cn(
+                                                    "rounded-lg overflow-hidden cursor-pointer border-2 hover:border-yellow-500 transition-colors group",
+                                                    currentView?.id === view.id ? "border-yellow-500" : "border-transparent"
                                                 )}
-                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                                            >
+                                                <div className="aspect-video relative">
+                                                    {view.imageUrl ? (
+                                                        <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
+                                                    ) : (
+                                                        <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
+                                                    )}
+                                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                                                </div>
+                                                <p className="text-xs text-white p-2 truncate font-medium bg-black/50">{view.name}</p>
                                             </div>
-                                            <p className="text-xs text-white p-2 truncate font-medium bg-black/50">{view.name}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                </Fragment>
+                            ))}
                         </div>
                     </div>
                 </div>
