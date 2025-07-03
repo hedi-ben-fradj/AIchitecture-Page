@@ -400,6 +400,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
             imageUrl={imageUrl}
             cursorPosition={dragInfo?.type === 'vertex' ? magnifierPosition : null}
             imageSize={{ width: svgRef.current?.getBoundingClientRect().width || 0, height: svgRef.current?.getBoundingClientRect().height || 0 }}
+            activePolygon={dragInfo?.type === 'vertex' ? selectedPolygon ?? null : null}
           />
         </div>
       </div>
