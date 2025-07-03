@@ -64,6 +64,10 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
 
+    const isFilterApplied = useMemo(() => {
+        return Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
+    }, [appliedFilters]);
+
     const getStorageKey = useCallback((key: string) => {
         if (!projectId) return '';
         return `project-${projectId}-${key}`;
@@ -361,8 +365,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
         const selectionsWithDetails = currentView.selections.filter(s => s.details?.makeAsEntity && s.details.title);
         
-        const hasFilters = Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
-        if (!hasFilters) {
+        if (!isFilterApplied) {
             return selectionsWithDetails;
         }
 
@@ -376,7 +379,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             
             return entityMatchesFilters(entity, appliedFilters) || hasMatchingDescendant(entity.id, appliedFilters, allEntities);
         });
-    }, [currentView?.selections, appliedFilters, allEntities, entityMatchesFilters, hasMatchingDescendant]);
+    }, [currentView?.selections, appliedFilters, allEntities, entityMatchesFilters, hasMatchingDescendant, isFilterApplied]);
 
     const handleApplyFilters = (filters: Filters) => {
         setAppliedFilters(filters);
@@ -454,26 +457,26 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             {/* Overlay for 2D view interactions */}
             {currentViewType === '2d' && renderedImageRect && (
                 <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>
-                    {/* ... (existing SVG content for 2D selections) ... */}
- {filteredSelections.map(selection => {
- const absPoints = selection.points.map(p => ({
- x: p.x * renderedImageRect.width,
- y: p.y * renderedImageRect.height,
- }));
+                    {filteredSelections.map(selection => {
+                        const absPoints = selection.points.map(p => ({
+                            x: p.x * renderedImageRect.width,
+                            y: p.y * renderedImageRect.height,
+                        }));
 
- const xCoords = absPoints.map(p => p.x);
- const yCoords = absPoints.map(p => p.y);
- const minX = Math.min(...xCoords);
- const maxX = Math.max(...xCoords);
- const minY = Math.min(...yCoords);
- const maxY = Math.max(...yCoords);
+                        const xCoords = absPoints.map(p => p.x);
+                        const yCoords = absPoints.map(p => p.y);
+                        const minX = Math.min(...xCoords);
+                        const maxX = Math.max(...xCoords);
+                        const minY = Math.min(...yCoords);
+                        const maxY = Math.max(...yCoords);
 
- const centerX = (minX + maxX) / 2;
- const centerY = (minY + maxY) / 2;
+                        const centerX = (minX + maxX) / 2;
+                        const centerY = (minY + maxY) / 2;
 
- const isHighlighted = clickedSelection?.id === selection.id || hoveredSelectionId === selection.id;
+                        const isClicked = clickedSelection?.id === selection.id;
+                        const isHovered = hoveredSelectionId === selection.id;
 
- return (
+                        return (
                             <g
                                 key={selection.id}
                                 onClick={(e) => handleSelectionClick(e, selection)}
@@ -485,23 +488,25 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     points={absPoints.map(p => `${p.x},${p.y}`).join(' ')}
                                     className={cn(
                                         "stroke-2 transition-all",
-                                        clickedSelection?.id === selection.id
+                                        isClicked
                                             ? "stroke-yellow-400 fill-yellow-400/50"
-                                            : hoveredSelectionId === selection.id
+                                            : isHovered
                                                 ? "stroke-yellow-500 fill-yellow-400/20"
-                                                : "stroke-transparent fill-transparent"
+                                                : isFilterApplied
+                                                    ? "stroke-yellow-500 fill-yellow-400/20"
+                                                    : "stroke-transparent fill-transparent"
                                     )}
                                 />
-                                {!isHighlighted && (
-                                     <foreignObject x={centerX - 16} y={centerY - 16} width="32" height="32" className="pointer-events-none">
+                                {!isClicked && !isHovered && !isFilterApplied && (
+                                    <foreignObject x={centerX - 16} y={centerY - 16} width="32" height="32" className="pointer-events-none">
                                         <div className="bg-black/60 rounded-full w-8 h-8 flex items-center justify-center backdrop-blur-sm">
                                             <Info className="h-5 w-5 text-white" />
                                         </div>
                                     </foreignObject>
                                 )}
                             </g>
- );
- })}
+                        );
+                    })}
                 </svg>
             )}
 
@@ -635,7 +640,11 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                             {filteredSelections.map((selection) => (
                                 <Card
                                     key={selection.id}
-                                    className={cn("w-56 bg-black/70 backdrop-blur-sm text-white border-neutral-700 transition-colors shrink-0", "cursor-pointer hover:border-yellow-500", (hoveredSelectionId === selection.id || clickedSelection?.id === selection.id) && "border-yellow-500")}
+                                    className={cn(
+                                        "w-56 bg-black/70 backdrop-blur-sm text-white border-neutral-700 transition-colors shrink-0",
+                                        "cursor-pointer hover:border-yellow-500",
+                                        (hoveredSelectionId === selection.id || clickedSelection?.id === selection.id || isFilterApplied) && "border-yellow-500"
+                                    )}
                                     onMouseEnter={() => setHoveredSelectionId(selection.id)}
                                     onMouseLeave={() => setHoveredSelectionId(null)}
                                     onClick={(e) => { e.stopPropagation(); handleSelectionClick(e, selection); }}
