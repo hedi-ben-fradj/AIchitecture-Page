@@ -58,7 +58,7 @@ export function AddEditTemplateModal({ isOpen, onClose, onSave, template, entity
                     .refine(val => entityTypes.includes(val), {
                         message: `Invalid entity type. Must be one of: ${entityTypes.join(', ')}`
                     }),
-                entityDescription: z.string({ required_error: "'entityDescription' is required for every entity." }),
+                entityDescription: z.string().optional(),
                 childEntities: z.array(entitySchema).optional(),
             }).strict("Template contains an unknown property in an entity object. Please stick to the defined structure.")
         );
