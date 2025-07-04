@@ -55,8 +55,13 @@ export function AddEditTemplateModal({ isOpen, onClose, onSave, template, entity
             z.object({
                 entityName: z.string({ required_error: "'entityName' is required for every entity." }),
                 entityType: z.string({ required_error: "'entityType' is required for every entity." })
-                    .refine(val => entityTypes.map(t => t.toLowerCase()).includes(val.toLowerCase()), {
-                        message: `Invalid entity type. Must be one of: ${entityTypes.join(', ')}`
+                    .refine(val => {
+                        const cleanedVal = val.replace(/[<>]/g, '').trim().toLowerCase();
+                        // An empty string could be from a pure placeholder like "<>", which is valid during template editing.
+                        if (cleanedVal === '') return true; 
+                        return entityTypes.map(t => t.toLowerCase()).includes(cleanedVal);
+                    }, {
+                        message: `Invalid entity type. Must resolve to one of: ${entityTypes.join(', ')}`
                     }),
                 entityDescription: z.string().optional(),
                 childEntities: z.array(entitySchema).optional(),
