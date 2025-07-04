@@ -4,11 +4,11 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ProjectTemplate } from './add-edit-template-modal';
+import { useToast } from '@/hooks/use-toast';
 
 interface AddProjectFromTemplateModalProps {
     isOpen: boolean;
@@ -18,13 +18,11 @@ interface AddProjectFromTemplateModalProps {
 
 const TEMPLATES_STORAGE_KEY = 'project_templates';
 
-
 export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: AddProjectFromTemplateModalProps) {
-    const [projectName, setProjectName] = useState('');
-    const [projectDescription, setProjectDescription] = useState('');
     const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
     const [templateContent, setTemplateContent] = useState('');
+    const { toast } = useToast();
 
      useEffect(() => {
         if (isOpen && typeof window !== 'undefined') {
@@ -32,50 +30,66 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
                 const storedTemplatesStr = localStorage.getItem(TEMPLATES_STORAGE_KEY);
                 const loadedTemplates: ProjectTemplate[] = storedTemplatesStr ? JSON.parse(storedTemplatesStr) : [];
                 setTemplates(loadedTemplates);
-                if (loadedTemplates.length > 0 && !selectedTemplateId) {
-                    setSelectedTemplateId(loadedTemplates[0].id);
-                } else if (loadedTemplates.length === 0) {
-                    setSelectedTemplateId('');
-                }
             } catch (error) {
                 console.error("Failed to load templates from localStorage", error);
                 setTemplates([]);
             }
         }
-    }, [isOpen, selectedTemplateId]);
+    }, [isOpen]);
 
-    useEffect(() => {
-        if(selectedTemplateId && templates.length > 0) {
-            const template = templates.find(t => t.id === selectedTemplateId);
-            if (template) {
-                setTemplateContent(template.content);
-            }
+    const handleTemplateSelect = (templateId: string) => {
+        setSelectedTemplateId(templateId);
+        const template = templates.find(t => t.id === templateId);
+        if (template) {
+            setTemplateContent(template.content);
         } else {
             setTemplateContent('');
         }
-    }, [selectedTemplateId, templates]);
-
+    }
 
     // Reset form on close to ensure fresh state
     useEffect(() => {
         if (!isOpen) {
-            setProjectName('');
-            setProjectDescription('');
-            if (templates.length > 0) {
-              setSelectedTemplateId(templates[0].id);
-            } else {
-              setSelectedTemplateId('');
-            }
+            setSelectedTemplateId('');
+            setTemplateContent('');
         }
-    }, [isOpen, templates]);
-
+    }, [isOpen]);
 
     const handleCreate = () => {
-        if (!projectName.trim() || !selectedTemplateId || !templateContent) {
+        if (!selectedTemplateId || !templateContent) {
+            toast({
+                title: "Incomplete Information",
+                description: "Please select a template and ensure it has content.",
+                variant: "destructive",
+            });
             return;
         }
-        onAddProject(projectName, projectDescription, templateContent);
-        onClose();
+
+        try {
+            const parsedTemplate = JSON.parse(templateContent);
+            const name = parsedTemplate.projectName;
+            const description = parsedTemplate.projectDescription;
+
+            if (!name) {
+                toast({
+                    title: "Invalid Template",
+                    description: 'The template JSON must include a "projectName" property.',
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            onAddProject(name, description || '', templateContent);
+            onClose();
+
+        } catch (e) {
+            toast({
+                title: "JSON Error",
+                description: "The template content is not valid JSON.",
+                variant: "destructive",
+            });
+            console.error("JSON parsing error:", e);
+        }
     };
 
     return (
@@ -83,15 +97,15 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
             <DialogContent className="sm:max-w-2xl bg-[#2a2a2a] border-neutral-700 text-white">
                 <DialogHeader>
                     <DialogTitle>Create Project From Template</DialogTitle>
-                    <DialogDescription>Select a template, customize it if needed, and provide a name for your new project.</DialogDescription>
+                    <DialogDescription>Select a template and customize its JSON content before creating the project.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="template-name" className="text-right">
+                    <div className="space-y-2">
+                        <Label htmlFor="template-name">
                             Template
                         </Label>
-                        <Select onValueChange={setSelectedTemplateId} value={selectedTemplateId}>
-                            <SelectTrigger className="col-span-3 bg-[#313131] border-neutral-600">
+                        <Select onValueChange={handleTemplateSelect} value={selectedTemplateId}>
+                            <SelectTrigger id="template-name" className="w-full bg-[#313131] border-neutral-600">
                                 <SelectValue placeholder="Select a template" />
                             </SelectTrigger>
                             <SelectContent className="bg-[#2a2a2a] border-neutral-700 text-white">
@@ -105,30 +119,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="project-name" className="text-right">
-                            Name
-                        </Label>
-                        <Input
-                            id="project-name"
-                            value={projectName}
-                            onChange={(e) => setProjectName(e.target.value)}
-                            className="col-span-3 bg-[#313131] border-neutral-600"
-                            placeholder="e.g., Downtown Plaza"
-                        />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="project-description" className="text-right">
-                            Description
-                        </Label>
-                        <Textarea
-                            id="project-description"
-                            value={projectDescription}
-                            onChange={(e) => setProjectDescription(e.target.value)}
-                            className="col-span-3 bg-[#313131] border-neutral-600"
-                            placeholder="A short description of the project."
-                        />
-                    </div>
+                   
                      {selectedTemplateId && (
                          <div className="space-y-2">
                             <Label htmlFor="template-content">
@@ -146,7 +137,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="ghost" onClick={onClose} className="hover:bg-neutral-700">Cancel</Button>
-                    <Button type="submit" onClick={handleCreate} disabled={!projectName.trim() || !selectedTemplateId || !templateContent} className="bg-yellow-500 hover:bg-yellow-600 text-black">Create Project</Button>
+                    <Button type="submit" onClick={handleCreate} disabled={!selectedTemplateId || !templateContent} className="bg-yellow-500 hover:bg-yellow-600 text-black">Create Project</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
