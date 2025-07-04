@@ -25,17 +25,45 @@ interface AddEditTemplateModalProps {
     template: Omit<ProjectTemplate, 'id'> | ProjectTemplate | null;
 }
 
+const entitySchema: z.ZodType<any> = z.lazy(() =>
+    z.object({
+        entityName: z.string({ required_error: "'entityName' is required for every entity." }),
+        entityType: z.string({ required_error: "'entityType' is required for every entity." }),
+        entityDescription: z.string({ required_error: "'entityDescription' is required for every entity." }),
+        childEntities: z.array(entitySchema, { invalid_type_error: "'childEntities' must be an array." }),
+    }).strict("Template contains an unknown property in an entity object. Please stick to the defined structure.")
+);
+
+const templateSchema = z.object({
+    projectName: z.string({ required_error: "'projectName' is required at the root of the template." }),
+    projectDescription: z.string({ required_error: "'projectDescription' is required at the root of the template." }),
+    projectEntities: z.array(entitySchema, { invalid_type_error: "'projectEntities' must be an array." }),
+}).strict("Template contains an unknown property at the root. Please stick to the defined structure.");
+
+
 const formSchema = z.object({
     name: z.string().min(2, "Template name must be at least 2 characters."),
     description: z.string().min(10, "Description must be at least 10 characters."),
-    content: z.string().min(2, "JSON content cannot be empty.").refine((val) => {
-        try {
-            JSON.parse(val);
-            return true;
-        } catch (e) {
-            return false;
+    content: z.string().min(2, "JSON content cannot be empty."),
+}).superRefine((data, ctx) => {
+    try {
+        const parsed = JSON.parse(data.content);
+        templateSchema.parse(parsed);
+    } catch (e: any) {
+        if (e instanceof z.ZodError) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['content'],
+                message: `Invalid template structure: ${e.errors[0].message}`,
+            });
+        } else {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['content'],
+                message: "Content must be valid JSON.",
+            });
         }
-    }, { message: "Content must be valid JSON." }),
+    }
 });
 
 const defaultTemplateContent = `{
@@ -43,14 +71,14 @@ const defaultTemplateContent = `{
     "projectDescription": "<Project Description>",
     "projectEntities": [
         {
-            "entityName": "<Entity Name>",
-            "entityType": "<Entity Type>",
-            "entityDescription": "<Entity Description>",
+            "entityName": "<Top-Level Entity, e.g., 'Main Compound'>",
+            "entityType": "residential compound",
+            "entityDescription": "<Description for top-level entity>",
             "childEntities": [
                 {
-                    "entityName": "<Entity Name>",
-                    "entityType": "<Entity Type>",
-                    "entityDescription": "<Entity Description>",
+                    "entityName": "<Child Entity, e.g., 'Building A'>",
+                    "entityType": "residential building",
+                    "entityDescription": "<Description for child entity>",
                     "childEntities": []
                 }
             ]

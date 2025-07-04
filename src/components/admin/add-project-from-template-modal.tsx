@@ -22,18 +22,19 @@ const TEMPLATES_STORAGE_KEY = 'project_templates';
 // Zod schema for strict template validation
 const entitySchema: z.ZodType<any> = z.lazy(() =>
     z.object({
-        entityName: z.string(),
-        entityType: z.string(),
-        entityDescription: z.string(),
-        childEntities: z.array(entitySchema),
-    }).strict()
+        entityName: z.string({ required_error: "'entityName' is required for every entity." }),
+        entityType: z.string({ required_error: "'entityType' is required for every entity." }),
+        entityDescription: z.string({ required_error: "'entityDescription' is required for every entity." }),
+        childEntities: z.array(entitySchema, { invalid_type_error: "'childEntities' must be an array." }),
+    }).strict("Template contains an unknown property in an entity object. Please stick to the defined structure.")
 );
 
 const templateSchema = z.object({
-    projectName: z.string(),
-    projectDescription: z.string(),
-    projectEntities: z.array(entitySchema),
-}).strict();
+    projectName: z.string({ required_error: "'projectName' is required at the root of the template." }),
+    projectDescription: z.string({ required_error: "'projectDescription' is required at the root of the template." }),
+    projectEntities: z.array(entitySchema, { invalid_type_error: "'projectEntities' must be an array." }),
+}).strict("Template contains an unknown property at the root. Please stick to the defined structure.");
+
 
 // Recursive function to check for placeholder values like "<...>"
 function checkForPlaceholders(obj: any): string | null {
@@ -123,7 +124,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
         const schemaResult = templateSchema.safeParse(parsedTemplate);
         if (!schemaResult.success) {
             const firstError = schemaResult.error.errors[0];
-            const errorMessage = `Schema validation failed at path: '${firstError.path.join('.')}' with error: ${firstError.message}`;
+            const errorMessage = `Structure Error: ${firstError.message}`;
             toast({ title: "Verification Failed", description: errorMessage, variant: "destructive" });
             setIsVerified(false);
             return;
