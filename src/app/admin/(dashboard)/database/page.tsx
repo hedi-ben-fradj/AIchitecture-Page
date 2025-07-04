@@ -274,6 +274,7 @@ export default function DatabasePage() {
                 onClose={() => setTemplateToEdit(null)}
                 template={templateToEdit}
                 onSave={handleSaveTemplate}
+                entityTypes={entityTypes}
             />
 
             <AlertDialog open={!!entityToDelete} onOpenChange={() => setEntityToDelete(null)}>

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,57 +23,8 @@ interface AddEditTemplateModalProps {
     onClose: () => void;
     onSave: (templateData: Omit<ProjectTemplate, 'id'>, id?: string) => void;
     template: Omit<ProjectTemplate, 'id'> | ProjectTemplate | null;
+    entityTypes: string[];
 }
-
-const entitySchema: z.ZodType<any> = z.lazy(() =>
-    z.object({
-        entityName: z.string({ required_error: "'entityName' is required for every entity." }),
-        entityType: z.string({ required_error: "'entityType' is required for every entity." }),
-        entityDescription: z.string({ required_error: "'entityDescription' is required for every entity." }),
-        childEntities: z.array(entitySchema, { invalid_type_error: "'childEntities' must be an array." }).optional(),
-    }).strict("Template contains an unknown property in an entity object. Please stick to the defined structure.")
-);
-
-const templateSchema = z.object({
-    projectName: z.string({ required_error: "'projectName' is required at the root of the template." }),
-    projectDescription: z.string({ required_error: "'projectDescription' is required at the root of the template." }),
-    projectEntities: z.array(entitySchema, { invalid_type_error: "'projectEntities' must be an array." }),
-}).strict("Template contains an unknown property at the root. Please stick to the defined structure.");
-
-
-const formSchema = z.object({
-    name: z.string().min(2, "Template name must be at least 2 characters."),
-    description: z.string().min(10, "Description must be at least 10 characters."),
-    content: z.string().min(2, "JSON content cannot be empty."),
-}).superRefine((data, ctx) => {
-    try {
-        const parsed = JSON.parse(data.content);
-        const result = templateSchema.safeParse(parsed);
-         if (!result.success) {
-            const firstError = result.error.errors[0];
-            const errorMessage = `Structure Error: ${firstError.message}`;
-             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['content'],
-                message: errorMessage,
-            });
-        }
-    } catch (e: any) {
-        if (e instanceof z.ZodError) {
-             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['content'],
-                message: `Invalid template structure: ${e.errors[0].message}`,
-            });
-        } else {
-             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['content'],
-                message: "Content must be valid JSON.",
-            });
-        }
-    }
-});
 
 const defaultTemplateContent = `{
     "projectName": "<Project Name>",
@@ -96,8 +47,63 @@ const defaultTemplateContent = `{
 }`;
 
 
-export function AddEditTemplateModal({ isOpen, onClose, onSave, template }: AddEditTemplateModalProps) {
+export function AddEditTemplateModal({ isOpen, onClose, onSave, template, entityTypes }: AddEditTemplateModalProps) {
     const isEditing = template && 'id' in template && template.id;
+
+    const formSchema = useMemo(() => {
+        const entitySchema: z.ZodType<any> = z.lazy(() =>
+            z.object({
+                entityName: z.string({ required_error: "'entityName' is required for every entity." }),
+                entityType: z.string({ required_error: "'entityType' is required for every entity." })
+                    .refine(val => entityTypes.includes(val), {
+                        message: `Invalid entity type. Must be one of: ${entityTypes.join(', ')}`
+                    }),
+                entityDescription: z.string({ required_error: "'entityDescription' is required for every entity." }),
+                childEntities: z.array(entitySchema).optional(),
+            }).strict("Template contains an unknown property in an entity object. Please stick to the defined structure.")
+        );
+        
+        const templateSchema = z.object({
+            projectName: z.string({ required_error: "'projectName' is required at the root of the template." }),
+            projectDescription: z.string({ required_error: "'projectDescription' is required at the root of the template." }),
+            projectEntities: z.array(entitySchema),
+        }).strict("Template contains an unknown property at the root. Please stick to the defined structure.");
+
+        return z.object({
+            name: z.string().min(2, "Template name must be at least 2 characters."),
+            description: z.string().min(10, "Description must be at least 10 characters."),
+            content: z.string().min(2, "JSON content cannot be empty."),
+        }).superRefine((data, ctx) => {
+            try {
+                const parsed = JSON.parse(data.content);
+                const result = templateSchema.safeParse(parsed);
+                 if (!result.success) {
+                    const firstError = result.error.errors[0];
+                    const errorMessage = `Structure Error: ${firstError.message}`;
+                     ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        path: ['content'],
+                        message: errorMessage,
+                    });
+                }
+            } catch (e: any) {
+                if (e instanceof z.ZodError) {
+                     ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        path: ['content'],
+                        message: `Invalid template structure: ${e.errors[0].message}`,
+                    });
+                } else {
+                     ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        path: ['content'],
+                        message: "Content must be valid JSON.",
+                    });
+                }
+            }
+        });
+
+    }, [entityTypes]);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),

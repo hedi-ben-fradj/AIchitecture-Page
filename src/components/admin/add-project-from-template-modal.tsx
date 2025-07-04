@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { ProjectTemplate } from './add-edit-template-modal';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
+import { useProjectData } from '@/contexts/views-context';
 
 interface AddProjectFromTemplateModalProps {
     isOpen: boolean;
@@ -18,23 +19,6 @@ interface AddProjectFromTemplateModalProps {
 }
 
 const TEMPLATES_STORAGE_KEY = 'project_templates';
-
-// Zod schema for strict template validation
-const entitySchema: z.ZodType<any> = z.lazy(() =>
-    z.object({
-        entityName: z.string({ required_error: "'entityName' is required for every entity." }),
-        entityType: z.string({ required_error: "'entityType' is required for every entity." }),
-        entityDescription: z.string({ required_error: "'entityDescription' is required for every entity." }),
-        childEntities: z.array(entitySchema, { invalid_type_error: "'childEntities' must be an array." }).optional(),
-    }).strict("Template contains an unknown property in an entity object. Please stick to the defined structure.")
-);
-
-const templateSchema = z.object({
-    projectName: z.string({ required_error: "'projectName' is required at the root of the template." }),
-    projectDescription: z.string({ required_error: "'projectDescription' is required at the root of the template." }),
-    projectEntities: z.array(entitySchema, { invalid_type_error: "'projectEntities' must be an array." }),
-}).strict("Template contains an unknown property at the root. Please stick to the defined structure.");
-
 
 // Recursive function to check for placeholder values like "<...>"
 function checkForPlaceholders(obj: any): string | null {
@@ -66,6 +50,28 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
     const [templateContent, setTemplateContent] = useState('');
     const [isVerified, setIsVerified] = useState<boolean>(false);
     const { toast } = useToast();
+    const { entityTypes } = useProjectData();
+
+    const templateSchema = useMemo(() => {
+        const entitySchema: z.ZodType<any> = z.lazy(() =>
+            z.object({
+                entityName: z.string({ required_error: "'entityName' is required for every entity." }),
+                entityType: z.string({ required_error: "'entityType' is required for every entity." })
+                    .refine(val => entityTypes.includes(val), {
+                        message: `Invalid entity type. Must be one of: ${entityTypes.join(', ')}`
+                    }),
+                entityDescription: z.string({ required_error: "'entityDescription' is required for every entity." }),
+                childEntities: z.array(entitySchema).optional(),
+            }).strict("Template contains an unknown property in an entity object. Please stick to the defined structure.")
+        );
+
+        return z.object({
+            projectName: z.string({ required_error: "'projectName' is required at the root of the template." }),
+            projectDescription: z.string({ required_error: "'projectDescription' is required at the root of the template." }),
+            projectEntities: z.array(entitySchema),
+        }).strict("Template contains an unknown property at the root. Please stick to the defined structure.");
+    }, [entityTypes]);
+
 
      useEffect(() => {
         if (isOpen && typeof window !== 'undefined') {
