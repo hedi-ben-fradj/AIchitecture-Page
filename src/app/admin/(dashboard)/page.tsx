@@ -16,8 +16,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AddProjectModal } from '@/components/admin/add-project-modal';
+import { AddProjectFromTemplateModal } from '@/components/admin/add-project-from-template-modal';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface Project {
     id: string;
@@ -45,6 +47,7 @@ export default function AdminProjectsPage() {
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
     const [isMounted, setIsMounted] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const router = useRouter();
 
 
@@ -146,6 +149,13 @@ export default function AdminProjectsPage() {
         updateProjectsInStorage(updatedProjects);
         router.push(`/admin/projects/${slug}`);
     };
+
+    const handleAddProjectFromTemplate = (name: string, description: string, template: string) => {
+        // For now, this function is the same as creating a basic project.
+        // The logic for handling templates will be implemented later.
+        console.log(`Creating project "${name}" from template "${template}"`);
+        handleAddProject(name, description);
+    };
     
     // Prevent hydration errors by not rendering until the client has mounted and loaded state
     if (!isMounted) {
@@ -158,6 +168,12 @@ export default function AdminProjectsPage() {
                 isOpen={isAddModalOpen} 
                 onClose={() => setIsAddModalOpen(false)} 
                 onAddProject={handleAddProject} 
+            />
+
+            <AddProjectFromTemplateModal
+                isOpen={isTemplateModalOpen}
+                onClose={() => setIsTemplateModalOpen(false)}
+                onAddProject={handleAddProjectFromTemplate}
             />
 
             <AlertDialog open={!!projectToDelete} onOpenChange={() => setProjectToDelete(null)}>
@@ -217,18 +233,26 @@ export default function AdminProjectsPage() {
                         </div>
                     ))}
 
-                    <Card 
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg border-2 border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 cursor-pointer transition-colors"
-                    >
-                        <CardHeader className="items-center text-center p-4">
-                            <Plus className="h-8 w-8 mb-2" />
-                            <CardTitle className="text-lg font-medium">New Project</CardTitle>
-                            <CardDescription className="text-neutral-400 pt-2 text-sm">
-                                Create or import a new project
-                            </CardDescription>
-                        </CardHeader>
-                    </Card>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                             <Card 
+                                className="bg-[#2a2a2a] border-neutral-700 text-white flex flex-col items-center justify-center min-h-[240px] rounded-lg border-2 border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 cursor-pointer transition-colors"
+                            >
+                                <CardHeader className="items-center text-center p-4">
+                                    <Plus className="h-8 w-8 mb-2" />
+                                    <CardTitle className="text-lg font-medium">New Project</CardTitle>
+                                    <CardDescription className="text-neutral-400 pt-2 text-sm">
+                                        Create or import a new project
+                                    </CardDescription>
+                                </CardHeader>
+                            </Card>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="bg-[#2a2a2a] border-neutral-700 text-white">
+                            <DropdownMenuItem onSelect={() => setIsAddModalOpen(true)} className="cursor-pointer hover:bg-neutral-700">Create basic project</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setIsTemplateModalOpen(true)} className="cursor-pointer hover:bg-neutral-700">Create project from template</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
                 </div>
             </main>
         </>
