@@ -244,8 +244,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
              if (selection.details.makeAsEntity && selection.details.title) {
                 const { entities } = loadDataFromStorage();
-                const entityId = selection.details.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-                const targetEntity = entities.find((e: Entity) => e.id === entityId);
+                const parentId = currentView?.entityId;
+                const targetEntity = entities.find(e => e.parentId === parentId && e.name === selection.details?.title);
                 setClickedEntity(targetEntity || null);
             } else {
                 setClickedEntity(null);
@@ -287,9 +287,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         }
     };
 
-    const handleNavigate = (entityName: string) => {
-        const entityId = entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        
+    const handleNavigate = (entityId: string) => {
         const { entities } = loadDataFromStorage();
         const targetEntity = entities.find(e => e.id === entityId);
         
@@ -307,11 +305,11 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 setRenderedImageRect(null);
                 setTimeout(calculateRect, 0);
             } else {
-                 alert(`The default view for entity "${entityName}" could not be found.`);
+                 alert(`The default view for entity "${targetEntity.name}" could not be found.`);
                  closeDetails();
             }
         } else {
-            alert(`The entity "${entityName}" or its default view could not be found.`);
+            alert(`The entity with ID "${entityId}" or its default view could not be found.`);
             closeDetails();
         }
     };
@@ -681,8 +679,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         </Button>
                                     )}
 
-                                    {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
-                                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black rounded-full px-5 h-9 text-[11px] font-semibold" onClick={() => handleNavigate(clickedSelection.details!.title)}>
+                                    {clickedEntity && clickedSelection?.details?.makeAsEntity && (
+                                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black rounded-full px-5 h-9 text-[11px] font-semibold" onClick={() => handleNavigate(clickedEntity.id)}>
                                             NAVIGATE TO
                                         </Button>
                                     )}
@@ -716,9 +714,9 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     </>
                                 )}
                                 
-                                {clickedSelection.details.makeAsEntity && clickedSelection.details.title && (
+                                {clickedEntity && clickedSelection?.details?.makeAsEntity && (
                                     <div className="flex justify-end mt-6">
-                                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedSelection.details!.title)}>
+                                        <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" onClick={() => handleNavigate(clickedEntity.id)}>
                                             <NavigationIcon className="mr-2 h-4 w-4" />
                                             Navigate to
                                         </Button>
