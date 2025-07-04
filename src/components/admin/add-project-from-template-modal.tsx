@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ProjectTemplate } from './add-edit-template-modal';
 import { useToast } from '@/hooks/use-toast';
+import { z } from 'zod';
 
 interface AddProjectFromTemplateModalProps {
     isOpen: boolean;
@@ -17,6 +18,46 @@ interface AddProjectFromTemplateModalProps {
 }
 
 const TEMPLATES_STORAGE_KEY = 'project_templates';
+
+// Zod schema for strict template validation
+const entitySchema: z.ZodType<any> = z.lazy(() =>
+    z.object({
+        entityName: z.string(),
+        entityType: z.string(),
+        entityDescription: z.string(),
+        childEntities: z.array(entitySchema),
+    }).strict()
+);
+
+const templateSchema = z.object({
+    projectName: z.string(),
+    projectDescription: z.string(),
+    projectEntities: z.array(entitySchema),
+}).strict();
+
+// Recursive function to check for placeholder values like "<...>"
+function checkForPlaceholders(obj: any): string | null {
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            const value = obj[key];
+            if (typeof value === 'string') {
+                if (value.startsWith('<') && value.endsWith('>')) {
+                    return `Placeholder detected for "${key}": ${value}. Please replace all placeholders.`;
+                }
+            } else if (Array.isArray(value)) {
+                for (const item of value) {
+                    const result = checkForPlaceholders(item);
+                    if (result) return result;
+                }
+            } else if (typeof value === 'object' && value !== null) {
+                const result = checkForPlaceholders(value);
+                if (result) return result;
+            }
+        }
+    }
+    return null;
+}
+
 
 export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: AddProjectFromTemplateModalProps) {
     const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
@@ -65,39 +106,40 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
 
     const handleVerify = () => {
         if (!templateContent) {
-            toast({
-                title: "Cannot Verify",
-                description: "Template content is empty.",
-                variant: "destructive",
-            });
+            toast({ title: "Cannot Verify", description: "Template content is empty.", variant: "destructive" });
+            setIsVerified(false);
             return;
         }
-        // Dummy check for now. We just check for valid JSON.
+
+        let parsedTemplate;
         try {
-            const parsedTemplate = JSON.parse(templateContent);
-             if (!parsedTemplate.projectName) {
-                toast({
-                    title: "Verification Failed",
-                    description: 'The template JSON must include a "projectName" property.',
-                    variant: "destructive",
-                });
-                setIsVerified(false);
-                return;
-            }
-            toast({
-                title: "Success",
-                description: "Template verified successfully.",
-            });
-            setIsVerified(true);
+            parsedTemplate = JSON.parse(templateContent);
         } catch (e) {
-            toast({
-                title: "Verification Failed",
-                description: "The template content is not valid JSON.",
-                variant: "destructive",
-            });
+            toast({ title: "Verification Failed", description: "The template content is not valid JSON.", variant: "destructive" });
             setIsVerified(false);
+            return;
         }
+
+        const schemaResult = templateSchema.safeParse(parsedTemplate);
+        if (!schemaResult.success) {
+            const firstError = schemaResult.error.errors[0];
+            const errorMessage = `Schema validation failed at path: '${firstError.path.join('.')}' with error: ${firstError.message}`;
+            toast({ title: "Verification Failed", description: errorMessage, variant: "destructive" });
+            setIsVerified(false);
+            return;
+        }
+
+        const placeholderError = checkForPlaceholders(schemaResult.data);
+        if (placeholderError) {
+            toast({ title: "Verification Failed", description: placeholderError, variant: "destructive" });
+            setIsVerified(false);
+            return;
+        }
+
+        toast({ title: "Success", description: "Template verified successfully." });
+        setIsVerified(true);
     };
+
 
     const handleCreate = () => {
         if (!isVerified) {
@@ -114,25 +156,16 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
             const name = parsedTemplate.projectName;
             const description = parsedTemplate.projectDescription;
 
-            if (!name) {
-                toast({
-                    title: "Invalid Template",
-                    description: 'The template JSON must include a "projectName" property.',
-                    variant: "destructive",
-                });
-                return;
-            }
-
             onAddProject(name, description || '', templateContent);
             onClose();
 
         } catch (e) {
             toast({
-                title: "JSON Error",
-                description: "The template content is not valid JSON.",
+                title: "Project Creation Error",
+                description: "An unexpected error occurred. Please re-verify the template.",
                 variant: "destructive",
             });
-            console.error("JSON parsing error:", e);
+            console.error("JSON parsing error during creation:", e);
         }
     };
 
