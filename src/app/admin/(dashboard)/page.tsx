@@ -20,6 +20,8 @@ import { AddProjectFromTemplateModal } from '@/components/admin/add-project-from
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
+import type { ProjectTemplate } from '@/components/admin/add-edit-template-modal';
 
 interface Project {
     id: string;
@@ -40,6 +42,7 @@ interface ProjectStats {
 }
 
 const PROJECTS_STORAGE_KEY = 'projects_list';
+const TEMPLATES_STORAGE_KEY = 'project_templates';
 
 export default function AdminProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -48,11 +51,24 @@ export default function AdminProjectsPage() {
     const [isMounted, setIsMounted] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+    const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
+    const { toast } = useToast();
     const router = useRouter();
 
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
+            // Load templates
+            try {
+                const storedTemplates = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+                if (storedTemplates) {
+                    setTemplates(JSON.parse(storedTemplates));
+                }
+            } catch (error) {
+                console.error("Failed to load templates from localStorage", error);
+                setTemplates([]);
+            }
+
             let currentProjects: Project[] = [];
             try {
                 const storedProjects = localStorage.getItem(PROJECTS_STORAGE_KEY);
@@ -157,6 +173,18 @@ export default function AdminProjectsPage() {
         handleAddProject(name, description);
     };
     
+    const handleCreateFromTemplateClick = () => {
+        if (templates.length > 0) {
+            setIsTemplateModalOpen(true);
+        } else {
+            toast({
+                title: "No Templates Available",
+                description: "Please create a project template in the Database section first.",
+                variant: "destructive",
+            });
+        }
+    };
+
     // Prevent hydration errors by not rendering until the client has mounted and loaded state
     if (!isMounted) {
         return null;
@@ -249,7 +277,7 @@ export default function AdminProjectsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="bg-[#2a2a2a] border-neutral-700 text-white">
                             <DropdownMenuItem onSelect={() => setIsAddModalOpen(true)} className="cursor-pointer hover:bg-neutral-700">Create basic project</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setIsTemplateModalOpen(true)} className="cursor-pointer hover:bg-neutral-700">Create project from template</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={handleCreateFromTemplateClick} className="cursor-pointer hover:bg-neutral-700">Create project from template</DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
 
