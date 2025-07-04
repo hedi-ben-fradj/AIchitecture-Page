@@ -187,27 +187,24 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   const handleSaveDetails = (data: Polygon['details']) => {
     if (!selectedPolygonId || !data) return;
 
-    const newPolygons = polygons.map(p => {
-      // Case 1: This is the polygon we are currently editing. Set its details to the new data.
-      if (p.id === selectedPolygonId) {
-        return { ...p, details: data };
-      }
+    const linkedEntityTitle = data.makeAsEntity ? data.title : null;
 
-      // Case 2: This is a different polygon. Check if it was previously linked to the
-      // entity that the selected polygon is *now* being linked to.
-      if (
-        data.makeAsEntity &&
-        data.title &&
-        p.details?.makeAsEntity &&
-        p.details.title === data.title
-      ) {
-        // It's a match. This polygon is the old link. Unlink it by clearing its details.
-        return { ...p, details: undefined };
-      }
+    // Filter out any other polygon that is already linked to this entity title.
+    const filteredPolygons = linkedEntityTitle
+      ? polygons.filter(p => {
+          const isOtherLinkedPolygon = 
+            p.id !== selectedPolygonId && // not the polygon being edited
+            p.details?.makeAsEntity &&
+            p.details.title === linkedEntityTitle;
+          
+          return !isOtherLinkedPolygon; // keep if it's NOT the other linked polygon
+        })
+      : polygons;
 
-      // Case 3: This polygon is not affected. Return it as is.
-      return p;
-    });
+    // Now, map over the filtered array to update the currently selected polygon.
+    const newPolygons = filteredPolygons.map(p =>
+      p.id === selectedPolygonId ? { ...p, details: data } : p
+    );
 
     setPolygons(newPolygons);
     saveToHistory(newPolygons);
