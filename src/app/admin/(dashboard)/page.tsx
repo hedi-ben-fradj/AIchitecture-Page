@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -166,10 +167,10 @@ export default function AdminProjectsPage() {
         router.push(`/admin/projects/${slug}`);
     };
 
-    const handleAddProjectFromTemplate = (name: string, description: string, template: string) => {
+    const handleAddProjectFromTemplate = (name: string, description: string, templateContent: string) => {
         // For now, this function is the same as creating a basic project.
         // The logic for handling templates will be implemented later.
-        console.log(`Creating project "${name}" from template "${template}"`);
+        console.log(`Creating project "${name}" from template content:`, templateContent);
         handleAddProject(name, description);
     };
     
