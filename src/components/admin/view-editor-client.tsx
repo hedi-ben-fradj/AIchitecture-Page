@@ -159,6 +159,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
               onMakeEntity={handleMakeEntity}
               initialPolygons={view?.selections}
               parentEntityType={entity.entityType}
+              entityId={entityId}
            />
          </div>
       )}

@@ -43,6 +43,7 @@ interface ImageEditorProps {
     onMakeEntity?: (entityName: string, entityType: EntityType) => void;
     initialPolygons?: Polygon[]; // These are expected to be in relative (0-1) format
     parentEntityType?: EntityType;
+    entityId?: string;
 }
 
 export interface ImageEditorRef {
@@ -61,7 +62,7 @@ function distToSegmentSquared(p: Point, v: Point, w: Point): number {
 }
 
 const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
-  ({ imageUrl, onMakeEntity, initialPolygons = [], parentEntityType }, ref) => {
+  ({ imageUrl, onMakeEntity, initialPolygons = [], parentEntityType, entityId }, ref) => {
   // `polygons` state is for internal use and stores coordinates in ABSOLUTE pixels for easier editing.
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [history, setHistory] = useState<Polygon[][]>([[]]);
@@ -325,6 +326,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
         onSave={handleSaveDetails}
         selectionData={selectedPolygon}
         parentEntityType={parentEntityType}
+        entityId={entityId}
+        onMakeEntity={onMakeEntity}
       />
       <div className="flex flex-col gap-4 items-center">
         <div className="w-full flex justify-end gap-2">
