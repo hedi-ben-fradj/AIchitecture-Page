@@ -2,14 +2,15 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type Entity, type EntityType } from '@/contexts/views-context';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, Plus } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { EditEntityModal } from '@/components/admin/edit-entity-modal';
+import { AddEditTemplateModal, type ProjectTemplate } from '@/components/admin/add-edit-template-modal';
 import { useProjectData } from '@/contexts/views-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ interface EnrichedEntity extends Entity {
 }
 
 const PROJECTS_STORAGE_KEY = 'projects_list';
+const TEMPLATES_STORAGE_KEY = 'project_templates';
 const getStorageSafeViewId = (viewId: string) => viewId.replace(/\//g, '__');
 
 
@@ -52,9 +54,16 @@ export default function DatabasePage() {
     const [viewTypeToDelete, setViewTypeToDelete] = useState<string | null>(null);
     const [newViewTypeName, setNewViewTypeName] = useState('');
 
+    // Template states
+    const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
+    const [templateToEdit, setTemplateToEdit] = useState<ProjectTemplate | Omit<ProjectTemplate, 'id'> | null>(null);
+    const [templateToDelete, setTemplateToDelete] = useState<ProjectTemplate | null>(null);
+
+
     const loadData = useCallback(() => {
         if (typeof window !== 'undefined') {
             try {
+                // Load Projects and Entities
                 const storedProjectsStr = localStorage.getItem(PROJECTS_STORAGE_KEY);
                 const loadedProjects: Project[] = storedProjectsStr ? JSON.parse(storedProjectsStr) : [];
                 setProjects(loadedProjects);
@@ -86,10 +95,16 @@ export default function DatabasePage() {
 
                 setAllEntities(enrichedEntitiesWithParents);
 
+                // Load Templates
+                const storedTemplatesStr = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+                const loadedTemplates: ProjectTemplate[] = storedTemplatesStr ? JSON.parse(storedTemplatesStr) : [];
+                setTemplates(loadedTemplates);
+
             } catch (error) {
                 console.error("Failed to load data from localStorage", error);
                 setAllEntities([]);
                 setProjects([]);
+                setTemplates([]);
             }
         }
     }, []);
@@ -195,6 +210,37 @@ export default function DatabasePage() {
         }
     };
 
+    const handleSaveTemplate = (templateData: Omit<ProjectTemplate, 'id'>, id?: string) => {
+        setTemplates(prev => {
+            let updatedTemplates;
+            if (id) {
+                updatedTemplates = prev.map(t => t.id === id ? { ...t, ...templateData, id } : t);
+            } else {
+                const newId = templateData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                 if (prev.some(t => t.id === newId)) {
+                    alert('A template with a similar name already exists, generating the same ID.');
+                    return prev;
+                }
+                const newTemplate: ProjectTemplate = { id: newId, ...templateData };
+                updatedTemplates = [...prev, newTemplate];
+            }
+            localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updatedTemplates));
+            return updatedTemplates;
+        });
+        setTemplateToEdit(null);
+    };
+
+    const confirmDeleteTemplate = () => {
+        if (!templateToDelete) return;
+        setTemplates(prev => {
+            const updatedTemplates = prev.filter(t => t.id !== templateToDelete.id);
+            localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updatedTemplates));
+            return updatedTemplates;
+        });
+        setTemplateToDelete(null);
+    };
+
+
     const filteredEntities = useMemo(() => {
         return allEntities
             .filter(entity => entity.entityType === selectedEntityType)
@@ -222,6 +268,12 @@ export default function DatabasePage() {
                 onClose={() => setEntityToEdit(null)}
                 entity={entityToEdit}
                 onUpdate={handleUpdateEntity}
+            />
+            <AddEditTemplateModal
+                isOpen={!!templateToEdit}
+                onClose={() => setTemplateToEdit(null)}
+                template={templateToEdit}
+                onSave={handleSaveTemplate}
             />
 
             <AlertDialog open={!!entityToDelete} onOpenChange={() => setEntityToDelete(null)}>
@@ -268,16 +320,32 @@ export default function DatabasePage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <AlertDialog open={!!templateToDelete} onOpenChange={() => setTemplateToDelete(null)}>
+                <AlertDialogContent className="bg-[#2a2a2a] border-neutral-700 text-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the "{templateToDelete?.name}" template.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="hover:bg-neutral-700" onClick={() => setTemplateToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDeleteTemplate} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             
             <header className="h-16 flex items-center px-6 border-b border-neutral-700 bg-[#2a2a2a] flex-shrink-0">
                 <h1 className="text-xl font-semibold text-white">Database</h1>
             </header>
             <main className="flex-1 p-8 bg-[#313131] overflow-y-auto">
                 <Tabs defaultValue="entities" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
+                    <TabsList className="grid w-full grid-cols-4 max-w-2xl mx-auto">
                         <TabsTrigger value="entities">Entities</TabsTrigger>
                         <TabsTrigger value="types">Entity Types</TabsTrigger>
                         <TabsTrigger value="view-types">View Types</TabsTrigger>
+                        <TabsTrigger value="templates">Project Templates</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="entities" className="mt-6">
@@ -453,6 +521,62 @@ export default function DatabasePage() {
                                 </CardContent>
                             </Card>
                         </div>
+                    </TabsContent>
+
+                    <TabsContent value="templates" className="mt-6">
+                        <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div>
+                                    <CardTitle>Project Templates</CardTitle>
+                                    <CardDescription>
+                                        Create and manage reusable templates for new projects.
+                                    </CardDescription>
+                                </div>
+                                <Button onClick={() => setTemplateToEdit({ name: '', description: '', content: '' })} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    New Template
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="rounded-md border border-neutral-700">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="border-neutral-700 hover:bg-[#2a2a2a]">
+                                                <TableHead className="text-white">Template Name</TableHead>
+                                                <TableHead className="text-white">Description</TableHead>
+                                                <TableHead className="text-right text-white">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {templates.length > 0 ? (
+                                                templates.map(template => (
+                                                    <TableRow key={template.id} className="border-neutral-700 hover:bg-[#313131]">
+                                                        <TableCell className="font-medium">{template.name}</TableCell>
+                                                        <TableCell className="text-neutral-400">{template.description}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-neutral-600" onClick={() => setTemplateToEdit(template)}>
+                                                                    <Edit className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-neutral-600 text-red-500 hover:text-red-400" onClick={() => setTemplateToDelete(template)}>
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} className="h-24 text-center text-neutral-400">
+                                                        No templates created yet.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </TabsContent>
                 </Tabs>
             </main>
