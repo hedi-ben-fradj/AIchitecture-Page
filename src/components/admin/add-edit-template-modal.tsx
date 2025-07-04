@@ -94,7 +94,7 @@ export function AddEditTemplateModal({ isOpen, onClose, onSave, template }: AddE
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px] bg-[#2a2a2a] border-neutral-700 text-white">
+            <DialogContent className="sm:max-w-4xl bg-[#2a2a2a] border-neutral-700 text-white">
                 <DialogHeader>
                     <DialogTitle>{isEditing ? `Edit "${(template as ProjectTemplate)?.name}"` : 'Create New Project Template'}</DialogTitle>
                     <DialogDescription>
@@ -136,7 +136,7 @@ export function AddEditTemplateModal({ isOpen, onClose, onSave, template }: AddE
                                 <FormItem>
                                     <FormLabel>Template Content (JSON)</FormLabel>
                                     <FormControl>
-                                        <Textarea placeholder='{ "entities": [], "entityTypes": [] }' {...field} className="bg-[#313131] border-neutral-600 h-64 font-mono text-xs" />
+                                        <Textarea placeholder='{ "entities": [], "entityTypes": [] }' {...field} className="bg-[#313131] border-neutral-600 h-96 font-mono text-xs" />
                                     </FormControl>
                                      <FormDescription>
                                         Provide the template structure in JSON format.

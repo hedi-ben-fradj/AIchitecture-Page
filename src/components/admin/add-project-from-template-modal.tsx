@@ -94,7 +94,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-2xl bg-[#2a2a2a] border-neutral-700 text-white">
+            <DialogContent className="sm:max-w-4xl bg-[#2a2a2a] border-neutral-700 text-white">
                 <DialogHeader>
                     <DialogTitle>Create Project From Template</DialogTitle>
                     <DialogDescription>Select a template and customize its JSON content before creating the project.</DialogDescription>
@@ -129,7 +129,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
                                 id="template-content"
                                 value={templateContent}
                                 onChange={(e) => setTemplateContent(e.target.value)}
-                                className="bg-[#313131] border-neutral-600 h-64 font-mono text-xs"
+                                className="bg-[#313131] border-neutral-600 h-96 font-mono text-xs"
                                 placeholder="Edit the template JSON as needed..."
                             />
                         </div>
