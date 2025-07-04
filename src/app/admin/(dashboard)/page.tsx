@@ -32,6 +32,7 @@ interface Project {
 
 // Minimal type for entity to avoid full context dependency
 interface ProjectEntity {
+    id: string;
     entityType: string;
     status?: 'available' | 'sold';
 }
@@ -168,10 +169,102 @@ export default function AdminProjectsPage() {
     };
 
     const handleAddProjectFromTemplate = (name: string, description: string, templateContent: string) => {
-        // For now, this function is the same as creating a basic project.
-        // The logic for handling templates will be implemented later.
-        console.log(`Creating project "${name}" from template content:`, templateContent);
-        handleAddProject(name, description);
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        if (!slug || projects.some(p => p.id === slug)) {
+            toast({
+                title: "Project Creation Failed",
+                description: `A project with a similar name already exists or is invalid.`,
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const newProject: Project = { id: slug, name, description };
+        const updatedProjects = [...projects, newProject];
+        setProjects(updatedProjects);
+        updateProjectsInStorage(updatedProjects);
+
+        try {
+            const template = JSON.parse(templateContent);
+            const allNewEntities: any[] = []; // Using any as full Entity type is not available here
+
+            const createEntitiesRecursive = (templateEntities: any[], parentId: string | null, parentPath: string) => {
+                if (!templateEntities || templateEntities.length === 0) {
+                    return;
+                }
+
+                for (const templateEntity of templateEntities) {
+                    const entitySlugPart = templateEntity.entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                    if (!entitySlugPart) continue;
+
+                    const entityId = parentPath ? `${parentPath}__${entitySlugPart}` : entitySlugPart;
+                    
+                    let finalId = entityId;
+                    let counter = 1;
+                    while(allNewEntities.some(e => e.id === finalId)) {
+                        finalId = `${entityId}-${counter++}`;
+                    }
+                    
+                    const newEntity = {
+                        id: finalId,
+                        name: templateEntity.entityName,
+                        entityType: templateEntity.entityType,
+                        parentId: parentId,
+                        views: [],
+                        defaultViewId: null,
+                        plotArea: undefined,
+                        houseArea: undefined,
+                        price: undefined,
+                        status: undefined,
+                        availableDate: undefined,
+                        floors: undefined,
+                        rooms: undefined,
+                        detailedRooms: [],
+                    };
+
+                    if (newEntity.entityType === 'Apartment' || newEntity.entityType === 'house') {
+                        newEntity.status = 'available';
+                        newEntity.floors = 1;
+                        newEntity.rooms = 1;
+                    }
+                    
+                    allNewEntities.push(newEntity);
+
+                    if (templateEntity.childEntities && templateEntity.childEntities.length > 0) {
+                        createEntitiesRecursive(templateEntity.childEntities, newEntity.id, newEntity.id);
+                    }
+                }
+            };
+
+            createEntitiesRecursive(template.projectEntities, null, '');
+
+            if (typeof window !== 'undefined') {
+                const projectData = {
+                    entities: allNewEntities,
+                    landingPageEntityId: null,
+                };
+                localStorage.setItem(`project-${slug}-data`, JSON.stringify(projectData));
+            }
+
+            toast({
+                title: "Project Created!",
+                description: `Project "${name}" has been created successfully from the template.`,
+            });
+            router.push(`/admin/projects/${slug}`);
+
+        } catch (error) {
+            console.error("Failed to parse template and create project:", error);
+            toast({
+                title: "Project Creation Error",
+                description: "There was an error processing the template. Please check the JSON and try again.",
+                variant: "destructive",
+            });
+            
+            // Rollback project creation if template processing fails
+            const rolledBackProjects = projects.filter(p => p.id !== slug);
+            setProjects(rolledBackProjects);
+            updateProjectsInStorage(rolledBackProjects);
+        }
     };
     
     const handleCreateFromTemplateClick = () => {
@@ -287,3 +380,5 @@ export default function AdminProjectsPage() {
         </>
     );
 }
+
+    
