@@ -22,6 +22,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
     const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
     const [templateContent, setTemplateContent] = useState('');
+    const [isVerified, setIsVerified] = useState<boolean>(false);
     const { toast } = useToast();
 
      useEffect(() => {
@@ -45,6 +46,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
         } else {
             setTemplateContent('');
         }
+        setIsVerified(false);
     }
 
     // Reset form on close to ensure fresh state
@@ -52,14 +54,56 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
         if (!isOpen) {
             setSelectedTemplateId('');
             setTemplateContent('');
+            setIsVerified(false);
         }
     }, [isOpen]);
 
-    const handleCreate = () => {
-        if (!selectedTemplateId || !templateContent) {
+    // Reset verification if content changes
+    useEffect(() => {
+        setIsVerified(false);
+    }, [templateContent]);
+
+    const handleVerify = () => {
+        if (!templateContent) {
             toast({
-                title: "Incomplete Information",
-                description: "Please select a template and ensure it has content.",
+                title: "Cannot Verify",
+                description: "Template content is empty.",
+                variant: "destructive",
+            });
+            return;
+        }
+        // Dummy check for now. We just check for valid JSON.
+        try {
+            const parsedTemplate = JSON.parse(templateContent);
+             if (!parsedTemplate.projectName) {
+                toast({
+                    title: "Verification Failed",
+                    description: 'The template JSON must include a "projectName" property.',
+                    variant: "destructive",
+                });
+                setIsVerified(false);
+                return;
+            }
+            toast({
+                title: "Success",
+                description: "Template verified successfully.",
+            });
+            setIsVerified(true);
+        } catch (e) {
+            toast({
+                title: "Verification Failed",
+                description: "The template content is not valid JSON.",
+                variant: "destructive",
+            });
+            setIsVerified(false);
+        }
+    };
+
+    const handleCreate = () => {
+        if (!isVerified) {
+             toast({
+                title: "Not Verified",
+                description: "Please verify the template before creating the project.",
                 variant: "destructive",
             });
             return;
@@ -137,7 +181,8 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="ghost" onClick={onClose} className="hover:bg-neutral-700">Cancel</Button>
-                    <Button type="submit" onClick={handleCreate} disabled={!selectedTemplateId || !templateContent} className="bg-yellow-500 hover:bg-yellow-600 text-black">Create Project</Button>
+                    <Button type="button" onClick={handleVerify} variant="outline" disabled={!selectedTemplateId || !templateContent}>Verify Template</Button>
+                    <Button type="button" onClick={handleCreate} disabled={!isVerified} className="bg-yellow-500 hover:bg-yellow-600 text-black">Create Project</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
