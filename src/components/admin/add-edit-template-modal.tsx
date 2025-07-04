@@ -30,7 +30,7 @@ const entitySchema: z.ZodType<any> = z.lazy(() =>
         entityName: z.string({ required_error: "'entityName' is required for every entity." }),
         entityType: z.string({ required_error: "'entityType' is required for every entity." }),
         entityDescription: z.string({ required_error: "'entityDescription' is required for every entity." }),
-        childEntities: z.array(entitySchema, { invalid_type_error: "'childEntities' must be an array." }),
+        childEntities: z.array(entitySchema, { invalid_type_error: "'childEntities' must be an array." }).optional(),
     }).strict("Template contains an unknown property in an entity object. Please stick to the defined structure.")
 );
 
@@ -48,7 +48,16 @@ const formSchema = z.object({
 }).superRefine((data, ctx) => {
     try {
         const parsed = JSON.parse(data.content);
-        templateSchema.parse(parsed);
+        const result = templateSchema.safeParse(parsed);
+         if (!result.success) {
+            const firstError = result.error.errors[0];
+            const errorMessage = `Structure Error: ${firstError.message}`;
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['content'],
+                message: errorMessage,
+            });
+        }
     } catch (e: any) {
         if (e instanceof z.ZodError) {
              ctx.addIssue({

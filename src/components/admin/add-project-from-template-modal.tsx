@@ -25,7 +25,7 @@ const entitySchema: z.ZodType<any> = z.lazy(() =>
         entityName: z.string({ required_error: "'entityName' is required for every entity." }),
         entityType: z.string({ required_error: "'entityType' is required for every entity." }),
         entityDescription: z.string({ required_error: "'entityDescription' is required for every entity." }),
-        childEntities: z.array(entitySchema, { invalid_type_error: "'childEntities' must be an array." }),
+        childEntities: z.array(entitySchema, { invalid_type_error: "'childEntities' must be an array." }).optional(),
     }).strict("Template contains an unknown property in an entity object. Please stick to the defined structure.")
 );
 
