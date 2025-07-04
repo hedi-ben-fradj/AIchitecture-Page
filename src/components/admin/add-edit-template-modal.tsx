@@ -55,7 +55,7 @@ export function AddEditTemplateModal({ isOpen, onClose, onSave, template, entity
             z.object({
                 entityName: z.string({ required_error: "'entityName' is required for every entity." }),
                 entityType: z.string({ required_error: "'entityType' is required for every entity." })
-                    .refine(val => entityTypes.includes(val), {
+                    .refine(val => entityTypes.map(t => t.toLowerCase()).includes(val.toLowerCase()), {
                         message: `Invalid entity type. Must be one of: ${entityTypes.join(', ')}`
                     }),
                 entityDescription: z.string().optional(),
