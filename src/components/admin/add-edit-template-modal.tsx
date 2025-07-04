@@ -38,6 +38,27 @@ const formSchema = z.object({
     }, { message: "Content must be valid JSON." }),
 });
 
+const defaultTemplateContent = `{
+    "projectName": "<Project Name>",
+    "projectDescription": "<Project Description>",
+    "projectEntities": [
+        {
+            "entityName": "<Entity Name>",
+            "entityType": "<Entity Type>",
+            "entityDescription": "<Entity Description>",
+            "childEntities": [
+                {
+                    "entityName": "<Entity Name>",
+                    "entityType": "<Entity Type>",
+                    "entityDescription": "<Entity Description>",
+                    "childEntities": []
+                }
+            ]
+        }
+    ]
+}`;
+
+
 export function AddEditTemplateModal({ isOpen, onClose, onSave, template }: AddEditTemplateModalProps) {
     const isEditing = template && 'id' in template && template.id;
 
@@ -46,7 +67,7 @@ export function AddEditTemplateModal({ isOpen, onClose, onSave, template }: AddE
         defaultValues: {
             name: '',
             description: '',
-            content: '{\n  "entities": [],\n  "entityTypes": [],\n  "viewTypes": []\n}',
+            content: defaultTemplateContent,
         },
     });
     
@@ -55,13 +76,13 @@ export function AddEditTemplateModal({ isOpen, onClose, onSave, template }: AddE
             form.reset({
                 name: template.name || '',
                 description: template.description || '',
-                content: template.content || '{\n  "entities": [],\n  "entityTypes": [],\n  "viewTypes": []\n}',
+                content: template.content || defaultTemplateContent,
             });
         } else {
              form.reset({
                 name: '',
                 description: '',
-                content: '{\n  "entities": [],\n  "entityTypes": [],\n  "viewTypes": []\n}',
+                content: defaultTemplateContent,
             });
         }
     }, [template, form]);
