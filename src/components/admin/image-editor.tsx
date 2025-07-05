@@ -408,8 +408,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                           className="cursor-move"
                         >
                             <Eye 
-                              className={cn("w-10 h-10 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-red-500' : 'text-blue-500')} 
-                              transform="translate(-20, -20)"
+                              className={cn("w-14 h-14 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-red-500' : 'text-blue-500')} 
+                              transform="translate(-28, -28)"
                             />
                         </g>
                     </TooltipTrigger>
@@ -436,3 +436,5 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
 
 ImageEditor.displayName = "ImageEditor";
 export default ImageEditor;
+
+    
