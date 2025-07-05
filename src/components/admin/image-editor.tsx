@@ -401,8 +401,15 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
             {hotspots.map(hotspot => (
                 <Tooltip key={hotspot.id} delayDuration={100}>
                     <TooltipTrigger asChild>
-                        <g transform={`translate(${hotspot.x}, ${hotspot.y})`} onMouseDown={(e) => handleMouseDownOnHotspot(e, hotspot.id)} className="cursor-move">
-                            <MapPin className={cn("w-8 h-8 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-red-500' : 'text-blue-500')} style={{transform: 'translate(-50%, -100%)'}}/>
+                        <g 
+                          transform={`translate(${hotspot.x}, ${hotspot.y})`} 
+                          onMouseDown={(e) => handleMouseDownOnHotspot(e, hotspot.id)} 
+                          className="cursor-move"
+                        >
+                            <MapPin 
+                              className={cn("w-8 h-8 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-red-500' : 'text-blue-500')} 
+                              transform="translate(-16, -32)"
+                            />
                         </g>
                     </TooltipTrigger>
                     {hotspot.linkedViewId && (
