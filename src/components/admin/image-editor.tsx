@@ -3,7 +3,7 @@
 
 import { useState, useRef, type MouseEvent, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, CheckSquare, MapPin, Edit } from 'lucide-react';
+import { Plus, Trash2, CheckSquare, Eye, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SelectionDetailsModal from './selection-details-modal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -340,7 +340,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
       <div className="w-full flex justify-between items-center mb-4">
         <div className="flex gap-2">
             <Button onClick={handleAddHotspot} className="bg-blue-600 hover:bg-blue-700 text-white">
-                <MapPin className="mr-2 h-4 w-4" />
+                <Eye className="mr-2 h-4 w-4" />
                 New Hotspot
             </Button>
             <Button variant="outline" onClick={handleConfirmHotspot} disabled={!selectedHotspotId}>
@@ -407,9 +407,9 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                           onClick={(e) => e.stopPropagation()}
                           className="cursor-move"
                         >
-                            <MapPin 
-                              className={cn("w-8 h-8 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-red-500' : 'text-blue-500')} 
-                              transform="translate(-16, -32)"
+                            <Eye 
+                              className={cn("w-10 h-10 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-red-500' : 'text-blue-500')} 
+                              transform="translate(-20, -20)"
                             />
                         </g>
                     </TooltipTrigger>
@@ -436,5 +436,3 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
 
 ImageEditor.displayName = "ImageEditor";
 export default ImageEditor;
-
-    
