@@ -545,24 +545,26 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         </TooltipContent>
                     </Tooltip>
 
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    show2DPlan();
-                                }}
-                            >
-                                <Layers size={24} />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                            <p>2D Plan</p>
-                        </TooltipContent>
-                    </Tooltip>
+                    {entityViews.some(view => view.type === '2d') && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        show2DPlan();
+                                    }}
+                                >
+                                    <Layers size={24} />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">
+                                <p>2D Plan</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
                 </TooltipProvider>
             </div>
 
