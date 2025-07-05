@@ -88,6 +88,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [currentViewType, setCurrentViewType] = useState<string>('2d');
     const [viewTypes, setViewTypes] = useState<string[]>([]);
     const [isMuted, setIsMuted] = useState(false);
+    const [isPlanOverlayVisible, setIsPlanOverlayVisible] = useState(false);
+    const [planOverlayImageUrl, setPlanOverlayImageUrl] = useState<string | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
@@ -464,16 +466,18 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         if (targetView) handleViewSelect(targetView);
     };
     
-    const show2DPlan = () => {
-        if (currentViewType.toLowerCase() === '2d plan') {
-            return; // Already on a 2D plan view, do nothing.
+    const togglePlanOverlay = () => {
+        if (isPlanOverlayVisible) {
+            setIsPlanOverlayVisible(false);
+            return;
         }
+
         const twoDPlanView = entityViews.find(view => view.type.toLowerCase() === '2d plan');
-        if (twoDPlanView) {
-            handleViewSelect(twoDPlanView);
+        if (twoDPlanView?.imageUrl) {
+            setPlanOverlayImageUrl(twoDPlanView.imageUrl);
+            setIsPlanOverlayVisible(true);
         } else {
-            // In a real app, you might show a toast notification here.
-            console.log("No 2D plan available for this entity.");
+            console.warn("Could not find a 2D plan image to display in the overlay.");
         }
     };
 
@@ -551,7 +555,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        show2DPlan();
+                                        togglePlanOverlay();
                                     }}
                                 >
                                     <Layers size={24} />
@@ -564,6 +568,32 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     )}
                 </TooltipProvider>
             </div>
+            
+            {/* 2D Plan Overlay */}
+            {planOverlayImageUrl && (
+                <div
+                    className={cn(
+                        "absolute bottom-20 z-40 w-72 h-auto aspect-video transition-all duration-300 ease-in-out",
+                        "transform-origin-bottom-left",
+                        "left-20",
+                        isPlanOverlayVisible
+                            ? "opacity-100 scale-100"
+                            : "opacity-0 scale-50 pointer-events-none"
+                    )}
+                >
+                    <Card className="w-full h-full bg-black/70 border-neutral-600 overflow-hidden shadow-2xl">
+                        <CardContent className="p-1 h-full w-full relative">
+                            <Image
+                                src={planOverlayImageUrl}
+                                alt="2D Plan Overlay"
+                                layout="fill"
+                                objectFit="contain"
+                                className="rounded-md"
+                            />
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
 
             {currentViewType === '360' ?
                 <ReactPhotoSphereViewer
