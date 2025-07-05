@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ReactPhotoSphereViewer } from 'react-photo-sphere-viewer'
-import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react'; // Importing specific icons
+import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize, Eye } from 'lucide-react'; // Importing specific icons
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -23,6 +23,15 @@ interface FullView extends View {
     entityId: string;
 }
 
+export interface Hotspot {
+  id: number;
+  x: number;
+  y: number;
+  linkedViewId: string;
+  rotation?: number;
+  fov?: number;
+}
+
 // Define types for View, Polygon, and Entity if not already imported from a central location
 export interface View {
   id: string;
@@ -30,6 +39,7 @@ export interface View {
   imageUrl?: string;
   type: string;
   selections?: Polygon[];
+  hotspots?: Hotspot[];
 }
 
 export interface Polygon {
@@ -100,6 +110,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         return Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
     }, [appliedFilters]);
 
+    const getStorageSafeViewId = (viewId: string) => viewId.replace(/\//g, '__');
+
     const getStorageKey = useCallback((key: string) => {
         if (!projectId) return '';
         return `project-${projectId}-${key}`;
@@ -122,10 +134,13 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 ...entityMeta,
                 detailedRooms: entityMeta.detailedRooms || [],
                 views: entityMeta.views.map((viewMeta: any) => {
-                    const imageUrl = localStorage.getItem(getStorageKey(`view-image-${viewMeta.id}`)) || undefined;
-                    const selectionsStr = localStorage.getItem(getStorageKey(`view-selections-${viewMeta.id}`));
+                    const safeViewId = getStorageSafeViewId(viewMeta.id);
+                    const imageUrl = localStorage.getItem(getStorageKey(`view-image-${safeViewId}`)) || undefined;
+                    const selectionsStr = localStorage.getItem(getStorageKey(`view-selections-${safeViewId}`));
                     const selections = selectionsStr ? JSON.parse(selectionsStr) : [];
-                    return { ...viewMeta, imageUrl, selections };
+                    const hotspotsStr = localStorage.getItem(getStorageKey(`view-hotspots-${safeViewId}`));
+                    const hotspots = hotspotsStr ? JSON.parse(hotspotsStr) : [];
+                    return { ...viewMeta, imageUrl, selections, hotspots };
                 })
             }));
 
@@ -340,6 +355,30 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             }
             alert(`The entity with ID "${entityId}" or its default view could not be found.`);
             closeDetails();
+        }
+    };
+
+    const handleHotspotNavigate = (viewId: string) => {
+        if (!viewId) return;
+        const newView = findViewInEntities(allEntities, viewId);
+        
+        if (newView) {
+            if (currentView) {
+                setViewHistory(prev => [...prev, currentView.id]);
+            }
+            setCurrentViewType(newView.type);
+            setCurrentView(newView);
+            const parentEntity = allEntities.find(e => e.id === newView.entityId);
+            if (parentEntity) {
+                setEntityViews(parentEntity.views);
+            }
+            closeDetails();
+            setHoveredSelectionId(null);
+            setRenderedImageRect(null);
+            setTimeout(calculateRect, 0);
+        } else {
+             console.warn(`Could not find the view with ID "${viewId}".`);
+             closeDetails();
         }
     };
 
@@ -732,6 +771,73 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         </text>
                                     </g>
                                 )}
+                            </g>
+                        );
+                    })}
+
+                    {(currentView.hotspots || []).map(hotspot => {
+                        const absX = hotspot.x * renderedImageRect.width;
+                        const absY = hotspot.y * renderedImageRect.height;
+
+                        const rotation = hotspot.rotation || 0;
+                        const fov = hotspot.fov || 60;
+                        
+                        const innerRadius = 22;
+                        const outerRadius = 35;
+
+                        const rotationRad = rotation * (Math.PI / 180);
+                        const fovRad = fov * (Math.PI / 180);
+
+                        const startAngle = rotationRad - fovRad / 2;
+                        const endAngle = rotationRad + fovRad / 2;
+                        
+                        const p1_outer = {
+                            x: absX + outerRadius * Math.cos(startAngle),
+                            y: absY + outerRadius * Math.sin(startAngle)
+                        };
+                        const p2_outer = {
+                            x: absX + outerRadius * Math.cos(endAngle),
+                            y: absY + outerRadius * Math.sin(endAngle)
+                        };
+
+                        const p1_inner = {
+                            x: absX + innerRadius * Math.cos(startAngle),
+                            y: absY + innerRadius * Math.sin(startAngle)
+                        };
+                        const p2_inner = {
+                            x: absX + innerRadius * Math.cos(endAngle),
+                            y: absY + innerRadius * Math.sin(endAngle)
+                        };
+
+                        const largeArcFlag = fov > 180 ? 1 : 0;
+                        
+                        const pathData = [
+                            `M ${p1_outer.x} ${p1_outer.y}`,
+                            `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${p2_outer.x} ${p2_outer.y}`,
+                            `L ${p2_inner.x} ${p2_inner.y}`,
+                            `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${p1_inner.x} ${p1_inner.y}`,
+                            'Z'
+                        ].join(' ');
+
+                        return (
+                            <g 
+                                key={hotspot.id} 
+                                onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
+                                className="cursor-pointer group"
+                            >
+                                <path
+                                    d={pathData}
+                                    className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors"
+                                    strokeWidth="1"
+                                />
+                                <g 
+                                    transform={`translate(${absX}, ${absY})`}
+                                >
+                                    <Eye 
+                                        className="w-14 h-14 drop-shadow-lg text-blue-500 group-hover:text-yellow-500 transition-colors" 
+                                        transform="translate(-28, -28)"
+                                    />
+                                </g>
                             </g>
                         );
                     })}
