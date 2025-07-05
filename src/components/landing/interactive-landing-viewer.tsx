@@ -99,7 +99,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [viewTypes, setViewTypes] = useState<string[]>([]);
     const [isMuted, setIsMuted] = useState(false);
     const [isPlanOverlayVisible, setIsPlanOverlayVisible] = useState(false);
-    const [planOverlayImageUrl, setPlanOverlayImageUrl] = useState<string | null>(null);
+    const [planOverlayView, setPlanOverlayView] = useState<View | null>(null);
     const [isPlanExpanded, setIsPlanExpanded] = useState(false);
     const [planOverlayImageRect, setPlanOverlayImageRect] = useState<RenderedImageRect | null>(null);
 
@@ -222,11 +222,11 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             
             if (has2dPlan) {
                 const twoDPlanView = entityViews.find(view => view.type.toLowerCase() === '2d plan');
-                setPlanOverlayImageUrl(twoDPlanView?.imageUrl || null);
+                setPlanOverlayView(twoDPlanView || null);
                 setIsPlanOverlayVisible(true); // Show by default
             } else {
                 setIsPlanOverlayVisible(false);
-                setPlanOverlayImageUrl(null);
+                setPlanOverlayView(null);
             }
         }
         prevEntityIdRef.current = currentEntityId;
@@ -613,7 +613,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
         const twoDPlanView = entityViews.find(view => view.type.toLowerCase() === '2d plan');
         if (twoDPlanView?.imageUrl) {
-            setPlanOverlayImageUrl(twoDPlanView.imageUrl);
+            setPlanOverlayView(twoDPlanView);
             setIsPlanOverlayVisible(true);
         } else {
             console.warn("Could not find a 2D plan image to display in the overlay.");
@@ -709,7 +709,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             </div>
             
             {/* 2D Plan Overlay */}
-            {planOverlayImageUrl && (
+            {planOverlayView?.imageUrl && (
                 <div
                     onClick={(e) => e.stopPropagation()}
                     className={cn(
@@ -727,14 +727,14 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     <Card className="w-full h-full bg-black/80 backdrop-blur-md border-neutral-600 overflow-hidden shadow-2xl relative">
                         <CardContent className="p-4 w-full h-full relative" ref={planOverlayContainerRef}>
                             <Image
-                                src={planOverlayImageUrl}
+                                src={planOverlayView.imageUrl}
                                 alt="2D Plan Overlay"
                                 layout="fill"
                                 objectFit="contain"
                                 className="rounded-md"
-                                key={planOverlayImageUrl}
+                                key={planOverlayView.imageUrl}
                             />
-                             {planOverlayImageRect && (currentView.hotspots?.length ?? 0) > 0 && (
+                             {planOverlayImageRect && (planOverlayView.hotspots?.length ?? 0) > 0 && (
                                 <svg
                                     className="absolute top-0 left-0 w-full h-full z-10"
                                     style={{
@@ -743,7 +743,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         height: planOverlayImageRect.height,
                                     }}
                                 >
-                                    {(currentView.hotspots || []).map(hotspot => {
+                                    {(planOverlayView.hotspots || []).map(hotspot => {
                                         const absX = hotspot.x * planOverlayImageRect.width;
                                         const absY = hotspot.y * planOverlayImageRect.height;
                                         
