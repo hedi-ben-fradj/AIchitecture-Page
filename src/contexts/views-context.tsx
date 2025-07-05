@@ -13,6 +13,8 @@ export interface Hotspot {
   x: number;
   y: number;
   linkedViewId: string;
+  rotation?: number; // Field of view rotation in degrees
+  fov?: number; // Field of view angle in degrees
 }
 
 export interface View {

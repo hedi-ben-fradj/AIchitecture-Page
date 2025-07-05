@@ -7,7 +7,7 @@ import { Plus, Trash2, CheckSquare, Eye, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SelectionDetailsModal from './selection-details-modal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { EntityType, Hotspot, View } from '@/contexts/views-context';
+import type { EntityType, View } from '@/contexts/views-context';
 import { useProjectData } from '@/contexts/views-context';
 import Magnifier from './magnifier';
 
@@ -31,15 +31,24 @@ export interface Polygon {
   };
 }
 
-export type { Hotspot };
+export interface Hotspot {
+  id: number;
+  x: number;
+  y: number;
+  linkedViewId: string;
+  rotation?: number; // Field of view rotation in degrees
+  fov?: number; // Field of view angle in degrees
+}
 
 interface DragInfo {
-  type: 'polygon' | 'vertex' | 'hotspot';
+  type: 'polygon' | 'vertex' | 'hotspot' | 'hotspot-rotation';
   polygonId?: number;
   hotspotId?: number;
   vertexIndex?: number;
   offset: Point;
   initialPoints?: Point[];
+  startAngle?: number;
+  hotspotStartRotation?: number;
 }
 
 interface ImageEditorProps {
@@ -182,6 +191,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
       x: width * 0.5,
       y: height * 0.5,
       linkedViewId: '',
+      rotation: 0,
+      fov: 60,
     };
     const newHotspots = [...hotspots, newHotspot];
     setHotspots(newHotspots);
@@ -251,6 +262,23 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     setDragInfo({ type: 'hotspot', hotspotId, offset: { x: mousePos.x - hotspot.x, y: mousePos.y - hotspot.y } });
   };
 
+  const handleMouseDownOnRotationHandle = (e: MouseEvent, hotspotId: number) => {
+    e.stopPropagation();
+    const mousePos = getMousePosition(e);
+    const hotspot = hotspots.find(h => h.id === hotspotId);
+    if (!hotspot) return;
+
+    const mouseAngle = Math.atan2(mousePos.y - hotspot.y, mousePos.x - hotspot.x) * (180 / Math.PI);
+    
+    setDragInfo({
+        type: 'hotspot-rotation',
+        hotspotId,
+        offset: { x: 0, y: 0 },
+        hotspotStartRotation: hotspot.rotation || 0,
+        startAngle: mouseAngle
+    });
+  };
+
   const handleMouseMove = (e: MouseEvent) => {
     const mousePos = getMousePosition(e);
     setMagnifierPosition(mousePos);
@@ -259,6 +287,27 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     
     if (dragInfo.type === 'hotspot') {
       setHotspots(spots => spots.map(s => s.id === dragInfo.hotspotId ? { ...s, x: mousePos.x - dragInfo.offset.x, y: mousePos.y - dragInfo.offset.y } : s));
+    } else if (dragInfo.type === 'hotspot-rotation') {
+        if (!dragInfo.hotspotId || dragInfo.startAngle === undefined || dragInfo.hotspotStartRotation === undefined) return;
+
+        const hotspot = hotspots.find(h => h.id === dragInfo.hotspotId);
+        if (!hotspot) return;
+
+        const currentMouseAngle = Math.atan2(mousePos.y - hotspot.y, mousePos.x - hotspot.x) * (180 / Math.PI);
+        const angleDelta = currentMouseAngle - dragInfo.startAngle;
+
+        let newRotation = dragInfo.hotspotStartRotation + angleDelta;
+        
+        // Snap to 15 degree increments while holding shift
+        if (e.shiftKey) {
+            newRotation = Math.round(newRotation / 15) * 15;
+        }
+
+        setHotspots(spots => spots.map(s => 
+            s.id === dragInfo.hotspotId 
+                ? { ...s, rotation: newRotation } 
+                : s
+        ));
     } else {
       setPolygons(polys => polys.map(p => {
         if (p.id !== dragInfo.polygonId) return p;
@@ -398,28 +447,83 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
               </Tooltip>
             ))}
 
-            {hotspots.map(hotspot => (
-                <Tooltip key={hotspot.id} delayDuration={100}>
-                    <TooltipTrigger asChild>
-                        <g 
-                          transform={`translate(${hotspot.x}, ${hotspot.y})`} 
-                          onMouseDown={(e) => handleMouseDownOnHotspot(e, hotspot.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="cursor-move"
-                        >
-                            <Eye 
-                              className={cn("w-14 h-14 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-red-500' : 'text-blue-500')} 
-                              transform="translate(-28, -28)"
-                            />
-                        </g>
-                    </TooltipTrigger>
-                    {hotspot.linkedViewId && (
-                        <TooltipContent className="bg-black text-white border-neutral-600">
-                           <p>Links to: {findViewName(hotspot.linkedViewId)}</p>
-                        </TooltipContent>
-                    )}
-                </Tooltip>
-            ))}
+            {hotspots.map(hotspot => {
+                const rotation = hotspot.rotation || 0;
+                const fov = hotspot.fov || 60;
+                const radius = 70;
+
+                const rotationRad = rotation * (Math.PI / 180);
+                const fovRad = fov * (Math.PI / 180);
+
+                const p1 = {
+                    x: hotspot.x + radius * Math.cos(rotationRad - fovRad / 2),
+                    y: hotspot.y + radius * Math.sin(rotationRad - fovRad / 2)
+                };
+                const p2 = {
+                    x: hotspot.x + radius * Math.cos(rotationRad + fovRad / 2),
+                    y: hotspot.y + radius * Math.sin(rotationRad + fovRad / 2)
+                };
+
+                const pathData = `M ${hotspot.x},${hotspot.y} L ${p1.x},${p1.y} A ${radius},${radius} 0 0 1 ${p2.x},${p2.y} Z`;
+
+                const handleRadius = radius + 15;
+                const rotationHandlePos = {
+                    x: hotspot.x + handleRadius * Math.cos(rotationRad),
+                    y: hotspot.y + handleRadius * Math.sin(rotationRad)
+                };
+
+                return (
+                    <Tooltip key={hotspot.id} delayDuration={100}>
+                        <TooltipTrigger asChild>
+                            <g onClick={(e) => e.stopPropagation()}>
+                                <path
+                                    d={pathData}
+                                    className={cn("fill-opacity-30 stroke-opacity-50 transition-colors cursor-move", 
+                                        selectedHotspotId === hotspot.id ? 'fill-yellow-400 stroke-yellow-400' : 'fill-blue-400 stroke-blue-400'
+                                    )}
+                                    strokeWidth="1"
+                                    onMouseDown={(e) => handleMouseDownOnHotspot(e, hotspot.id)}
+                                />
+                                <g 
+                                    transform={`translate(${hotspot.x}, ${hotspot.y})`} 
+                                    onMouseDown={(e) => handleMouseDownOnHotspot(e, hotspot.id)}
+                                    className="cursor-move"
+                                >
+                                    <Eye 
+                                        className={cn("w-14 h-14 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-red-500' : 'text-blue-500')} 
+                                        transform="translate(-28, -28)"
+                                    />
+                                </g>
+                                {selectedHotspotId === hotspot.id && (
+                                    <g className="cursor-alias">
+                                        <line 
+                                            x1={hotspot.x} 
+                                            y1={hotspot.y} 
+                                            x2={rotationHandlePos.x} 
+                                            y2={rotationHandlePos.y} 
+                                            className="stroke-yellow-400" 
+                                            strokeWidth="1"
+                                            strokeDasharray="3 3"
+                                        />
+                                        <circle
+                                            cx={rotationHandlePos.x}
+                                            cy={rotationHandlePos.y}
+                                            r="6"
+                                            className="fill-yellow-400 stroke-white stroke-2"
+                                            onMouseDown={(e) => handleMouseDownOnRotationHandle(e, hotspot.id)}
+                                        />
+                                    </g>
+                                )}
+                            </g>
+                        </TooltipTrigger>
+                        {hotspot.linkedViewId && (
+                            <TooltipContent className="bg-black text-white border-neutral-600">
+                                <p>Links to: {findViewName(hotspot.linkedViewId)}</p>
+                            </TooltipContent>
+                        )}
+                    </Tooltip>
+                );
+            })}
 
           </svg>
         </div>
@@ -436,5 +540,3 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
 
 ImageEditor.displayName = "ImageEditor";
 export default ImageEditor;
-
-    
