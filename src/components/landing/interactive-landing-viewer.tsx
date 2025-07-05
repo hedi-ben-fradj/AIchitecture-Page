@@ -101,10 +101,12 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [isPlanOverlayVisible, setIsPlanOverlayVisible] = useState(false);
     const [planOverlayImageUrl, setPlanOverlayImageUrl] = useState<string | null>(null);
     const [isPlanExpanded, setIsPlanExpanded] = useState(false);
+    const [planOverlayImageRect, setPlanOverlayImageRect] = useState<RenderedImageRect | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
     const prevEntityIdRef = useRef<string | null>(null);
+    const planOverlayContainerRef = useRef<HTMLDivElement>(null);
 
     const isFilterApplied = useMemo(() => {
         return Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
@@ -263,6 +265,76 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         
         setRenderedImageRect({ width: renderWidth, height: renderHeight, x, y });
     }, []);
+
+    const calculatePlanOverlayRect = useCallback(() => {
+        const imageElement = planOverlayContainerRef.current?.querySelector('img');
+        const containerElement = planOverlayContainerRef.current;
+    
+        if (!imageElement || !containerElement) {
+            setPlanOverlayImageRect(null);
+            return;
+        }
+    
+        const { naturalWidth, naturalHeight } = imageElement;
+        if (naturalWidth === 0 || naturalHeight === 0) {
+            setPlanOverlayImageRect(null);
+            return;
+        }
+    
+        const { width: containerWidth, height: containerHeight } = containerElement.getBoundingClientRect();
+        
+        const imageAspectRatio = naturalWidth / naturalHeight;
+        const containerAspectRatio = containerWidth / containerHeight;
+        
+        let renderWidth, renderHeight, x, y;
+        
+        if (imageAspectRatio > containerAspectRatio) {
+            renderWidth = containerWidth;
+            renderHeight = containerWidth / imageAspectRatio;
+            x = 0;
+            y = (containerHeight - renderHeight) / 2;
+        } else {
+            renderHeight = containerHeight;
+            renderWidth = containerHeight * imageAspectRatio;
+            y = 0;
+            x = (containerWidth - renderWidth) / 2;
+        }
+        
+        setPlanOverlayImageRect({ width: renderWidth, height: renderHeight, x, y });
+    }, []);
+    
+    useEffect(() => {
+        // This effect handles the plan overlay rect calculation
+        if (!isPlanOverlayVisible) {
+            setPlanOverlayImageRect(null);
+            return;
+        }
+    
+        const container = planOverlayContainerRef.current;
+        if (!container) return;
+    
+        const resizeObserver = new ResizeObserver(calculatePlanOverlayRect);
+        resizeObserver.observe(container);
+    
+        const imageElement = container.querySelector('img');
+        if (imageElement) {
+            if (imageElement.complete) {
+                calculatePlanOverlayRect();
+            } else {
+                imageElement.addEventListener('load', calculatePlanOverlayRect);
+            }
+        }
+    
+        // Recalculate when expansion state changes because container size changes
+        calculatePlanOverlayRect(); 
+    
+        return () => {
+            resizeObserver.disconnect();
+            if (imageElement) {
+                imageElement.removeEventListener('load', calculatePlanOverlayRect);
+            }
+        };
+    }, [isPlanOverlayVisible, isPlanExpanded, calculatePlanOverlayRect]);
 
     useEffect(() => {
         const resizeObserver = new ResizeObserver(calculateRect);
@@ -653,14 +725,73 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     )}
                 >
                     <Card className="w-full h-full bg-black/80 backdrop-blur-md border-neutral-600 overflow-hidden shadow-2xl relative">
-                        <CardContent className="p-4 w-full h-full">
+                        <CardContent className="p-4 w-full h-full relative" ref={planOverlayContainerRef}>
                             <Image
                                 src={planOverlayImageUrl}
                                 alt="2D Plan Overlay"
                                 layout="fill"
                                 objectFit="contain"
                                 className="rounded-md"
+                                key={planOverlayImageUrl}
                             />
+                             {planOverlayImageRect && (currentView.hotspots?.length ?? 0) > 0 && (
+                                <svg
+                                    className="absolute top-0 left-0 w-full h-full z-10"
+                                    style={{
+                                        transform: `translate(${planOverlayImageRect.x}px, ${planOverlayImageRect.y}px)`,
+                                        width: planOverlayImageRect.width,
+                                        height: planOverlayImageRect.height,
+                                    }}
+                                >
+                                    {(currentView.hotspots || []).map(hotspot => {
+                                        const absX = hotspot.x * planOverlayImageRect.width;
+                                        const absY = hotspot.y * planOverlayImageRect.height;
+                                        
+                                        const rotation = hotspot.rotation || 0;
+                                        const fov = hotspot.fov || 60;
+                                        
+                                        const eyeIconSize = isPlanExpanded ? 48 : 24;
+                                        const innerRadius = eyeIconSize * 0.4;
+                                        const outerRadius = eyeIconSize * 0.7;
+
+                                        const rotationRad = rotation * (Math.PI / 180);
+                                        const fovRad = fov * (Math.PI / 180);
+
+                                        const startAngle = rotationRad - fovRad / 2;
+                                        const endAngle = rotationRad + fovRad / 2;
+                                        
+                                        const p1_outer = { x: absX + outerRadius * Math.cos(startAngle), y: absY + outerRadius * Math.sin(startAngle) };
+                                        const p2_outer = { x: absX + outerRadius * Math.cos(endAngle), y: absY + outerRadius * Math.sin(endAngle) };
+                                        const p1_inner = { x: absX + innerRadius * Math.cos(startAngle), y: absY + innerRadius * Math.sin(startAngle) };
+                                        const p2_inner = { x: absX + innerRadius * Math.cos(endAngle), y: absY + innerRadius * Math.sin(endAngle) };
+
+                                        const largeArcFlag = fov > 180 ? 1 : 0;
+                                        
+                                        const pathData = [ `M ${p1_outer.x} ${p1_outer.y}`, `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${p2_outer.x} ${p2_outer.y}`, `L ${p2_inner.x} ${p2_inner.y}`, `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${p1_inner.x} ${p1_inner.y}`, 'Z' ].join(' ');
+
+                                        return (
+                                            <g 
+                                                key={`plan-hotspot-${hotspot.id}`} 
+                                                onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
+                                                className="cursor-pointer group"
+                                            >
+                                                <path
+                                                    d={pathData}
+                                                    className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors"
+                                                    strokeWidth="1"
+                                                />
+                                                <g transform={`translate(${absX}, ${absY})`}>
+                                                    <Eye 
+                                                        className="drop-shadow-lg text-blue-500 group-hover:text-yellow-500 transition-colors"
+                                                        style={{ width: eyeIconSize, height: eyeIconSize }} 
+                                                        transform={`translate(-${eyeIconSize/2}, -${eyeIconSize/2})`}
+                                                    />
+                                                </g>
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
+                            )}
                         </CardContent>
                         <Button
                             variant="ghost"
