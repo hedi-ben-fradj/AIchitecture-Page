@@ -524,7 +524,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 )}
             </div>
 
-            <div className="absolute bottom-4 left-4 z-50 flex flex-col gap-3">
+            <div className="absolute bottom-20 left-4 z-50 flex flex-col gap-3">
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
