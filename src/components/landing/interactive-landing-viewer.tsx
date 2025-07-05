@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ReactPhotoSphereViewer } from 'react-photo-sphere-viewer'
-import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX } from 'lucide-react'; // Importing specific icons
+import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react'; // Importing specific icons
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -90,6 +90,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [isMuted, setIsMuted] = useState(false);
     const [isPlanOverlayVisible, setIsPlanOverlayVisible] = useState(false);
     const [planOverlayImageUrl, setPlanOverlayImageUrl] = useState<string | null>(null);
+    const [isPlanExpanded, setIsPlanExpanded] = useState(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
@@ -196,6 +197,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     
     useEffect(() => {
         const currentEntityId = currentView?.entityId || null;
+        setIsPlanExpanded(false); // Reset on entity change
 
         // Reset overlay visibility when navigating to a new entity
         if (currentEntityId && currentEntityId !== prevEntityIdRef.current) {
@@ -481,8 +483,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
         let targetView;
         if (currentViewType === '360') {
-            // Find any non-360 view. Prefer '2d plan' if available.
-            targetView = entityViews.find(view => view.type.toLowerCase() === '2d plan') || entityViews.find(view => view.type !== '360');
+            // Find any non-360 view. Prefer '2d' if available.
+            targetView = entityViews.find(view => view.type.toLowerCase() === '2d') || entityViews.find(view => view.type !== '360');
         } else {
             // Find a 360 view
             targetView = entityViews.find(view => view.type === '360');
@@ -494,6 +496,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const togglePlanOverlay = () => {
         if (isPlanOverlayVisible) {
             setIsPlanOverlayVisible(false);
+            setIsPlanExpanded(false);
             return;
         }
 
@@ -597,17 +600,27 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             {/* 2D Plan Overlay */}
             {planOverlayImageUrl && (
                 <div
+                    onClick={(e) => e.stopPropagation()}
                     className={cn(
-                        "absolute bottom-20 z-40 w-96 h-auto aspect-video transition-all duration-300 ease-in-out",
-                        "transform-origin-bottom-left",
-                        "left-20",
+                        "absolute z-40 transition-all duration-500 ease-in-out",
+                        // Minimized state
+                        !isPlanExpanded && "bottom-20 left-20 w-96 aspect-video transform-origin-bottom-left",
+                        // Expanded state
+                        isPlanExpanded && "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vh] max-w-7xl max-h-[85vh]",
+                        // Visibility
                         isPlanOverlayVisible
                             ? "opacity-100 scale-100"
                             : "opacity-0 scale-50 pointer-events-none"
                     )}
                 >
-                    <Card className="w-full h-full bg-black/70 border-neutral-600 overflow-hidden shadow-2xl">
-                        <CardContent className="p-1 h-full w-full relative">
+                    <Card className="w-full h-full bg-black/80 backdrop-blur-md border-neutral-600 overflow-hidden shadow-2xl flex flex-col">
+                        <div className="p-2 flex items-center justify-end shrink-0">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={(e) => { e.stopPropagation(); setIsPlanExpanded(!isPlanExpanded); }}>
+                                {isPlanExpanded ? <Minimize size={20} /> : <Maximize size={20} />}
+                                <span className="sr-only">{isPlanExpanded ? 'Minimize' : 'Expand'}</span>
+                            </Button>
+                        </div>
+                        <CardContent className="p-1 pb-2 px-2 flex-grow relative">
                             <Image
                                 src={planOverlayImageUrl}
                                 alt="2D Plan Overlay"
@@ -619,6 +632,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     </Card>
                 </div>
             )}
+
 
             {currentViewType === '360' ?
                 <ReactPhotoSphereViewer
