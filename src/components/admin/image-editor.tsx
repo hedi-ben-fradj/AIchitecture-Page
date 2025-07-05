@@ -450,23 +450,46 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
             {hotspots.map(hotspot => {
                 const rotation = hotspot.rotation || 0;
                 const fov = hotspot.fov || 60;
-                const radius = 35;
+                
+                const innerRadius = 28;
+                const outerRadius = 43;
 
                 const rotationRad = rotation * (Math.PI / 180);
                 const fovRad = fov * (Math.PI / 180);
 
-                const p1 = {
-                    x: hotspot.x + radius * Math.cos(rotationRad - fovRad / 2),
-                    y: hotspot.y + radius * Math.sin(rotationRad - fovRad / 2)
+                const startAngle = rotationRad - fovRad / 2;
+                const endAngle = rotationRad + fovRad / 2;
+                
+                const p1_outer = {
+                    x: hotspot.x + outerRadius * Math.cos(startAngle),
+                    y: hotspot.y + outerRadius * Math.sin(startAngle)
                 };
-                const p2 = {
-                    x: hotspot.x + radius * Math.cos(rotationRad + fovRad / 2),
-                    y: hotspot.y + radius * Math.sin(rotationRad + fovRad / 2)
+                const p2_outer = {
+                    x: hotspot.x + outerRadius * Math.cos(endAngle),
+                    y: hotspot.y + outerRadius * Math.sin(endAngle)
                 };
 
-                const pathData = `M ${hotspot.x},${hotspot.y} L ${p1.x},${p1.y} A ${radius},${radius} 0 0 1 ${p2.x},${p2.y} Z`;
+                const p1_inner = {
+                    x: hotspot.x + innerRadius * Math.cos(startAngle),
+                    y: hotspot.y + innerRadius * Math.sin(startAngle)
+                };
+                const p2_inner = {
+                    x: hotspot.x + innerRadius * Math.cos(endAngle),
+                    y: hotspot.y + innerRadius * Math.sin(endAngle)
+                };
 
-                const handleRadius = radius + 10;
+                const largeArcFlag = fov > 180 ? 1 : 0;
+                
+                const pathData = [
+                    `M ${p1_outer.x} ${p1_outer.y}`,
+                    `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${p2_outer.x} ${p2_outer.y}`,
+                    `L ${p2_inner.x} ${p2_inner.y}`,
+                    `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${p1_inner.x} ${p1_inner.y}`,
+                    'Z'
+                ].join(' ');
+
+
+                const handleRadius = outerRadius + 10;
                 const rotationHandlePos = {
                     x: hotspot.x + handleRadius * Math.cos(rotationRad),
                     y: hotspot.y + handleRadius * Math.sin(rotationRad)
