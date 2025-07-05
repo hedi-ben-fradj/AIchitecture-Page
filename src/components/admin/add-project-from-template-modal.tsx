@@ -11,6 +11,9 @@ import type { ProjectTemplate } from './add-edit-template-modal';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import { useProjectData } from '@/contexts/views-context';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { VisualTemplateEditor } from './visual-template-editor';
+
 
 interface AddProjectFromTemplateModalProps {
     isOpen: boolean;
@@ -51,6 +54,9 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
     const [isVerified, setIsVerified] = useState<boolean>(false);
     const { toast } = useToast();
     const { entityTypes } = useProjectData();
+    const [editorMode, setEditorMode] = useState<'json' | 'visual'>('json');
+    const [projectData, setProjectData] = useState<any>(null);
+
 
     const templateSchema = useMemo(() => {
         const entitySchema: z.ZodType<any> = z.lazy(() =>
@@ -91,8 +97,15 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
         const template = templates.find(t => t.id === templateId);
         if (template) {
             setTemplateContent(template.content);
+             try {
+                const parsed = JSON.parse(template.content);
+                setProjectData(parsed);
+            } catch {
+                setProjectData(null);
+            }
         } else {
             setTemplateContent('');
+            setProjectData(null);
         }
         setIsVerified(false);
     }
@@ -102,7 +115,9 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
         if (!isOpen) {
             setSelectedTemplateId('');
             setTemplateContent('');
+            setProjectData(null);
             setIsVerified(false);
+            setEditorMode('json');
         }
     }, [isOpen]);
 
@@ -110,6 +125,24 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
     useEffect(() => {
         setIsVerified(false);
     }, [templateContent]);
+
+    const handleUpdateProjectData = (newData: any) => {
+        setProjectData(newData);
+        setTemplateContent(JSON.stringify(newData, null, 2));
+    };
+
+    const handleEditorModeChange = (mode: 'json' | 'visual') => {
+        if (mode === 'visual') {
+            try {
+                const parsed = JSON.parse(templateContent);
+                setProjectData(parsed);
+            } catch (e) {
+                toast({ title: "Invalid JSON", description: "Cannot switch to visual editor. Please fix the JSON structure first.", variant: "destructive" });
+                return;
+            }
+        }
+        setEditorMode(mode);
+    };
 
     const handleVerify = () => {
         if (!templateContent) {
@@ -181,7 +214,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
             <DialogContent className="sm:max-w-4xl bg-[#2a2a2a] border-neutral-700 text-white">
                 <DialogHeader>
                     <DialogTitle>Create Project From Template</DialogTitle>
-                    <DialogDescription>Select a template and customize its JSON content before creating the project.</DialogDescription>
+                    <DialogDescription>Select a template and customize its content before creating the project.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div className="space-y-2">
@@ -205,17 +238,35 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
                     </div>
                    
                      {selectedTemplateId && (
-                         <div className="space-y-2">
-                            <Label htmlFor="template-content">
-                                Template Content (JSON)
-                            </Label>
-                            <Textarea
-                                id="template-content"
-                                value={templateContent}
-                                onChange={(e) => setTemplateContent(e.target.value)}
-                                className="bg-[#313131] border-neutral-600 h-96 font-mono text-xs"
-                                placeholder="Edit the template JSON as needed..."
-                            />
+                        <div className="space-y-4">
+                            <div className="flex justify-center">
+                                <Tabs defaultValue={editorMode} onValueChange={(value) => handleEditorModeChange(value as 'json' | 'visual')} className="w-auto">
+                                    <TabsList>
+                                        <TabsTrigger value="json">JSON</TabsTrigger>
+                                        <TabsTrigger value="visual">Visual</TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                            </div>
+                           
+                            {editorMode === 'json' ? (
+                                <div className="space-y-2">
+                                    <Label htmlFor="template-content">Template Content (JSON)</Label>
+                                    <Textarea
+                                        id="template-content"
+                                        value={templateContent}
+                                        onChange={(e) => setTemplateContent(e.target.value)}
+                                        className="bg-[#313131] border-neutral-600 h-96 font-mono text-xs"
+                                        placeholder="Edit the template JSON as needed..."
+                                    />
+                                </div>
+                             ) : (
+                                projectData && (
+                                    <VisualTemplateEditor
+                                        data={projectData}
+                                        onUpdate={handleUpdateProjectData}
+                                    />
+                                )
+                             )}
                         </div>
                     )}
                 </div>
