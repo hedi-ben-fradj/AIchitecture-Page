@@ -6,9 +6,10 @@ import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ReactPhotoSphereViewer } from 'react-photo-sphere-viewer'
-import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone } from 'lucide-react'; // Importing specific icons
+import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX } from 'lucide-react'; // Importing specific icons
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface RenderedImageRect {
     x: number;
@@ -86,6 +87,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [detailsPosition, setDetailsPosition] = useState<React.CSSProperties>({ opacity: 0 });
     const [currentViewType, setCurrentViewType] = useState<string>('2d');
     const [viewTypes, setViewTypes] = useState<string[]>([]);
+    const [isMuted, setIsMuted] = useState(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
@@ -464,6 +466,20 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
         if (targetView) handleViewSelect(targetView);
     };
+    
+    const show2DPlan = () => {
+        if (currentViewType === '2d') {
+            return; // Already on a 2D view, do nothing.
+        }
+        const twoDView = entityViews.find(view => view.type === '2d');
+        if (twoDView) {
+            handleViewSelect(twoDView);
+        } else {
+            // In a real app, you might show a toast notification here.
+            console.log("No 2D plan available for this entity.");
+        }
+    };
+
 
     if (!isLoaded) {
         return <div className="h-full w-full flex items-center justify-center bg-neutral-900"><p className="text-muted-foreground animate-pulse">Loading View...</p></div>;
@@ -506,6 +522,48 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         <ArrowLeft size={20} />
                     </Button>
                 )}
+            </div>
+
+            <div className="absolute bottom-4 left-4 z-50 flex flex-col gap-3">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    show2DPlan();
+                                }}
+                            >
+                                <Layers size={24} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                            <p>2D Plan</p>
+                        </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsMuted(!isMuted);
+                                }}
+                            >
+                                {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                            <p>{isMuted ? 'Unmute' : 'Mute'}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             </div>
 
             {currentViewType === '360' ?
