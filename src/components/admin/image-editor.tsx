@@ -450,7 +450,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
             {hotspots.map(hotspot => {
                 const rotation = hotspot.rotation || 0;
                 const fov = hotspot.fov || 60;
-                const radius = 70;
+                const radius = 35;
 
                 const rotationRad = rotation * (Math.PI / 180);
                 const fovRad = fov * (Math.PI / 180);
@@ -466,7 +466,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
 
                 const pathData = `M ${hotspot.x},${hotspot.y} L ${p1.x},${p1.y} A ${radius},${radius} 0 0 1 ${p2.x},${p2.y} Z`;
 
-                const handleRadius = radius + 15;
+                const handleRadius = radius + 10;
                 const rotationHandlePos = {
                     x: hotspot.x + handleRadius * Math.cos(rotationRad),
                     y: hotspot.y + handleRadius * Math.sin(rotationRad)
@@ -490,7 +490,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                                     className="cursor-move"
                                 >
                                     <Eye 
-                                        className={cn("w-14 h-14 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-red-500' : 'text-blue-500')} 
+                                        className={cn("w-14 h-14 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-yellow-500' : 'text-blue-500')} 
                                         transform="translate(-28, -28)"
                                     />
                                 </g>
