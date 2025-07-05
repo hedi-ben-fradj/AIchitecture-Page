@@ -760,10 +760,10 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         const startAngle = rotationRad - fovRad / 2;
                                         const endAngle = rotationRad + fovRad / 2;
                                         
-                                        const p1_outer = { x: absX + outerRadius * Math.cos(startAngle), y: absY + outerRadius * Math.sin(startAngle) };
-                                        const p2_outer = { x: absX + outerRadius * Math.cos(endAngle), y: absY + outerRadius * Math.sin(endAngle) };
-                                        const p1_inner = { x: absX + innerRadius * Math.cos(startAngle), y: absY + innerRadius * Math.sin(startAngle) };
-                                        const p2_inner = { x: absX + innerRadius * Math.cos(endAngle), y: absY + innerRadius * Math.sin(endAngle) };
+                                        const p1_outer = { x: outerRadius * Math.cos(startAngle), y: outerRadius * Math.sin(startAngle) };
+                                        const p2_outer = { x: outerRadius * Math.cos(endAngle), y: outerRadius * Math.sin(endAngle) };
+                                        const p1_inner = { x: innerRadius * Math.cos(startAngle), y: innerRadius * Math.sin(startAngle) };
+                                        const p2_inner = { x: innerRadius * Math.cos(endAngle), y: innerRadius * Math.sin(endAngle) };
 
                                         const largeArcFlag = fov > 180 ? 1 : 0;
                                         
@@ -772,6 +772,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         return (
                                             <g 
                                                 key={`plan-hotspot-${hotspot.id}`} 
+                                                transform={`translate(${absX}, ${absY})`}
                                                 onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
                                                 className="cursor-pointer group"
                                             >
@@ -780,7 +781,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                                     className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors"
                                                     strokeWidth="1"
                                                 />
-                                                <g transform={`translate(${absX}, ${absY})`}>
+                                                <g>
                                                     <Eye 
                                                         className="drop-shadow-lg text-blue-500 group-hover:text-yellow-500 transition-colors"
                                                         style={{ width: eyeIconSize, height: eyeIconSize }} 
@@ -923,21 +924,21 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         const endAngle = rotationRad + fovRad / 2;
                         
                         const p1_outer = {
-                            x: absX + outerRadius * Math.cos(startAngle),
-                            y: absY + outerRadius * Math.sin(startAngle)
+                            x: outerRadius * Math.cos(startAngle),
+                            y: outerRadius * Math.sin(startAngle)
                         };
                         const p2_outer = {
-                            x: absX + outerRadius * Math.cos(endAngle),
-                            y: absY + outerRadius * Math.sin(endAngle)
+                            x: outerRadius * Math.cos(endAngle),
+                            y: outerRadius * Math.sin(endAngle)
                         };
 
                         const p1_inner = {
-                            x: absX + innerRadius * Math.cos(startAngle),
-                            y: absY + innerRadius * Math.sin(startAngle)
+                            x: innerRadius * Math.cos(startAngle),
+                            y: innerRadius * Math.sin(startAngle)
                         };
                         const p2_inner = {
-                            x: absX + innerRadius * Math.cos(endAngle),
-                            y: absY + innerRadius * Math.sin(endAngle)
+                            x: innerRadius * Math.cos(endAngle),
+                            y: innerRadius * Math.sin(endAngle)
                         };
 
                         const largeArcFlag = fov > 180 ? 1 : 0;
@@ -953,6 +954,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         return (
                             <g 
                                 key={hotspot.id} 
+                                transform={`translate(${absX}, ${absY})`}
                                 onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
                                 className="cursor-pointer group"
                             >
@@ -961,9 +963,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors"
                                     strokeWidth="1"
                                 />
-                                <g 
-                                    transform={`translate(${absX}, ${absY})`}
-                                >
+                                <g>
                                     <Eye 
                                         className="w-14 h-14 drop-shadow-lg text-blue-500 group-hover:text-yellow-500 transition-colors" 
                                         transform="translate(-28, -28)"

@@ -232,6 +232,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   };
 
   const handleMouseDownOnPolygon = (e: MouseEvent, polygonId: number) => {
+    e.stopPropagation();
     setSelectedPolygonId(polygonId);
     setSelectedHotspotId(null);
     const mousePos = getMousePosition(e);
@@ -284,6 +285,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     setMagnifierPosition(mousePos);
     
     if (!dragInfo) return;
+    e.preventDefault();
+    e.stopPropagation();
     
     if (dragInfo.type === 'hotspot') {
       setHotspots(spots => spots.map(s => s.id === dragInfo.hotspotId ? { ...s, x: mousePos.x - dragInfo.offset.x, y: mousePos.y - dragInfo.offset.y } : s));
@@ -461,21 +464,21 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                 const endAngle = rotationRad + fovRad / 2;
                 
                 const p1_outer = {
-                    x: hotspot.x + outerRadius * Math.cos(startAngle),
-                    y: hotspot.y + outerRadius * Math.sin(startAngle)
+                    x: outerRadius * Math.cos(startAngle),
+                    y: outerRadius * Math.sin(startAngle)
                 };
                 const p2_outer = {
-                    x: hotspot.x + outerRadius * Math.cos(endAngle),
-                    y: hotspot.y + outerRadius * Math.sin(endAngle)
+                    x: outerRadius * Math.cos(endAngle),
+                    y: outerRadius * Math.sin(endAngle)
                 };
 
                 const p1_inner = {
-                    x: hotspot.x + innerRadius * Math.cos(startAngle),
-                    y: hotspot.y + innerRadius * Math.sin(startAngle)
+                    x: innerRadius * Math.cos(startAngle),
+                    y: innerRadius * Math.sin(startAngle)
                 };
                 const p2_inner = {
-                    x: hotspot.x + innerRadius * Math.cos(endAngle),
-                    y: hotspot.y + innerRadius * Math.sin(endAngle)
+                    x: innerRadius * Math.cos(endAngle),
+                    y: innerRadius * Math.sin(endAngle)
                 };
 
                 const largeArcFlag = fov > 180 ? 1 : 0;
@@ -491,14 +494,17 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
 
                 const handleRadius = outerRadius + 10;
                 const rotationHandlePos = {
-                    x: hotspot.x + handleRadius * Math.cos(rotationRad),
-                    y: hotspot.y + handleRadius * Math.sin(rotationRad)
+                    x: handleRadius * Math.cos(rotationRad),
+                    y: handleRadius * Math.sin(rotationRad)
                 };
 
                 return (
                     <Tooltip key={hotspot.id} delayDuration={100}>
                         <TooltipTrigger asChild>
-                            <g onClick={(e) => e.stopPropagation()}>
+                            <g 
+                                transform={`translate(${hotspot.x}, ${hotspot.y})`}
+                                onClick={(e) => e.stopPropagation()}
+                            >
                                 <path
                                     d={pathData}
                                     className={cn("fill-opacity-30 stroke-opacity-50 transition-colors cursor-move", 
@@ -508,7 +514,6 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                                     onMouseDown={(e) => handleMouseDownOnHotspot(e, hotspot.id)}
                                 />
                                 <g 
-                                    transform={`translate(${hotspot.x}, ${hotspot.y})`} 
                                     onMouseDown={(e) => handleMouseDownOnHotspot(e, hotspot.id)}
                                     className="cursor-move"
                                 >
@@ -520,8 +525,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                                 {selectedHotspotId === hotspot.id && (
                                     <g className="cursor-alias">
                                         <line 
-                                            x1={hotspot.x} 
-                                            y1={hotspot.y} 
+                                            x1={0} 
+                                            y1={0} 
                                             x2={rotationHandlePos.x} 
                                             y2={rotationHandlePos.y} 
                                             className="stroke-yellow-400" 
