@@ -613,14 +613,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                             : "opacity-0 scale-50 pointer-events-none"
                     )}
                 >
-                    <Card className="w-full h-full bg-black/80 backdrop-blur-md border-neutral-600 overflow-hidden shadow-2xl flex flex-col">
-                        <div className="p-2 flex items-center justify-end shrink-0">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={(e) => { e.stopPropagation(); setIsPlanExpanded(!isPlanExpanded); }}>
-                                {isPlanExpanded ? <Minimize size={20} /> : <Maximize size={20} />}
-                                <span className="sr-only">{isPlanExpanded ? 'Minimize' : 'Expand'}</span>
-                            </Button>
-                        </div>
-                        <CardContent className="p-1 pb-2 px-2 flex-grow relative">
+                    <Card className="w-full h-full bg-black/80 backdrop-blur-md border-neutral-600 overflow-hidden shadow-2xl relative">
+                        <CardContent className="p-4 w-full h-full">
                             <Image
                                 src={planOverlayImageUrl}
                                 alt="2D Plan Overlay"
@@ -629,6 +623,15 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 className="rounded-md"
                             />
                         </CardContent>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-10 w-10 text-white bg-black/25 hover:bg-black/50 rounded-full"
+                            onClick={(e) => { e.stopPropagation(); setIsPlanExpanded(!isPlanExpanded); }}
+                        >
+                            {isPlanExpanded ? <Minimize size={20} /> : <Maximize size={20} />}
+                            <span className="sr-only">{isPlanExpanded ? 'Minimize' : 'Expand'}</span>
+                        </Button>
                     </Card>
                 </div>
             )}
