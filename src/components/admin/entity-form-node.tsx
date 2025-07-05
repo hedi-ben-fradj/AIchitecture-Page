@@ -12,6 +12,9 @@ import { Card, CardContent } from '@/components/ui/card';
 export function EntityFormNode({ entity, onUpdate, onDelete }: { entity: any, onUpdate: (entity: any) => void, onDelete: () => void }) {
     const { entityTypes } = useProjectData();
 
+    // Find the correctly cased entity type from the list to ensure the Select works case-insensitively
+    const currentEntityType = entityTypes.find(et => et.toLowerCase() === (entity.entityType || '').toLowerCase()) || entity.entityType;
+
     const handleFieldChange = (field: string, value: string) => {
         onUpdate({ ...entity, [field]: value });
     };
@@ -55,7 +58,7 @@ export function EntityFormNode({ entity, onUpdate, onDelete }: { entity: any, on
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-neutral-300 block mb-2">Type</label>
-                                <Select value={entity.entityType} onValueChange={(value) => handleFieldChange('entityType', value)}>
+                                <Select value={currentEntityType} onValueChange={(value) => handleFieldChange('entityType', value)}>
                                     <SelectTrigger className="bg-[#313131] border-neutral-600">
                                         <SelectValue placeholder="<Select Type>" />
                                     </SelectTrigger>
