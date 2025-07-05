@@ -93,6 +93,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
+    const prevEntityIdRef = useRef<string | null>(null);
 
     const isFilterApplied = useMemo(() => {
         return Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
@@ -193,6 +194,25 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         }
     }, [projectId, loadDataFromStorage]);
     
+    useEffect(() => {
+        const currentEntityId = currentView?.entityId || null;
+
+        // Reset overlay visibility when navigating to a new entity
+        if (currentEntityId && currentEntityId !== prevEntityIdRef.current) {
+            const has2dPlan = entityViews.some(view => view.type.toLowerCase() === '2d plan');
+            
+            if (has2dPlan) {
+                const twoDPlanView = entityViews.find(view => view.type.toLowerCase() === '2d plan');
+                setPlanOverlayImageUrl(twoDPlanView?.imageUrl || null);
+                setIsPlanOverlayVisible(true); // Show by default
+            } else {
+                setIsPlanOverlayVisible(false);
+                setPlanOverlayImageUrl(null);
+            }
+        }
+        prevEntityIdRef.current = currentEntityId;
+    }, [currentView, entityViews]);
+
     const closeDetails = useCallback(() => {
         setClickedSelection(null);
         setClickedEntity(null);
@@ -573,7 +593,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             {planOverlayImageUrl && (
                 <div
                     className={cn(
-                        "absolute bottom-20 z-40 w-72 h-auto aspect-video transition-all duration-300 ease-in-out",
+                        "absolute bottom-20 z-40 w-96 h-auto aspect-video transition-all duration-300 ease-in-out",
                         "transform-origin-bottom-left",
                         "left-20",
                         isPlanOverlayVisible
@@ -905,3 +925,5 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         </div>
     );
 }
+
+    
