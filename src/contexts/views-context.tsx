@@ -8,12 +8,20 @@ export type EntityType = string;
 export type ViewType = string;
 
 // Interfaces
+export interface Hotspot {
+  id: number;
+  x: number;
+  y: number;
+  linkedViewId: string;
+}
+
 export interface View {
   id: string;
   name: string;
   imageUrl?: string;
   type: ViewType;
   selections?: Polygon[];
+  hotspots?: Hotspot[];
 }
 
 export interface RoomDetail {
@@ -60,6 +68,7 @@ interface ProjectContextType {
   getView: (entityId: string, viewId: string) => View | undefined;
   updateViewImage: (entityId: string, viewId: string, imageUrl: string) => void;
   updateViewSelections: (entityId: string, viewId: string, selections: Polygon[]) => void;
+  updateViewHotspots: (entityId: string, viewId: string, hotspots: Hotspot[]) => void;
   setDefaultViewId: (entityId: string, viewId: string) => void;
 
   // Entity Type methods
@@ -119,8 +128,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
               views: entityMeta.views.map((viewMeta: any) => {
                 const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${getStorageSafeViewId(viewMeta.id)}`)) || undefined;
                 const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewMeta.id)}`));
-                const selections = selectionsStr ? JSON.parse(selectionsStr) : undefined;
-                return { ...viewMeta, imageUrl, selections };
+                const selections = selectionsStr ? JSON.parse(selectionsStr) : [];
+                const hotspotsStr = window.localStorage.getItem(getStorageKey(`view-hotspots-${getStorageSafeViewId(viewMeta.id)}`));
+                const hotspots = hotspotsStr ? JSON.parse(hotspotsStr) : [];
+                return { ...viewMeta, imageUrl, selections, hotspots };
               }),
               defaultViewId: entityMeta.defaultViewId || (entityMeta.views.length > 0 ? entityMeta.views[0].id : null)
             }));
@@ -412,6 +423,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     try {
       window.localStorage.removeItem(getStorageKey(`view-image-${getStorageSafeViewId(viewId)}`));
       window.localStorage.removeItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewId)}`));
+      window.localStorage.removeItem(getStorageKey(`view-hotspots-${getStorageSafeViewId(viewId)}`));
     } catch (error) {
       console.error(`Failed to remove data for view ${viewId}:`, error);
     }
@@ -443,6 +455,20 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       window.localStorage.setItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewId)}`), JSON.stringify(selections));
     } catch (error) {
       console.error(`Failed to save selections for view ${viewId}:`, error);
+    }
+  }, [projectId, getStorageKey]);
+
+  const updateViewHotspots = useCallback((entityId: string, viewId: string, hotspots: Hotspot[]) => {
+    if (!projectId) return;
+    setEntities(prev => prev.map(entity => 
+      entity.id === entityId
+        ? { ...entity, views: entity.views.map(view => view.id === viewId ? { ...view, hotspots } : view) }
+        : entity
+    ));
+    try {
+      window.localStorage.setItem(getStorageKey(`view-hotspots-${getStorageSafeViewId(viewId)}`), JSON.stringify(hotspots));
+    } catch (error) {
+      console.error(`Failed to save hotspots for view ${viewId}:`, error);
     }
   }, [projectId, getStorageKey]);
 
@@ -512,6 +538,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     deleteView,
     updateViewImage,
     updateViewSelections,
+    updateViewHotspots,
     setDefaultViewId,
     addEntityType,
     deleteEntityType,

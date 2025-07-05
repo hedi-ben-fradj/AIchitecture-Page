@@ -5,10 +5,11 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Save, ArrowLeft } from 'lucide-react';
-import ImageEditor, { type ImageEditorRef } from '@/components/admin/image-editor';
+import { Upload, Save, ArrowLeft, MapPin, Edit, Trash2 } from 'lucide-react';
+import ImageEditor, { type ImageEditorRef, type Hotspot } from '@/components/admin/image-editor';
 import { useProjectData, type EntityType } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
+import HotspotDetailsModal from './hotspot-details-modal';
 
 interface ViewEditorClientProps {
   projectId: string;
@@ -17,11 +18,14 @@ interface ViewEditorClientProps {
 }
 
 export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEditorClientProps) {
-  const { getView, updateViewImage, updateViewSelections, addEntity, getEntity } = useProjectData();
+  const { getView, updateViewImage, updateViewSelections, updateViewHotspots, addEntity, getEntity } = useProjectData();
   const router = useRouter();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<ImageEditorRef>(null);
+  
+  const [isHotspotModalOpen, setIsHotspotModalOpen] = useState(false);
+  const [hotspotToEdit, setHotspotToEdit] = useState<Hotspot | null>(null);
 
   const view = getView(entityId, viewId);
   const entity = getEntity(entityId);
@@ -37,7 +41,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       setImageToEdit(null);
     }
   }, [view, router, projectId, entityId]);
-
+  
   if (!view || !entity) {
     return (
         <div className="flex flex-col h-full bg-[#313131] items-center justify-center text-white">
@@ -108,11 +112,20 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const triggerFileInput = () => {
     fileInputRef.current?.click();
   };
+  
+  const handleSaveHotspot = (hotspotData: { linkedViewId: string }) => {
+    if (hotspotToEdit) {
+      editorRef.current?.updateHotspot({ ...hotspotToEdit, ...hotspotData });
+      setHotspotToEdit(null);
+    }
+  };
 
   const handleSaveAndExit = () => {
     const currentPolygons = editorRef.current?.getRelativePolygons();
-    if (view && currentPolygons) {
+    const currentHotspots = editorRef.current?.getRelativeHotspots();
+    if (view && currentPolygons && currentHotspots) {
         updateViewSelections(entityId, view.id, currentPolygons);
+        updateViewHotspots(entityId, view.id, currentHotspots);
         router.push(`/admin/projects/${projectId}/entities/${entityId}`);
     }
   };
@@ -120,6 +133,13 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   return (
     <>
       <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} ref={fileInputRef} accept="image/png, image/jpeg, image/webp" />
+      <HotspotDetailsModal 
+        isOpen={isHotspotModalOpen}
+        onClose={() => { setIsHotspotModalOpen(false); setHotspotToEdit(null); }}
+        onSave={handleSaveHotspot}
+        entity={entity}
+        hotspot={hotspotToEdit}
+      />
       
       {!imageToEdit ? (
         <Card className="max-w-2xl mx-auto bg-[#2a2a2a] border-neutral-700 text-white">
@@ -142,24 +162,32 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         </Card>
       ) : (
          <div>
-            <div className="flex justify-end gap-2 mb-4">
-                <Button onClick={triggerFileInput} variant="outline">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Change Image
-                </Button>
-                <Button onClick={handleSaveAndExit} className="bg-yellow-500 hover:bg-yellow-600 text-black">
-                    <Save className="mr-2 h-4 w-4" />
-                    Save and Exit
-                </Button>
-            </div>
-           <h2 className="text-lg font-semibold mb-4 text-center text-white">Define Selections for {viewName}</h2>
+           <div className="flex justify-between items-start mb-4">
+              <div/>
+              <h2 className="text-lg font-semibold text-center text-white self-center">Define Selections & Hotspots for {viewName}</h2>
+              <div className="flex justify-end gap-2">
+                  <Button onClick={triggerFileInput} variant="outline">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Change Image
+                  </Button>
+                  <Button onClick={handleSaveAndExit} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                      <Save className="mr-2 h-4 w-4" />
+                      Save and Exit
+                  </Button>
+              </div>
+           </div>
            <ImageEditor
               ref={editorRef}
               imageUrl={imageToEdit}
               onMakeEntity={handleMakeEntity}
               initialPolygons={view?.selections}
+              initialHotspots={view?.hotspots}
               parentEntityType={entity.entityType}
               entityId={entityId}
+              onEditHotspot={(hotspot) => {
+                setHotspotToEdit(hotspot);
+                setIsHotspotModalOpen(true);
+              }}
            />
          </div>
       )}
