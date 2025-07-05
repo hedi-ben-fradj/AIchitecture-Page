@@ -331,6 +331,11 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                  closeDetails();
             }
         } else {
+            const entityForSelection = allEntities.find(e => e.parentId === currentView?.entityId && e.name === entityId);
+            if (entityForSelection && entityForSelection.defaultViewId) {
+                handleNavigate(entityForSelection.id);
+                return;
+            }
             alert(`The entity with ID "${entityId}" or its default view could not be found.`);
             closeDetails();
         }
@@ -378,6 +383,9 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         const groups: { [key: string]: View[] } = {};
 
         viewTypes.forEach(type => {
+            if (type.toLowerCase() === '2d plan') {
+                return;
+            }
             const viewsOfType = entityViews.filter(v => v.type === type);
             if (viewsOfType.length > 0) {
                 groups[type] = viewsOfType;
@@ -427,7 +435,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     }, [entityMatchesFilters]);
 
     const filteredSelections = useMemo(() => {
-        if (!currentView?.selections) return [];
+        if (!currentView?.selections || !currentView.entityId) return [];
 
         const selectionsWithDetails = currentView.selections.filter(s => s.details?.makeAsEntity && s.details.title);
         
@@ -437,19 +445,16 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         
         return selectionsWithDetails
             .map(selection => {
-                const entityId = selection.details!.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-                const entity = allEntities.find(e => e.id === entityId);
+                const targetEntity = allEntities.find(e => e.parentId === currentView.entityId && e.name === selection.details?.title);
                 
-                if (!entity) return null;
+                if (!targetEntity) return null;
 
                 let totalMatches = 0;
-                if (entity.entityType === 'Apartment' || entity.entityType === 'house') {
-                    if (entityMatchesFilters(entity, appliedFilters)) {
-                        totalMatches = 1;
-                    }
+                if (entityMatchesFilters(targetEntity, appliedFilters)) {
+                    totalMatches = 1;
                 }
                 
-                const descendantMatches = getMatchingDescendantCount(entity.id, appliedFilters, allEntities);
+                const descendantMatches = getMatchingDescendantCount(targetEntity.id, appliedFilters, allEntities);
                 totalMatches += descendantMatches;
                 
                 if (totalMatches > 0) {
@@ -459,7 +464,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 return null;
             })
             .filter((item): item is { selection: Polygon; matchCount: number } => item !== null);
-    }, [currentView?.selections, isFilterApplied, appliedFilters, allEntities, entityMatchesFilters, getMatchingDescendantCount]);
+    }, [currentView?.selections, currentView?.entityId, isFilterApplied, appliedFilters, allEntities, entityMatchesFilters, getMatchingDescendantCount]);
 
     const handleApplyFilters = (filters: Filters) => {
         setAppliedFilters(filters);
@@ -833,7 +838,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             )}
             
             {/* Views list sidebar */}
-            {entityViews.length > 1 && (
+            {Object.keys(groupedViews).length > 0 && (
                 <div className="absolute top-1/2 -translate-y-1/2 right-4 h-auto max-h-[calc(100%-8rem)] w-48 z-30 hidden lg:block">
                     <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
                         <div className="max-h-[calc(100vh-10rem)] overflow-y-auto space-y-2">
@@ -925,5 +930,3 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         </div>
     );
 }
-
-    
