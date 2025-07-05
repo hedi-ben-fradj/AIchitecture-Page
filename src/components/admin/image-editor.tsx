@@ -451,8 +451,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                 const rotation = hotspot.rotation || 0;
                 const fov = hotspot.fov || 60;
                 
-                const innerRadius = 28;
-                const outerRadius = 43;
+                const innerRadius = 22;
+                const outerRadius = 35;
 
                 const rotationRad = rotation * (Math.PI / 180);
                 const fovRad = fov * (Math.PI / 180);
