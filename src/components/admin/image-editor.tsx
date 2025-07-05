@@ -403,7 +403,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                     <TooltipTrigger asChild>
                         <g 
                           transform={`translate(${hotspot.x}, ${hotspot.y})`} 
-                          onMouseDown={(e) => handleMouseDownOnHotspot(e, hotspot.id)} 
+                          onMouseDown={(e) => handleMouseDownOnHotspot(e, hotspot.id)}
+                          onClick={(e) => e.stopPropagation()}
                           className="cursor-move"
                         >
                             <MapPin 
@@ -435,3 +436,5 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
 
 ImageEditor.displayName = "ImageEditor";
 export default ImageEditor;
+
+    
