@@ -534,14 +534,14 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    show2DPlan();
+                                    setIsMuted(!isMuted);
                                 }}
                             >
-                                <Layers size={24} />
+                                {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
-                            <p>2D Plan</p>
+                            <p>{isMuted ? 'Unmute' : 'Mute'}</p>
                         </TooltipContent>
                     </Tooltip>
 
@@ -553,14 +553,14 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    setIsMuted(!isMuted);
+                                    show2DPlan();
                                 }}
                             >
-                                {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                                <Layers size={24} />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
-                            <p>{isMuted ? 'Unmute' : 'Mute'}</p>
+                            <p>2D Plan</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
