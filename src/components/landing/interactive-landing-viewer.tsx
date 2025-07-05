@@ -245,9 +245,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             setClickedSelection(selection);
 
              if (selection.details.makeAsEntity && selection.details.title) {
-                const { entities } = loadDataFromStorage();
                 const parentId = currentView?.entityId;
-                const targetEntity = entities.find(e => e.parentId === parentId && e.name === selection.details?.title);
+                const targetEntity = allEntities.find(e => e.parentId === parentId && e.name === selection.details?.title);
                 setClickedEntity(targetEntity || null);
             } else {
                 setClickedEntity(null);
@@ -290,11 +289,10 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     };
 
     const handleNavigate = (entityId: string) => {
-        const { entities } = loadDataFromStorage();
-        const targetEntity = entities.find(e => e.id === entityId);
+        const targetEntity = allEntities.find(e => e.id === entityId);
         
         if (targetEntity && targetEntity.defaultViewId) {
-            const newView = findViewInEntities(entities, targetEntity.defaultViewId);
+            const newView = findViewInEntities(allEntities, targetEntity.defaultViewId);
             if (newView) {
                 if (currentView) {
                     setViewHistory(prev => [...prev, currentView.id]);
@@ -320,13 +318,12 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         if (viewHistory.length === 0) return;
 
         const previousViewId = viewHistory[viewHistory.length - 1];
-        const { entities } = loadDataFromStorage();
-        const previousView = findViewInEntities(entities, previousViewId);
+        const previousView = findViewInEntities(allEntities, previousViewId);
         
         if (previousView) {
             setCurrentViewType(previousView.type);
             setCurrentView(previousView);
-            const parentEntity = entities.find(e => e.id === previousView.entityId);
+            const parentEntity = allEntities.find(e => e.id === previousView.entityId);
             if (parentEntity) {
                 setEntityViews(parentEntity.views);
             }
@@ -457,8 +454,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
         let targetView;
         if (currentViewType === '360') {
-            // Find any non-360 view. Prefer '2d' if available.
-            targetView = entityViews.find(view => view.type === '2d') || entityViews.find(view => view.type !== '360');
+            // Find any non-360 view. Prefer '2d plan' if available.
+            targetView = entityViews.find(view => view.type.toLowerCase() === '2d plan') || entityViews.find(view => view.type !== '360');
         } else {
             // Find a 360 view
             targetView = entityViews.find(view => view.type === '360');
@@ -468,12 +465,12 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     };
     
     const show2DPlan = () => {
-        if (currentViewType === '2d') {
-            return; // Already on a 2D view, do nothing.
+        if (currentViewType.toLowerCase() === '2d plan') {
+            return; // Already on a 2D plan view, do nothing.
         }
-        const twoDView = entityViews.find(view => view.type === '2d');
-        if (twoDView) {
-            handleViewSelect(twoDView);
+        const twoDPlanView = entityViews.find(view => view.type.toLowerCase() === '2d plan');
+        if (twoDPlanView) {
+            handleViewSelect(twoDPlanView);
         } else {
             // In a real app, you might show a toast notification here.
             console.log("No 2D plan available for this entity.");
@@ -545,7 +542,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         </TooltipContent>
                     </Tooltip>
 
-                    {entityViews.some(view => view.type === '2d') && (
+                    {entityViews.some(view => view.type.toLowerCase() === '2d plan') && (
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
@@ -608,10 +605,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
                         if (!hasDetails) return null;
 
-                        const entityIdForSelection = selection.details?.makeAsEntity && selection.details.title
-                            ? selection.details.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-                            : null;
-                        const entityForSelection = entityIdForSelection ? allEntities.find(e => e.id === entityIdForSelection) : null;
+                        const entityForSelection = allEntities.find(e => e.parentId === currentView.entityId && e.name === selection.details?.title);
                         const isProperty = entityForSelection && (entityForSelection.entityType === 'Apartment' || entityForSelection.entityType === 'house');
 
                         const getHighlightClasses = () => {
@@ -835,10 +829,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     <div className="pointer-events-auto overflow-x-auto pb-2 -mb-2 flex justify-center">
                         <div className="flex gap-4 w-max">
                             {(!isFilterApplied ? currentView.selections?.filter(s => s.details?.title) || [] : filteredSelections.map(f => f.selection)).map((selection) => {
-                                const entityIdForSelection = selection.details?.makeAsEntity && selection.details.title
-                                    ? selection.details.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-                                    : null;
-                                const entityForSelection = entityIdForSelection ? allEntities.find(e => e.id === entityIdForSelection) : null;
+                                const entityForSelection = allEntities.find(e => e.parentId === currentView.entityId && e.name === selection.details?.title);
                                 const isProperty = entityForSelection && (entityForSelection.entityType === 'Apartment' || entityForSelection.entityType === 'house');
                                 
                                 const isClicked = clickedSelection?.id === selection.id;
