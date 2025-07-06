@@ -390,7 +390,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
            {view.type === '360' ? (
               <div>
                 <div className="flex gap-2 mb-4">
-                    <Button onClick={handleAddNewHotspot} className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isPlacingHotspot}>
+                    <Button onClick={handleAddNewHotspot} className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isPlacingHotspot || !!selectedHotspotId}>
                         <Eye className="mr-2 h-4 w-4" />
                         New Hotspot
                     </Button>
