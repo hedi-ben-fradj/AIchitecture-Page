@@ -113,7 +113,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [isPlanExpanded, setIsPlanExpanded] = useState(false);
     const [planOverlayImageRect, setPlanOverlayImageRect] = useState<RenderedImageRect | null>(null);
     const [volume, setVolume] = useState(0.5);
-    const [isVolumeControlVisible, setIsVolumeControlVisible] = useState(false);
 
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -769,12 +768,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             <div className="absolute bottom-20 left-4 z-50 flex flex-col gap-3">
                 <TooltipProvider>
                     {currentViewType === '360' && (
-                         <div
-                            className="relative"
-                            onMouseEnter={() => setIsVolumeControlVisible(true)}
-                            onMouseLeave={() => setIsVolumeControlVisible(false)}
-                        >
-                            {isVolumeControlVisible && (
+                        <div className="relative">
+                            {!isMuted && (
                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-4 pt-2 pb-2 bg-black/50 rounded-full backdrop-blur-sm">
                                     <Slider
                                         orientation="vertical"
@@ -1024,8 +1019,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 className="group cursor-pointer"
                                 onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
                             >
-                                <circle cx={0} cy={0} r={eyeIconSize / 2} className="pointer-events-auto" fill="transparent" />
-                                <g className="pointer-events-none">
+                               <g className="pointer-events-none">
                                     <path
                                         d="M0-7C-3.87 0-7-3.87-7-0S-3.87 7 0 7s7-3.87 7-0S3.87-7 0-7zM0 3.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"
                                         className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors"
@@ -1037,6 +1031,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         transform="translate(-28, -28)"
                                     />
                                 </g>
+                                <circle cx={0} cy={0} r={eyeIconSize / 2} className="pointer-events-auto" fill="transparent" onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }} />
                             </g>
                         );
                     })}
