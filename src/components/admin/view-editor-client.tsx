@@ -130,9 +130,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       currentMarkersPlugin.setMarkers(initialMarkers);
 
       currentMarkersPlugin.addEventListener('select-marker', (e) => {
-        if (e.marker.data.id !== selectedHotspotIdRef.current) {
-            toast({ title: 'Hotspot Selected', description: 'Click anywhere to move it, or click "Edit Hotspot".' });
-        }
+        toast({ title: 'Hotspot Selected', description: 'Click anywhere to move it, or click "Edit Hotspot".' });
         setIsPlacingHotspot(false);
         setSelectedHotspotId(e.marker.data.id as number);
       });
@@ -179,6 +177,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
             setViewerHotspots(prev => prev.map(h => h.id === selectedHotspotIdRef.current ? { ...h, ...newNormalizedCoords } : h));
             currentMarkersPlugin.updateMarker({ id: String(selectedHotspotIdRef.current), position: newPosition });
+            toast({ title: 'Hotspot Moved' });
             return;
         }
 
@@ -214,51 +213,69 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
 
   const handleSaveHotspot = (hotspotData: { linkedViewId: string }) => {
-    if (hotspotToEdit && markersPlugin) {
-      const updatedHotspot = { ...hotspotToEdit, ...hotspotData };
-      const findViewName = (h: Hotspot) => {
-        if (!h.linkedViewId) return 'Unlinked Hotspot';
-        for (const entity of allEntities) {
-            const foundView = entity.views.find(v => v.id === h.linkedViewId);
-            if (foundView) return foundView.name;
-        }
-        return 'Link';
-      };
-      
-      setViewerHotspots(prev => prev.map(h => h.id === updatedHotspot.id ? updatedHotspot : h));
-      
-      markersPlugin.updateMarker({
-        id: String(updatedHotspot.id),
-        data: updatedHotspot,
-        tooltip: findViewName(updatedHotspot),
-      });
+    if (!hotspotToEdit) return;
 
-      setSelectedHotspotId(null);
-      setHotspotToEdit(null);
-      toast({ title: 'Hotspot saved!' });
+    const updatedHotspot = { ...hotspotToEdit, ...hotspotData };
+
+    if (view?.type === '360') {
+      if (markersPlugin) {
+        const findViewName = (h: Hotspot) => {
+          if (!h.linkedViewId) return 'Unlinked Hotspot';
+          for (const entity of allEntities) {
+            const foundView = entity.views.find((v) => v.id === h.linkedViewId);
+            if (foundView) return foundView.name;
+          }
+          return 'Link';
+        };
+
+        setViewerHotspots((prev) =>
+          prev.map((h) => (h.id === updatedHotspot.id ? updatedHotspot : h))
+        );
+
+        markersPlugin.updateMarker({
+          id: String(updatedHotspot.id),
+          data: updatedHotspot,
+          tooltip: findViewName(updatedHotspot),
+        });
+      }
+    } else {
+      // Logic for 2D editor
+      editorRef.current?.updateHotspot(updatedHotspot);
     }
+    
+    // Common logic to close modal and reset state
+    setSelectedHotspotId(null);
+    setHotspotToEdit(null);
+    setIsHotspotModalOpen(false);
+    toast({ title: 'Hotspot saved!' });
   };
 
   const handleAddNewHotspot = () => {
-    setIsPlacingHotspot(true);
-    setSelectedHotspotId(null);
-    toast({ title: 'Placement Mode Active', description: 'Click anywhere on the panorama to place the new hotspot.' });
+    if (view?.type === '360') {
+        setIsPlacingHotspot(true);
+        setSelectedHotspotId(null);
+        toast({ title: 'Placement Mode Active', description: 'Click anywhere on the panorama to place the new hotspot.' });
+    }
   };
   
   const handleEditSelectedHotspot = () => {
-    if (!selectedHotspotId) return;
-    const spotToEdit = viewerHotspots.find(h => h.id === selectedHotspotId);
-    if (spotToEdit) {
-        setHotspotToEdit(spotToEdit);
-        setIsHotspotModalOpen(true);
+    if (view?.type === '360') {
+      if (!selectedHotspotId) return;
+      const spotToEdit = viewerHotspots.find(h => h.id === selectedHotspotId);
+      if (spotToEdit) {
+          setHotspotToEdit(spotToEdit);
+          setIsHotspotModalOpen(true);
+      }
     }
   };
 
   const handleDeleteSelectedHotspot = () => {
-    if (!selectedHotspotId || !markersPlugin) return;
-    markersPlugin.removeMarker(String(selectedHotspotId));
-    setViewerHotspots(prev => prev.filter(h => h.id !== selectedHotspotId));
-    setSelectedHotspotId(null);
+    if (view?.type === '360') {
+      if (!selectedHotspotId || !markersPlugin) return;
+      markersPlugin.removeMarker(String(selectedHotspotId));
+      setViewerHotspots(prev => prev.filter(h => h.id !== selectedHotspotId));
+      setSelectedHotspotId(null);
+    }
   };
   
   if (!view || !entity) {
