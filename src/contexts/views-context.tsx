@@ -3,6 +3,22 @@
 
 import React, { createContext, useContext, useState, useCallback, type ReactNode, useEffect } from 'react';
 import type { Polygon } from '@/components/admin/image-editor';
+import { db } from '@/lib/firebase';
+import { 
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    setDoc,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    writeBatch,
+    query,
+    where,
+    arrayUnion,
+    arrayRemove
+} from 'firebase/firestore';
 
 export type EntityType = string;
 export type ViewType = string;
@@ -65,7 +81,7 @@ interface ProjectContextType {
   setLandingPageEntityId: (entityId: string | null) => void;
 
   // View methods
-  addView: (entityId: string, viewName: string, viewType: ViewType) => string;
+  addView: (entityId: string, viewName: string, viewType: ViewType) => Promise<string>;
   deleteView: (entityId: string, viewId: string) => void;
   getView: (entityId: string, viewId: string) => View | undefined;
   updateViewImage: (entityId: string, viewId: string, imageUrl: string) => void;
@@ -92,124 +108,93 @@ const defaultEntityTypes: EntityType[] = [
     'Room',
     'house',
 ];
-const ENTITY_TYPES_STORAGE_KEY = 'entity_types_list';
 
-const defaultViewTypes: ViewType[] = ['2d', '360'];
-const VIEW_TYPES_STORAGE_KEY = 'view_types_list';
+const defaultViewTypes: ViewType[] = ['2d', '360', '2d plan'];
+
+// Helper function to recursively get all descendant IDs
+const getDescendantIds = (entityId: string, allEntities: Entity[]): string[] => {
+    const descendants = new Set<string>();
+    const toProcess = [entityId];
+    while (toProcess.length > 0) {
+        const currentId = toProcess.pop()!;
+        if (currentId !== entityId) { // Exclude the initial entity itself from descendants list
+            descendants.add(currentId);
+        }
+        const children = allEntities.filter(e => e.parentId === currentId);
+        children.forEach(child => toProcess.push(child.id));
+    }
+    return Array.from(descendants);
+};
 
 
 export function ViewsProvider({ children, projectId }: { children: ReactNode; projectId?: string }) {
   const [isMounted, setIsMounted] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [landingPageEntityId, setLandingPageEntityIdState] = useState<string | null>(null);
-  const [entityTypes, setEntityTypes] = useState<EntityType[]>(defaultEntityTypes);
-  const [viewTypes, setViewTypes] = useState<ViewType[]>(defaultViewTypes);
+  const [entityTypes, setEntityTypes] = useState<EntityType[]>([]);
+  const [viewTypes, setViewTypes] = useState<ViewType[]>([]);
 
-  const getStorageKey = useCallback((key: string) => {
-    if (!projectId) return '';
-    return `project-${projectId}-${key}`
-  }, [projectId]);
-  const getStorageSafeViewId = (viewId: string) => viewId.replace(/\//g, '__');
+  // Load global types
+  useEffect(() => {
+    const loadTypes = async () => {
+        try {
+            const entityTypesDoc = await getDoc(doc(db, 'app_config', 'entity_types'));
+            if (entityTypesDoc.exists()) {
+                setEntityTypes(entityTypesDoc.data().types);
+            } else {
+                await setDoc(doc(db, 'app_config', 'entity_types'), { types: defaultEntityTypes });
+                setEntityTypes(defaultEntityTypes);
+            }
+
+            const viewTypesDoc = await getDoc(doc(db, 'app_config', 'view_types'));
+            if (viewTypesDoc.exists()) {
+                setViewTypes(viewTypesDoc.data().types);
+            } else {
+                await setDoc(doc(db, 'app_config', 'view_types'), { types: defaultViewTypes });
+                setViewTypes(defaultViewTypes);
+            }
+        } catch (error) {
+            console.error("Failed to load types from Firestore", error);
+        }
+    };
+    loadTypes();
+  }, []);
   
   // Project-specific data loading
   useEffect(() => {
-    if (typeof window !== 'undefined' && projectId) {
-      try {
-        const projectDataStr = window.localStorage.getItem(getStorageKey('data'));
-        let loadedEntities: Entity[] = [];
-        let loadedLandingId: string | null = null;
-        
-        if (projectDataStr) {
-          const projectData = JSON.parse(projectDataStr);
-          
-          if (projectData && Array.isArray(projectData.entities)) {
-            loadedLandingId = projectData.landingPageEntityId || null;
-            
-            loadedEntities = projectData.entities.map((entityMeta: any) => ({
-              ...entityMeta,
-              views: entityMeta.views.map((viewMeta: any) => {
-                const imageUrl = window.localStorage.getItem(getStorageKey(`view-image-${getStorageSafeViewId(viewMeta.id)}`)) || undefined;
-                const selectionsStr = window.localStorage.getItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewMeta.id)}`));
-                const selections = selectionsStr ? JSON.parse(selectionsStr) : [];
-                const hotspotsStr = window.localStorage.getItem(getStorageKey(`view-hotspots-${getStorageSafeViewId(viewMeta.id)}`));
-                const hotspots = hotspotsStr ? JSON.parse(hotspotsStr) : [];
-                return { ...viewMeta, imageUrl, selections, hotspots };
-              }),
-              defaultViewId: entityMeta.defaultViewId || (entityMeta.views.length > 0 ? entityMeta.views[0].id : null)
-            }));
-          } else {
-             console.warn("Project data in localStorage is malformed. Resetting state.", projectData);
-          }
-        }
-        setEntities(loadedEntities);
-        setLandingPageEntityIdState(loadedLandingId);
-      } catch (error) {
-        console.error("Failed to load project data from storage", error);
-        setEntities([]);
-        setLandingPageEntityIdState(null);
-      }
-    }
-  }, [projectId, getStorageKey]);
+    if (!projectId) {
+      setEntities([]);
+      setLandingPageEntityIdState(null);
+      return;
+    };
 
-  // Global data loading (entity types and view types)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const loadProjectData = async () => {
         try {
-            const storedEntityTypes = window.localStorage.getItem(ENTITY_TYPES_STORAGE_KEY);
-            if (storedEntityTypes) {
-                setEntityTypes(JSON.parse(storedEntityTypes));
-            } else {
-                window.localStorage.setItem(ENTITY_TYPES_STORAGE_KEY, JSON.stringify(defaultEntityTypes));
-            }
+            // Fetch project metadata
+            const projectDocRef = doc(db, 'projects', projectId);
+            const projectDoc = await getDoc(projectDocRef);
+            const projectData = projectDoc.exists() ? projectDoc.data() : {};
+            setLandingPageEntityIdState(projectData.landingPageEntityId || null);
 
-            const storedViewTypes = window.localStorage.getItem(VIEW_TYPES_STORAGE_KEY);
-            if (storedViewTypes) {
-                setViewTypes(JSON.parse(storedViewTypes));
-            } else {
-                window.localStorage.setItem(VIEW_TYPES_STORAGE_KEY, JSON.stringify(defaultViewTypes));
-            }
+            // Fetch all entities for the project
+            const entitiesQuery = query(collection(db, 'projects', projectId, 'entities'));
+            const entitiesSnapshot = await getDocs(entitiesQuery);
+            const fetchedEntities = entitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Entity[];
+            
+            // Set entities and mark as mounted
+            setEntities(fetchedEntities);
+            setIsMounted(true);
+
         } catch (error) {
-            console.error("Failed to load types from storage", error);
-            setEntityTypes(defaultEntityTypes);
-            setViewTypes(defaultViewTypes);
+            console.error(`Failed to load data for project ${projectId}:`, error);
+            setEntities([]);
+            setLandingPageEntityIdState(null);
+            setIsMounted(true);
         }
-        setIsMounted(true);
-    }
-  }, []);
+    };
 
-  const saveMetadata = useCallback((updatedEntities: Entity[], updatedLandingId: string | null) => {
-    if (typeof window !== 'undefined' && projectId) {
-      try {
-        const metadata = {
-          landingPageEntityId: updatedLandingId,
-          // Strip large data fields before saving metadata
-          entities: updatedEntities.map(entity => ({
-            id: entity.id,
-            name: entity.name,
-            entityType: entity.entityType,
-            parentId: entity.parentId,
-            defaultViewId: entity.defaultViewId,
-            plotArea: entity.plotArea,
-            houseArea: entity.houseArea,
-            price: entity.price,
-            status: entity.status,
-            availableDate: entity.availableDate,
-            floors: entity.floors,
-            rooms: entity.rooms,
-            detailedRooms: entity.detailedRooms,
-            views: entity.views.map(view => ({
-              id: view.id,
-              name: view.name,
-              type: view.type
-            })),
-          })),
-        };
-        window.localStorage.setItem(getStorageKey('data'), JSON.stringify(metadata));
-      } catch (error) {
-        console.error("Failed to save project metadata to storage", error);
-      }
-    }
-  }, [projectId, getStorageKey]);
+    loadProjectData();
+  }, [projectId]);
 
 
   const getEntity = useCallback((entityId: string) => {
@@ -221,309 +206,247 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     return entity?.views.find(v => v.id === viewId);
   }, [getEntity]);
 
-  const addEntity = useCallback((entityName: string, entityType: EntityType, parentId: string | null = null) => {
-    if (!projectId) {
-        console.error("Cannot add an entity without a project context.");
+  const addEntity = useCallback(async (entityName: string, entityType: EntityType, parentId: string | null = null) => {
+    if (!projectId) return;
+
+    const slug = entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (!slug) {
+        alert("Invalid entity name.");
         return;
     }
-    setEntities(prevEntities => {
-      const slug = entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      if (!slug || prevEntities.some(e => e.id === slug)) {
-        alert(`Entity with name "${entityName}" already exists or name is invalid.`);
-        return prevEntities;
-      }
-      const newEntity: Entity = {
-        id: slug,
-        name: entityName,
-        entityType: entityType,
-        parentId: parentId,
-        views: [],
-        defaultViewId: null,
-      };
 
-      if (entityType === 'Apartment' || entityType === 'house') {
+    const entityRef = doc(db, 'projects', projectId, 'entities', slug);
+    const entitySnap = await getDoc(entityRef);
+
+    if (entitySnap.exists()) {
+        alert(`Entity with name "${entityName}" already exists or name is invalid.`);
+        return;
+    }
+
+    const newEntity: Omit<Entity, 'id'> = {
+      name: entityName,
+      entityType: entityType,
+      parentId: parentId,
+      views: [],
+      defaultViewId: null,
+      plotArea: undefined,
+      houseArea: undefined,
+      price: undefined,
+      status: undefined,
+      availableDate: undefined,
+      floors: undefined,
+      rooms: undefined,
+      detailedRooms: [],
+    };
+    
+    if (entityType === 'Apartment' || entityType === 'house') {
+        newEntity.status = 'available';
         newEntity.floors = 1;
         newEntity.rooms = 1;
-        newEntity.status = 'available';
-      }
-
-      const updatedEntities = [...prevEntities, newEntity];
-      saveMetadata(updatedEntities, landingPageEntityId);
-      return updatedEntities;
-    });
-  }, [projectId, landingPageEntityId, saveMetadata]);
-
-  const updateEntity = useCallback((entityId: string, data: Partial<Entity>) => {
-    if (!projectId) {
-        console.error("Cannot update an entity without a project context.");
-        return;
     }
-    setEntities(prevEntities => {
-        const updatedEntities = prevEntities.map(entity => {
-            if (entity.id === entityId) {
-                return { ...entity, ...data };
-            }
-            return entity;
-        });
-        saveMetadata(updatedEntities, landingPageEntityId);
-        return updatedEntities;
-    });
-  }, [projectId, landingPageEntityId, saveMetadata]);
 
-  const deleteEntity = useCallback((entityId: string) => {
-    if (!projectId) {
-        console.error("Cannot delete an entity without a project context.");
-        return;
-    }
-    const updatedLandingId = landingPageEntityId === entityId ? null : landingPageEntityId;
-    
-    setEntities(prevEntities => {
-      const entitiesToDelete = new Set<string>([entityId]);
-      let changed = true;
-      // Find all children, grandchildren, etc.
-      while(changed) {
-        changed = false;
-        const currentSize = entitiesToDelete.size;
-        prevEntities.forEach(e => {
-          if (e.parentId && entitiesToDelete.has(e.parentId)) {
-            entitiesToDelete.add(e.id);
-          }
-        });
-        if (entitiesToDelete.size > currentSize) {
-          changed = true;
-        }
-      }
+    await setDoc(entityRef, newEntity);
+    setEntities(prev => [...prev, { id: slug, ...newEntity }]);
 
-      const entitiesToDeleteArray = Array.from(entitiesToDelete);
+  }, [projectId]);
 
-      // Clean up associated view data from localStorage
-      entitiesToDeleteArray.forEach(idToDelete => {
-        const entityToDelete = prevEntities.find(e => e.id === idToDelete);
-        if (entityToDelete) {
-          entityToDelete.views.forEach(view => {
-            try {
-              window.localStorage.removeItem(getStorageKey(`view-image-${getStorageSafeViewId(view.id)}`));
-              window.localStorage.removeItem(getStorageKey(`view-selections-${getStorageSafeViewId(view.id)}`));
-            } catch (error) {
-              console.error(`Failed to remove data for view ${view.id}:`, error);
-            }
-          });
-        }
-      });
-      
-      const updatedEntities = prevEntities.filter(e => !entitiesToDelete.has(e.id));
-      saveMetadata(updatedEntities, updatedLandingId);
-      return updatedEntities;
-    });
-
-    if (landingPageEntityId === entityId) {
-      setLandingPageEntityIdState(null);
-    }
-  }, [projectId, landingPageEntityId, saveMetadata, getStorageKey]);
-
-  const setLandingPageEntityId = useCallback((entityId: string | null) => {
+  const updateEntity = useCallback(async (entityId: string, data: Partial<Entity>) => {
     if (!projectId) return;
+    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    await updateDoc(entityRef, data);
+    setEntities(prev => prev.map(e => e.id === entityId ? { ...e, ...data } : e));
+  }, [projectId]);
+
+  const deleteEntity = useCallback(async (entityId: string) => {
+    if (!projectId) return;
+
+    const allDescendantIds = getDescendantIds(entityId, entities);
+    const allIdsToDelete = [entityId, ...allDescendantIds];
+
+    const batch = writeBatch(db);
+
+    allIdsToDelete.forEach(id => {
+        const entityRef = doc(db, 'projects', projectId, 'entities', id);
+        batch.delete(entityRef);
+    });
+
+    await batch.commit();
+
+    setEntities(prev => prev.filter(e => !allIdsToDelete.includes(e.id)));
+    
+    if (landingPageEntityId && allIdsToDelete.includes(landingPageEntityId)) {
+        setLandingPageEntityIdState(null);
+        await updateDoc(doc(db, 'projects', projectId), { landingPageEntityId: null });
+    }
+
+  }, [projectId, entities, landingPageEntityId]);
+
+  const setLandingPageEntityId = useCallback(async (entityId: string | null) => {
+    if (!projectId) return;
+    await updateDoc(doc(db, 'projects', projectId), { landingPageEntityId: entityId });
     setLandingPageEntityIdState(entityId);
-    saveMetadata(entities, entityId);
-     if (typeof window !== 'undefined') {
-        if (entityId) {
-            window.localStorage.setItem('landing_project_id', projectId);
-        } else {
-            const currentLandingProject = window.localStorage.getItem('landing_project_id');
-            if (currentLandingProject === projectId) {
-                window.localStorage.removeItem('landing_project_id');
-            }
+    
+    // Also set the global landing project ID
+    const globalsRef = doc(db, 'globals', 'config');
+    if (entityId) {
+        await setDoc(globalsRef, { landingProjectId: projectId }, { merge: true });
+    } else {
+        const globalsDoc = await getDoc(globalsRef);
+        if (globalsDoc.exists() && globalsDoc.data().landingProjectId === projectId) {
+             await updateDoc(globalsRef, { landingProjectId: null });
         }
     }
-  }, [projectId, entities, saveMetadata]);
+  }, [projectId]);
 
- const addView = useCallback((entityId: string, viewName: string, viewType: ViewType) => {
-    if (!projectId) {
-        console.error("Cannot add a view without a project context.");
+ const addView = useCallback(async (entityId: string, viewName: string, viewType: ViewType) => {
+    if (!projectId) return '';
+    
+    const targetEntity = entities.find(e => e.id === entityId);
+    if (!targetEntity) {
+        console.error(`Entity with id "${entityId}" not found.`);
         return '';
     }
-    let newViewHref = '';
 
-    setEntities(prevEntities => {
-      const targetEntity = prevEntities.find(e => e.id === entityId);
-      if (!targetEntity) {
-        console.error(`Entity with id "${entityId}" not found.`);
-        return prevEntities;
-      }
-      
-      const viewSlug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      if (!viewSlug) {
-        alert("Invalid view name. The name must contain alphanumeric characters.");
-        return prevEntities;
-      }
-
-      const alreadyExists = targetEntity.views.some(v => {
-          const existingSlug = v.id.split('__').pop();
-          return existingSlug === viewSlug;
-      });
-      
-      if (alreadyExists) {
-        alert(`A view with a name that generates the same URL slug ("${viewSlug}") already exists in this entity. Please choose a different name.`);
-        return prevEntities;
-      }
-
-      const getEntityPath = (currentEntityId: string, allEntities: Entity[]): string[] => {
-        const path: string[] = [];
-        let currentId: string | undefined | null = currentEntityId;
-        while(currentId) {
-          const entity = allEntities.find(e => e.id === currentId);
-          if (entity) {
-            path.unshift(entity.id);
-            currentId = entity.parentId;
-          } else {
-            currentId = null;
-          }
-        }
-        return path;
-      };
-      
-      const entityPath = getEntityPath(entityId, prevEntities);
-      const newViewId = [...entityPath, viewSlug].join('__');
-
-      const newView: View = { id: newViewId, name: viewName, type: viewType };
-      newViewHref = `/admin/projects/${projectId}/entities/${entityId}/views/${encodeURIComponent(newViewId)}`;
-
-      const updatedEntities = prevEntities.map(entity => {
-        if (entity.id === entityId) {
-          const updatedViews = [...entity.views, newView];
-          const newDefaultViewId = updatedViews.length === 1 ? newViewId : entity.defaultViewId;
-          return { ...entity, views: updatedViews, defaultViewId: newDefaultViewId };
-        }
-        return entity;
-      });
-
-      saveMetadata(updatedEntities, landingPageEntityId);
-      return updatedEntities;
-    });
-
-    return newViewHref;
-  }, [projectId, landingPageEntityId, saveMetadata]);
-
-  const deleteView = useCallback((entityId: string, viewId: string) => {
-    if (!projectId) return;
-    setEntities(prevEntities => {
-      const updatedEntities = prevEntities.map(entity => {
-        if (entity.id === entityId) {
-          const updatedViews = entity.views.filter(v => v.id !== viewId);
-          let newDefaultViewId = entity.defaultViewId;
-          if (entity.defaultViewId === viewId) {
-            newDefaultViewId = updatedViews.length > 0 ? updatedViews[0].id : null;
-          }
-          return { ...entity, views: updatedViews, defaultViewId: newDefaultViewId };
-        }
-        return entity;
-      });
-      saveMetadata(updatedEntities, landingPageEntityId);
-      return updatedEntities;
-    });
+    const viewSlug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (!viewSlug) {
+        alert("Invalid view name.");
+        return '';
+    }
     
-    try {
-      window.localStorage.removeItem(getStorageKey(`view-image-${getStorageSafeViewId(viewId)}`));
-      window.localStorage.removeItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewId)}`));
-      window.localStorage.removeItem(getStorageKey(`view-hotspots-${getStorageSafeViewId(viewId)}`));
-    } catch (error) {
-      console.error(`Failed to remove data for view ${viewId}:`, error);
+    const newViewId = `${entityId}__${viewSlug}`;
+    if (targetEntity.views.some(v => v.id === newViewId)) {
+        alert(`A view with a similar name already exists in this entity.`);
+        return '';
     }
-  }, [projectId, landingPageEntityId, saveMetadata, getStorageKey]);
 
-  const updateViewImage = useCallback((entityId: string, viewId: string, imageUrl: string) => {
-    if (!projectId) return;
-    setEntities(prev => prev.map(entity => 
-      entity.id === entityId 
-        ? { ...entity, views: entity.views.map(view => view.id === viewId ? { ...view, imageUrl } : view) }
-        : entity
-    ));
-    try {
-      window.localStorage.setItem(getStorageKey(`view-image-${getStorageSafeViewId(viewId)}`), imageUrl);
-    } catch (error) {
-      console.error(`Failed to save image for view ${viewId}:`, error);
-      alert("Error: Could not save image due to browser storage limits. Your changes are visible now but won't be saved. Please try a smaller image or clear some space by removing other views.");
-    }
-  }, [projectId, getStorageKey]);
+    const newView: View = { id: newViewId, name: viewName, type: viewType };
+    
+    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    const viewData = {
+        id: newView.id,
+        name: newView.name,
+        type: newView.type
+    };
+    
+    const newDefaultViewId = targetEntity.views.length === 0 ? newViewId : targetEntity.defaultViewId;
 
-  const updateViewSelections = useCallback((entityId: string, viewId: string, selections: Polygon[]) => {
-    if (!projectId) return;
-    setEntities(prev => prev.map(entity => 
-      entity.id === entityId
-        ? { ...entity, views: entity.views.map(view => view.id === viewId ? { ...view, selections } : view) }
-        : entity
-    ));
-    try {
-      window.localStorage.setItem(getStorageKey(`view-selections-${getStorageSafeViewId(viewId)}`), JSON.stringify(selections));
-    } catch (error) {
-      console.error(`Failed to save selections for view ${viewId}:`, error);
-    }
-  }, [projectId, getStorageKey]);
-
-  const updateViewHotspots = useCallback((entityId: string, viewId: string, hotspots: Hotspot[]) => {
-    if (!projectId) return;
-    setEntities(prev => prev.map(entity => 
-      entity.id === entityId
-        ? { ...entity, views: entity.views.map(view => view.id === viewId ? { ...view, hotspots } : view) }
-        : entity
-    ));
-    try {
-      window.localStorage.setItem(getStorageKey(`view-hotspots-${getStorageSafeViewId(viewId)}`), JSON.stringify(hotspots));
-    } catch (error) {
-      console.error(`Failed to save hotspots for view ${viewId}:`, error);
-    }
-  }, [projectId, getStorageKey]);
-
-  const setDefaultViewId = useCallback((entityId: string, viewId: string) => {
-    if (!projectId) return;
-    setEntities(prev => {
-      const updated = prev.map(entity => 
-        entity.id === entityId ? { ...entity, defaultViewId: viewId } : entity
-      );
-      saveMetadata(updated, landingPageEntityId);
-      return updated;
+    await updateDoc(entityRef, {
+        views: arrayUnion(viewData),
+        defaultViewId: newDefaultViewId
     });
-  }, [projectId, landingPageEntityId, saveMetadata]);
 
-  const addEntityType = useCallback((typeName: string) => {
-    setEntityTypes(prevTypes => {
-        if (prevTypes.map(t => t.toLowerCase()).includes(typeName.toLowerCase())) {
-            alert('This entity type already exists.');
-            return prevTypes;
+    setEntities(prev => prev.map(e => e.id === entityId ? {
+        ...e,
+        views: [...e.views, newView],
+        defaultViewId: newDefaultViewId
+    } : e));
+
+    return `/admin/projects/${projectId}/entities/${entityId}/views/${encodeURIComponent(newViewId)}`;
+
+  }, [projectId, entities]);
+
+  const deleteView = useCallback(async (entityId: string, viewId: string) => {
+    if (!projectId) return;
+
+    const entity = getEntity(entityId);
+    const viewToDelete = entity?.views.find(v => v.id === viewId);
+    if (!entity || !viewToDelete) return;
+
+    const viewMetadata = { id: viewToDelete.id, name: viewToDelete.name, type: viewToDelete.type };
+
+    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    await updateDoc(entityRef, {
+        views: arrayRemove(viewMetadata)
+    });
+
+    // If deleted view was the default, set a new default
+    if (entity.defaultViewId === viewId) {
+        const remainingViews = entity.views.filter(v => v.id !== viewId);
+        const newDefault = remainingViews.length > 0 ? remainingViews[0].id : null;
+        await updateDoc(entityRef, { defaultViewId: newDefault });
+    }
+    
+    // This is a special case since we store all view data inside the entity doc for simplicity now.
+    // If view data were in separate docs, we would delete them here.
+    // The update to the entity doc is sufficient with the current model.
+
+    // Refresh local state
+    setEntities(prev => prev.map(e => {
+        if (e.id === entityId) {
+            const updatedViews = e.views.filter(v => v.id !== viewId);
+            let newDefaultViewId = e.defaultViewId;
+             if (e.defaultViewId === viewId) {
+                newDefaultViewId = updatedViews.length > 0 ? updatedViews[0].id : null;
+             }
+            return { ...e, views: updatedViews, defaultViewId: newDefaultViewId };
         }
-        const updatedTypes = [...prevTypes, typeName];
-        window.localStorage.setItem(ENTITY_TYPES_STORAGE_KEY, JSON.stringify(updatedTypes));
-        return updatedTypes;
-    });
-  }, []);
+        return e;
+    }));
 
-  const deleteEntityType = useCallback((typeName: string) => {
-    setEntityTypes(prevTypes => {
-        const updatedTypes = prevTypes.filter(t => t !== typeName);
-        window.localStorage.setItem(ENTITY_TYPES_STORAGE_KEY, JSON.stringify(updatedTypes));
-        return updatedTypes;
-    });
-  }, []);
+  }, [projectId, getEntity]);
 
-  const addViewType = useCallback((typeName: ViewType) => {
-    setViewTypes(prevTypes => {
-        if (prevTypes.map(t => t.toLowerCase()).includes(typeName.toLowerCase())) {
-            alert('This view type already exists.');
-            return prevTypes;
-        }
-        const updatedTypes = [...prevTypes, typeName];
-        window.localStorage.setItem(VIEW_TYPES_STORAGE_KEY, JSON.stringify(updatedTypes));
-        return updatedTypes;
-    });
-  }, []);
+  const updateViewData = async (entityId: string, viewId: string, data: Partial<View>) => {
+    if (!projectId) return;
+    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    const entitySnap = await getDoc(entityRef);
+    if (!entitySnap.exists()) return;
 
-  const deleteViewType = useCallback((typeName: ViewType) => {
-    setViewTypes(prevTypes => {
-        const updatedTypes = prevTypes.filter(t => t !== typeName);
-        window.localStorage.setItem(VIEW_TYPES_STORAGE_KEY, JSON.stringify(updatedTypes));
-        return updatedTypes;
-    });
-  }, []);
+    const entityData = entitySnap.data() as Entity;
+    const views = entityData.views || [];
+    const viewIndex = views.findIndex(v => v.id === viewId);
+    if (viewIndex === -1) return;
+
+    const updatedView = { ...views[viewIndex], ...data };
+    const updatedViews = [...views];
+    updatedViews[viewIndex] = updatedView;
+
+    await updateDoc(entityRef, { views: updatedViews });
+    
+    setEntities(prev => prev.map(e => e.id === entityId ? { ...e, views: updatedViews } : e));
+  };
+
+  const updateViewImage = (entityId: string, viewId: string, imageUrl: string) => updateViewData(entityId, viewId, { imageUrl });
+  const updateViewSelections = (entityId: string, viewId: string, selections: Polygon[]) => updateViewData(entityId, viewId, { selections });
+  const updateViewHotspots = (entityId: string, viewId: string, hotspots: Hotspot[]) => updateViewData(entityId, viewId, { hotspots });
+  
+  const setDefaultViewId = useCallback(async (entityId: string, viewId: string) => {
+    if (!projectId) return;
+    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    await updateDoc(entityRef, { defaultViewId: viewId });
+    setEntities(prev => prev.map(e => e.id === entityId ? { ...e, defaultViewId: viewId } : e));
+  }, [projectId]);
+
+  const addEntityType = useCallback(async (typeName: string) => {
+    if (entityTypes.map(t => t.toLowerCase()).includes(typeName.toLowerCase())) {
+        alert('This entity type already exists.');
+        return;
+    }
+    const updatedTypes = [...entityTypes, typeName];
+    await setDoc(doc(db, 'app_config', 'entity_types'), { types: updatedTypes });
+    setEntityTypes(updatedTypes);
+  }, [entityTypes]);
+
+  const deleteEntityType = useCallback(async (typeName: string) => {
+    const updatedTypes = entityTypes.filter(t => t !== typeName);
+    await setDoc(doc(db, 'app_config', 'entity_types'), { types: updatedTypes });
+    setEntityTypes(updatedTypes);
+  }, [entityTypes]);
+
+  const addViewType = useCallback(async (typeName: ViewType) => {
+     if (viewTypes.map(t => t.toLowerCase()).includes(typeName.toLowerCase())) {
+        alert('This view type already exists.');
+        return;
+    }
+    const updatedTypes = [...viewTypes, typeName];
+    await setDoc(doc(db, 'app_config', 'view_types'), { types: updatedTypes });
+    setViewTypes(updatedTypes);
+  }, [viewTypes]);
+
+  const deleteViewType = useCallback(async (typeName: ViewType) => {
+    const updatedTypes = viewTypes.filter(t => t !== typeName);
+    await setDoc(doc(db, 'app_config', 'view_types'), { types: updatedTypes });
+    setViewTypes(updatedTypes);
+  }, [viewTypes]);
 
   const value = { 
     entities, 
@@ -548,7 +471,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     deleteViewType
   };
 
-  if (!isMounted && projectId) return null; // Only pause rendering for project-specific contexts
+  if (!isMounted && projectId) return null;
 
   return (
     <ProjectContext.Provider value={value}>
@@ -560,7 +483,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 export function useProjectData() {
   const context = useContext(ProjectContext);
   if (context === undefined) {
-    throw new Error('useProjectData must be used within a ProjectProvider');
+    throw new Error('useProjectData must be used within a ViewsProvider');
   }
   return context;
 }

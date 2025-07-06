@@ -13,6 +13,8 @@ import { z } from 'zod';
 import { useProjectData } from '@/contexts/views-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VisualTemplateEditor } from './visual-template-editor';
+import { db } from '@/lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 
 interface AddProjectFromTemplateModalProps {
@@ -20,8 +22,6 @@ interface AddProjectFromTemplateModalProps {
     onClose: () => void;
     onAddProject: (name: string, description: string, templateContent: string) => void;
 }
-
-const TEMPLATES_STORAGE_KEY = 'project_templates';
 
 // Recursive function to check for placeholder values like "<...>"
 function checkForPlaceholders(obj: any): string | null {
@@ -80,15 +80,18 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
 
 
      useEffect(() => {
-        if (isOpen && typeof window !== 'undefined') {
-            try {
-                const storedTemplatesStr = localStorage.getItem(TEMPLATES_STORAGE_KEY);
-                const loadedTemplates: ProjectTemplate[] = storedTemplatesStr ? JSON.parse(storedTemplatesStr) : [];
-                setTemplates(loadedTemplates);
-            } catch (error) {
-                console.error("Failed to load templates from localStorage", error);
-                setTemplates([]);
-            }
+        if (isOpen) {
+            const loadTemplates = async () => {
+                try {
+                    const templatesSnapshot = await getDocs(collection(db, 'project_templates'));
+                    const loadedTemplates = templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectTemplate[];
+                    setTemplates(loadedTemplates);
+                } catch (error) {
+                    console.error("Failed to load templates from Firestore", error);
+                    setTemplates([]);
+                }
+            };
+            loadTemplates();
         }
     }, [isOpen]);
 

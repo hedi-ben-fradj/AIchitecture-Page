@@ -117,7 +117,7 @@ export default function HotspotDetailsModal({ isOpen, onClose, onSave, entity, h
                 return;
             }
             
-            const newViewHref = addView(entity.id, newViewName, newViewType);
+            const newViewHref = await addView(entity.id, newViewName, newViewType);
             if (!newViewHref) {
                 toast({ variant: 'destructive', title: 'Failed to create view', description: 'A view with this name may already exist.' });
                 return;
@@ -264,4 +264,3 @@ export default function HotspotDetailsModal({ isOpen, onClose, onSave, entity, h
         </Dialog>
     );
 }
-

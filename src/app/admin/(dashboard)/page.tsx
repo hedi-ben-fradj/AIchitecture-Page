@@ -23,6 +23,9 @@ import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import type { ProjectTemplate } from '@/components/admin/add-edit-template-modal';
+import { db } from '@/lib/firebase';
+import { collection, doc, getDocs, getDoc, setDoc, writeBatch, deleteDoc, query, where } from 'firebase/firestore';
+
 
 interface Project {
     id: string;
@@ -43,8 +46,15 @@ interface ProjectStats {
     availableUnits: number;
 }
 
-const PROJECTS_STORAGE_KEY = 'projects_list';
-const TEMPLATES_STORAGE_KEY = 'project_templates';
+const deleteCollection = async (collectionRef: any) => {
+    const q = query(collectionRef);
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+}
 
 export default function AdminProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
@@ -59,154 +69,144 @@ export default function AdminProjectsPage() {
 
 
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            // Load templates
+        const loadProjects = async () => {
             try {
-                const storedTemplates = localStorage.getItem(TEMPLATES_STORAGE_KEY);
-                if (storedTemplates) {
-                    setTemplates(JSON.parse(storedTemplates));
-                }
-            } catch (error) {
-                console.error("Failed to load templates from localStorage", error);
-                setTemplates([]);
-            }
-
-            let currentProjects: Project[] = [];
-            try {
-                const storedProjects = localStorage.getItem(PROJECTS_STORAGE_KEY);
-                if (storedProjects) {
-                    currentProjects = JSON.parse(storedProjects);
-                }
+                // Load templates from Firestore
+                const templatesSnapshot = await getDocs(collection(db, 'project_templates'));
+                const loadedTemplates = templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectTemplate[];
+                setTemplates(loadedTemplates);
                 
-                if (currentProjects.length === 0) {
-                    const defaultProjects = [{ id: 'porto-montenegro', name: 'Porto Montenegro', description: 'description placeholder' }];
-                    currentProjects = defaultProjects;
-                    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(defaultProjects));
-                }
-            } catch (error) {
-                console.error("Failed to load or parse projects from localStorage", error);
-                currentProjects = [{ id: 'porto-montenegro', name: 'Porto Montenegro', description: 'description placeholder' }];
-            }
-            setProjects(currentProjects);
+                // Load projects from Firestore
+                const projectsSnapshot = await getDocs(collection(db, 'projects'));
+                const loadedProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
+                setProjects(loadedProjects);
 
-            const stats: Record<string, ProjectStats> = {};
-            currentProjects.forEach(project => {
-                const projectDataStr = localStorage.getItem(`project-${project.id}-data`);
-                let totalUnits = 0;
-                let soldUnits = 0;
-                let availableUnits = 0;
-                if (projectDataStr) {
-                    try {
-                        const projectData = JSON.parse(projectDataStr);
-                        if (projectData && Array.isArray(projectData.entities)) {
-                            const units = projectData.entities.filter(
-                                (e: ProjectEntity) => e.entityType === 'Apartment' || e.entityType === 'house'
-                            );
-                            totalUnits = units.length;
-                            soldUnits = units.filter((u: ProjectEntity) => u.status === 'sold').length;
-                            availableUnits = units.length - soldUnits;
-                        }
-                    } catch(e) {
-                        console.error(`Error parsing data for project ${project.id}:`, e);
+                // Load stats for each project
+                const stats: Record<string, ProjectStats> = {};
+                for (const project of loadedProjects) {
+                    const entitiesQuery = query(collection(db, 'projects', project.id, 'entities'), where('entityType', 'in', ['Apartment', 'house']));
+                    const entitiesSnapshot = await getDocs(entitiesQuery);
+                    
+                    let totalUnits = 0;
+                    let soldUnits = 0;
+                    if (!entitiesSnapshot.empty) {
+                        const units = entitiesSnapshot.docs.map(doc => doc.data() as ProjectEntity);
+                        totalUnits = units.length;
+                        soldUnits = units.filter((u: ProjectEntity) => u.status === 'sold').length;
                     }
+                    stats[project.id] = { totalUnits, soldUnits, availableUnits: totalUnits - soldUnits };
                 }
-                stats[project.id] = { totalUnits, soldUnits, availableUnits };
-            });
-            setProjectStats(stats);
-            setIsMounted(true);
-        }
-    }, []);
+                setProjectStats(stats);
+            } catch (error) {
+                console.error("Failed to load data from Firestore", error);
+                toast({ title: "Error", description: "Could not load project data from the database.", variant: "destructive" });
+            } finally {
+                setIsMounted(true);
+            }
+        };
+        
+        loadProjects();
+    }, [toast]);
     
-    const updateProjectsInStorage = (updatedProjects: Project[]) => {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(updatedProjects));
-        }
-    };
-
     const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
         e.preventDefault();
         e.stopPropagation();
         setProjectToDelete(project);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!projectToDelete) return;
-
-        // Remove project-specific data from localStorage
-        if (typeof window !== 'undefined') {
-            Object.keys(localStorage).forEach(key => {
-                if (key.startsWith(`project-${projectToDelete.id}-`)) {
-                    localStorage.removeItem(key);
-                }
-            });
-        }
-
-        // Update the main projects list in state and storage
-        const updatedProjects = projects.filter(p => p.id !== projectToDelete.id);
-        setProjects(updatedProjects);
-        updateProjectsInStorage(updatedProjects);
         
-        setProjectToDelete(null);
+        try {
+            // Firestore does not support deleting subcollections from the client SDK directly.
+            // A common pattern is to use a Cloud Function. For this client-side implementation,
+            // we'll delete collections by querying and batch-deleting documents.
+            // This can be slow for large projects.
+            const entitiesRef = collection(db, 'projects', projectToDelete.id, 'entities');
+            await deleteCollection(entitiesRef);
+            
+            // Delete the main project document
+            await deleteDoc(doc(db, 'projects', projectToDelete.id));
+
+            setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+            setProjectToDelete(null);
+            toast({ title: "Project Deleted", description: `"${projectToDelete.name}" has been permanently removed.` });
+        } catch (error) {
+            console.error("Error deleting project:", error);
+            toast({ title: "Error", description: "Could not delete the project.", variant: "destructive" });
+        }
     };
     
-    const handleAddProject = (name: string, description: string) => {
+    const handleAddProject = async (name: string, description: string) => {
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        if (!slug || projects.some(p => p.id === slug)) {
+        if (!slug) {
+            alert(`Invalid project name.`);
+            return;
+        }
+
+        const projectRef = doc(db, 'projects', slug);
+        const projectSnap = await getDoc(projectRef);
+
+        if (projectSnap.exists()) {
             alert(`A project with a similar name already exists or is invalid.`);
             return;
         }
 
-        const newProject: Project = {
-            id: slug,
-            name,
-            description,
-        };
+        const newProject: Omit<Project, 'id'> = { name, description };
+        await setDoc(projectRef, newProject);
 
-        const updatedProjects = [...projects, newProject];
-        setProjects(updatedProjects);
-        updateProjectsInStorage(updatedProjects);
+        setProjects(prev => [...prev, { id: slug, ...newProject }]);
         router.push(`/admin/projects/${slug}`);
     };
 
-    const handleAddProjectFromTemplate = (name: string, description: string, templateContent: string) => {
+    const handleAddProjectFromTemplate = async (name: string, description: string, templateContent: string) => {
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        if (!slug || projects.some(p => p.id === slug)) {
-            toast({
-                title: "Project Creation Failed",
-                description: `A project with a similar name already exists or is invalid.`,
-                variant: "destructive",
-            });
+        if (!slug) {
+            toast({ title: "Project Creation Failed", description: `Invalid project name.`, variant: "destructive" });
             return;
         }
 
-        const newProject: Project = { id: slug, name, description };
-        const updatedProjects = [...projects, newProject];
-        setProjects(updatedProjects);
-        updateProjectsInStorage(updatedProjects);
+        const projectRef = doc(db, 'projects', slug);
+        const projectSnap = await getDoc(projectRef);
+        if (projectSnap.exists()) {
+             toast({ title: "Project Creation Failed", description: `A project with a similar name already exists.`, variant: "destructive" });
+            return;
+        }
 
         try {
             const template = JSON.parse(templateContent);
-            const allNewEntities: any[] = []; // Using any as full Entity type is not available here
+            
+            // Start a batch write
+            const batch = writeBatch(db);
 
-            const createEntitiesRecursive = (templateEntities: any[], parentId: string | null, parentPath: string) => {
-                if (!templateEntities || templateEntities.length === 0) {
-                    return;
-                }
+            // 1. Create the main project document
+            const newProjectData = { name, description, landingPageEntityId: null };
+            batch.set(projectRef, newProjectData);
+
+            // 2. Recursively prepare entity documents for batch write
+            const createEntitiesRecursive = (templateEntities: any[], parentId: string | null, allNewEntities: Map<string, any>) => {
+                 if (!templateEntities || templateEntities.length === 0) return;
 
                 for (const templateEntity of templateEntities) {
                     const entitySlugPart = templateEntity.entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                     if (!entitySlugPart) continue;
 
-                    const entityId = parentPath ? `${parentPath}__${entitySlugPart}` : entitySlugPart;
-                    
+                    let parentPath = '';
+                    if (parentId) {
+                         const parentEntityData = allNewEntities.get(parentId);
+                         parentPath = parentEntityData ? parentEntityData.id : '';
+                    }
+
+                    const entityId = parentId ? `${parentPath}__${entitySlugPart}` : entitySlugPart;
+
                     let finalId = entityId;
                     let counter = 1;
-                    while(allNewEntities.some(e => e.id === finalId)) {
+                    while(allNewEntities.has(finalId)) {
                         finalId = `${entityId}-${counter++}`;
                     }
-                    
+
                     const newEntity = {
-                        id: finalId,
+                        id: finalId, // Will be used for subcollection path
                         name: templateEntity.entityName,
                         entityType: templateEntity.entityType,
                         parentId: parentId,
@@ -221,30 +221,34 @@ export default function AdminProjectsPage() {
                         rooms: undefined,
                         detailedRooms: [],
                     };
-
+                    
                     if (newEntity.entityType === 'Apartment' || newEntity.entityType === 'house') {
                         newEntity.status = 'available';
                         newEntity.floors = 1;
                         newEntity.rooms = 1;
                     }
-                    
-                    allNewEntities.push(newEntity);
 
+                    allNewEntities.set(finalId, newEntity);
+                    
                     if (templateEntity.childEntities && templateEntity.childEntities.length > 0) {
-                        createEntitiesRecursive(templateEntity.childEntities, newEntity.id, newEntity.id);
+                        createEntitiesRecursive(templateEntity.childEntities, newEntity.id, allNewEntities);
                     }
                 }
             };
+            
+            const allNewEntities = new Map<string, any>();
+            createEntitiesRecursive(template.projectEntities, null, allNewEntities);
+            
+            allNewEntities.forEach((entityData, entityId) => {
+                const entityDocRef = doc(db, 'projects', slug, 'entities', entityId);
+                const { id, ...dataToSave } = entityData; // Don't save id inside the doc itself
+                batch.set(entityDocRef, dataToSave);
+            });
 
-            createEntitiesRecursive(template.projectEntities, null, '');
+            // Commit the batch
+            await batch.commit();
 
-            if (typeof window !== 'undefined') {
-                const projectData = {
-                    entities: allNewEntities,
-                    landingPageEntityId: null,
-                };
-                localStorage.setItem(`project-${slug}-data`, JSON.stringify(projectData));
-            }
+            setProjects(prev => [...prev, { id: slug, name, description }]);
 
             toast({
                 title: "Project Created!",
@@ -259,11 +263,6 @@ export default function AdminProjectsPage() {
                 description: "There was an error processing the template. Please check the JSON and try again.",
                 variant: "destructive",
             });
-            
-            // Rollback project creation if template processing fails
-            const rolledBackProjects = projects.filter(p => p.id !== slug);
-            setProjects(rolledBackProjects);
-            updateProjectsInStorage(rolledBackProjects);
         }
     };
     
@@ -279,7 +278,6 @@ export default function AdminProjectsPage() {
         }
     };
 
-    // Prevent hydration errors by not rendering until the client has mounted and loaded state
     if (!isMounted) {
         return null;
     }
@@ -303,7 +301,7 @@ export default function AdminProjectsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the "{projectToDelete?.name}" project and all of its associated data.
+                            This action cannot be undone. This will permanently delete the "{projectToDelete?.name}" project and all of its associated data (entities, views, etc.).
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -380,5 +378,3 @@ export default function AdminProjectsPage() {
         </>
     );
 }
-
-    

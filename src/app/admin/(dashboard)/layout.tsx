@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePathname, useParams } from 'next/navigation';
 import { ViewsProvider } from '@/contexts/views-context';
+import { db } from '@/lib/firebase';
+import { collection, query, onSnapshot } from 'firebase/firestore';
 
 // Minimal type for sidebar display
 interface SidebarView {
@@ -120,27 +122,24 @@ export default function AdminLayout({
   const [entities, setEntities] = useState<SidebarEntity[]>([]);
 
   useEffect(() => {
-    if (projectId && typeof window !== 'undefined') {
-      try {
-        const projectDataStr = localStorage.getItem(`project-${projectId}-data`);
-        if (projectDataStr) {
-          const projectData = JSON.parse(projectDataStr);
-          // Just load the full entities
-          const entitiesForSidebar = projectData.entities?.map((e: Entity) => ({
-            ...e,
-            views: e.views?.map((v: View) => ({ id: v.id, name: v.name })) || []
-          })) || [];
-          setEntities(entitiesForSidebar);
-        } else {
-          setEntities([]);
-        }
-      } catch (error) {
-        console.error("Failed to load entities for sidebar", error);
+    if (!projectId) {
         setEntities([]);
-      }
-    } else {
-      setEntities([]);
+        return;
     }
+    const entitiesQuery = query(collection(db, 'projects', projectId, 'entities'));
+
+    const unsubscribe = onSnapshot(entitiesQuery, (querySnapshot) => {
+        const entitiesForSidebar = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as SidebarEntity[];
+        setEntities(entitiesForSidebar);
+    }, (error) => {
+        console.error("Failed to load entities for sidebar from Firestore:", error);
+        setEntities([]);
+    });
+
+    return () => unsubscribe();
   }, [projectId]);
 
   const rootEntities = useMemo(() => entities.filter(e => !e.parentId), [entities]);

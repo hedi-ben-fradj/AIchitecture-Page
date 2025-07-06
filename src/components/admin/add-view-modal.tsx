@@ -40,8 +40,8 @@ export function AddViewModal({ isOpen, onClose, entityId }: AddViewModalProps) {
         },
     });
 
-    const onSubmit = (values: z.infer<typeof formSchema>) => {
-        const newViewHref = addView(entityId, values.name, values.type);
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        const newViewHref = await addView(entityId, values.name, values.type);
         if (newViewHref) {
             onClose();
             form.reset();

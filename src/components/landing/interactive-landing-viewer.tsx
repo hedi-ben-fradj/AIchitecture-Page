@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo, Fragment } from 'react';
@@ -13,6 +12,9 @@ import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
+import { db } from '@/lib/firebase';
+import { collection, doc, getDoc, getDocs, query } from 'firebase/firestore';
+
 
 interface RenderedImageRect {
     x: number;
@@ -126,47 +128,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         return Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
     }, [appliedFilters]);
 
-    const getStorageSafeViewId = (viewId: string) => viewId.replace(/\//g, '__');
-
-    const getStorageKey = useCallback((key: string) => {
-        if (!projectId) return '';
-        return `project-${projectId}-${key}`;
-    }, [projectId]);
-
-    const loadDataFromStorage = useCallback(() => {
-        if (typeof window === 'undefined' || !projectId) return { entities: [], landingPageEntityId: null };
-        try {
-            const projectDataStr = localStorage.getItem(getStorageKey('data'));
-            if (!projectDataStr) return { entities: [], landingPageEntityId: null };
-
-            const projectData = JSON.parse(projectDataStr);
-
-            if (!projectData || !Array.isArray(projectData.entities)) {
-                console.warn("Project data in localStorage is malformed. Resetting state.", projectData);
-                return { entities: [], landingPageEntityId: null };
-            }
-
-            const loadedEntities: Entity[] = projectData.entities.map((entityMeta: any) => ({
-                ...entityMeta,
-                detailedRooms: entityMeta.detailedRooms || [],
-                views: entityMeta.views.map((viewMeta: any) => {
-                    const safeViewId = getStorageSafeViewId(viewMeta.id);
-                    const imageUrl = localStorage.getItem(getStorageKey(`view-image-${safeViewId}`)) || undefined;
-                    const selectionsStr = localStorage.getItem(getStorageKey(`view-selections-${safeViewId}`));
-                    const selections = selectionsStr ? JSON.parse(selectionsStr) : [];
-                    const hotspotsStr = localStorage.getItem(getStorageKey(`view-hotspots-${safeViewId}`));
-                    const hotspots = hotspotsStr ? JSON.parse(hotspotsStr) : [];
-                    return { ...viewMeta, imageUrl, selections, hotspots };
-                })
-            }));
-
-            return { entities: loadedEntities, landingPageEntityId: projectData.landingPageEntityId };
-        } catch (error) {
-            console.error("Failed to load project data from storage", error);
-            return { entities: [], landingPageEntityId: null };
-        }
-    }, [getStorageKey, projectId]);
-
     const findViewInEntities = (entities: Entity[], viewId: string): FullView | null => {
         for (const entity of entities) {
             const view = entity.views.find(v => v.id === viewId);
@@ -178,53 +139,53 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     };
     
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const landingProjectId = window.localStorage.getItem('landing_project_id');
-            setProjectId(landingProjectId);
-
-            const VIEW_TYPES_STORAGE_KEY = 'view_types_list';
-            const storedViewTypes = window.localStorage.getItem(VIEW_TYPES_STORAGE_KEY);
-            if (storedViewTypes) {
-                try {
-                    setViewTypes(JSON.parse(storedViewTypes));
-                } catch (e) {
-                    console.error("Failed to parse view types from storage", e);
-                    setViewTypes(['2d', '360']);
+        const loadInitialData = async () => {
+            try {
+                // 1. Find the landing project ID
+                const globalsDoc = await getDoc(doc(db, 'globals', 'config'));
+                const landingProjectId = globalsDoc.exists() ? globalsDoc.data().landingProjectId : null;
+                
+                if (!landingProjectId) {
+                    console.warn("No landing project is configured.");
+                    setIsLoaded(true);
+                    return;
                 }
-            } else {
-                 setViewTypes(['2d', '360']);
+                setProjectId(landingProjectId);
+
+                // 2. Load project data
+                const projectDoc = await getDoc(doc(db, 'projects', landingProjectId));
+                if (!projectDoc.exists()) {
+                    console.warn(`Landing project with ID "${landingProjectId}" not found.`);
+                    setIsLoaded(true);
+                    return;
+                }
+                const projectData = projectDoc.data();
+                const landingPageEntityId = projectData.landingPageEntityId;
+
+                // 3. Load all entities for that project
+                const entitiesSnapshot = await getDocs(query(collection(db, 'projects', landingProjectId, 'entities')));
+                const loadedEntities = entitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Entity[];
+                setAllEntities(loadedEntities);
+
+                // 4. Set the initial view
+                if (landingPageEntityId) {
+                    const landingEntity = loadedEntities.find(e => e.id === landingPageEntityId);
+                    if (landingEntity && landingEntity.defaultViewId) {
+                        const defaultView = findViewInEntities(loadedEntities, landingEntity.defaultViewId);
+                        setCurrentView(defaultView);
+                        if (defaultView) setCurrentViewType(defaultView.type);
+                        setEntityViews(landingEntity.views);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to load initial data from Firestore:", error);
+            } finally {
+                setIsLoaded(true);
             }
-        }
+        };
+
+        loadInitialData();
     }, []);
-    
-    useEffect(() => {
-        if (typeof window !== 'undefined' && projectId) {
-            setIsLoaded(false);
-            const { entities, landingPageEntityId } = loadDataFromStorage();
-            
-            setAllEntities(entities);
-
-            if (landingPageEntityId) {
-                const landingEntity = entities.find(e => e.id === landingPageEntityId);
-                if (landingEntity && landingEntity.defaultViewId) {
-                    const defaultView = findViewInEntities(entities, landingEntity.defaultViewId);
-                    setCurrentView(defaultView);
-                    if (defaultView) setCurrentViewType(defaultView.type);
-                    setEntityViews(landingEntity.views);
-                }
-            } else {
-                setCurrentView(null);
-                setEntityViews([]);
-            }
-            setViewHistory([]);
-            setIsLoaded(true);
-        } else {
-             setIsLoaded(true);
-             setCurrentView(null);
-             setAllEntities([]);
-             setEntityViews([]);
-        }
-    }, [projectId, loadDataFromStorage]);
     
     useEffect(() => {
         const currentEntityId = currentView?.entityId || null;
@@ -879,7 +840,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                                 className="group cursor-pointer"
                                                 onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
                                             >
-                                                <circle cx={0} cy={0} r={eyeIconSize} className="pointer-events-auto" fill="transparent" />
                                                 <g className="pointer-events-none">
                                                     <path
                                                         d="M0-7C-3.87 0-7-3.87-7-0S-3.87 7 0 7s7-3.87 7-0S3.87-7 0-7zM0 3.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"
@@ -893,6 +853,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                                         transform={`translate(-${eyeIconSize/2}, -${eyeIconSize/2})`}
                                                     />
                                                 </g>
+                                                <circle cx={0} cy={0} r={eyeIconSize} className="pointer-events-auto" fill="transparent" />
                                             </g>
                                         );
                                     })}

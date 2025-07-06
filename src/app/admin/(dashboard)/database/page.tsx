@@ -14,7 +14,9 @@ import { AddEditTemplateModal, type ProjectTemplate } from '@/components/admin/a
 import { useProjectData } from '@/contexts/views-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
-
+import { db } from '@/lib/firebase';
+import { collection, doc, getDocs, updateDoc, deleteDoc, writeBatch, setDoc, query } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 interface Project {
     id: string;
@@ -27,11 +29,6 @@ interface EnrichedEntity extends Entity {
     projectName: string;
     parentName?: string;
 }
-
-const PROJECTS_STORAGE_KEY = 'projects_list';
-const TEMPLATES_STORAGE_KEY = 'project_templates';
-const getStorageSafeViewId = (viewId: string) => viewId.replace(/\//g, '__');
-
 
 export default function DatabasePage() {
     const [allEntities, setAllEntities] = useState<EnrichedEntity[]>([]);
@@ -54,131 +51,102 @@ export default function DatabasePage() {
     const [viewTypeToDelete, setViewTypeToDelete] = useState<string | null>(null);
     const [newViewTypeName, setNewViewTypeName] = useState('');
 
-    // Template states
     const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
     const [templateToEdit, setTemplateToEdit] = useState<ProjectTemplate | Omit<ProjectTemplate, 'id'> | null>(null);
     const [templateToDelete, setTemplateToDelete] = useState<ProjectTemplate | null>(null);
+    const { toast } = useToast();
 
+    const loadData = useCallback(async () => {
+        try {
+            // Load Projects from Firestore
+            const projectsSnapshot = await getDocs(collection(db, 'projects'));
+            const loadedProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
+            setProjects(loadedProjects);
 
-    const loadData = useCallback(() => {
-        if (typeof window !== 'undefined') {
-            try {
-                // Load Projects and Entities
-                const storedProjectsStr = localStorage.getItem(PROJECTS_STORAGE_KEY);
-                const loadedProjects: Project[] = storedProjectsStr ? JSON.parse(storedProjectsStr) : [];
-                setProjects(loadedProjects);
-                
-                let entitiesFromAllProjects: EnrichedEntity[] = [];
-
-                loadedProjects.forEach(project => {
-                    const projectDataStr = localStorage.getItem(`project-${project.id}-data`);
-                    if (projectDataStr) {
-                        const projectData = JSON.parse(projectDataStr);
-                        if (projectData && Array.isArray(projectData.entities)) {
-                             const projectEntities = projectData.entities.map((entity: Entity) => ({
-                                ...entity,
-                                projectId: project.id,
-                                projectName: project.name,
-                            }));
-                            entitiesFromAllProjects.push(...projectEntities);
-                        }
-                    }
-                });
-
-                const enrichedEntitiesWithParents = entitiesFromAllProjects.map(entity => {
-                    if (entity.parentId) {
-                        const parent = entitiesFromAllProjects.find(p => p.id === entity.parentId);
-                        return { ...entity, parentName: parent?.name || 'N/A' };
-                    }
-                    return entity;
-                });
-
-                setAllEntities(enrichedEntitiesWithParents);
-
-                // Load Templates
-                const storedTemplatesStr = localStorage.getItem(TEMPLATES_STORAGE_KEY);
-                const loadedTemplates: ProjectTemplate[] = storedTemplatesStr ? JSON.parse(storedTemplatesStr) : [];
-                setTemplates(loadedTemplates);
-
-            } catch (error) {
-                console.error("Failed to load data from localStorage", error);
-                setAllEntities([]);
-                setProjects([]);
-                setTemplates([]);
+            // Load all entities from all projects
+            let entitiesFromAllProjects: EnrichedEntity[] = [];
+            for (const project of loadedProjects) {
+                const entitiesSnapshot = await getDocs(collection(db, 'projects', project.id, 'entities'));
+                const projectEntities = entitiesSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    projectId: project.id,
+                    projectName: project.name,
+                })) as EnrichedEntity[];
+                entitiesFromAllProjects.push(...projectEntities);
             }
+
+            const enrichedEntitiesWithParents = entitiesFromAllProjects.map(entity => {
+                if (entity.parentId) {
+                    const parent = entitiesFromAllProjects.find(p => p.id === entity.parentId);
+                    return { ...entity, parentName: parent?.name || 'N/A' };
+                }
+                return entity;
+            });
+            setAllEntities(enrichedEntitiesWithParents);
+
+            // Load Templates from Firestore
+            const templatesSnapshot = await getDocs(collection(db, 'project_templates'));
+            const loadedTemplates = templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectTemplate[];
+            setTemplates(loadedTemplates);
+        } catch (error) {
+            console.error("Failed to load data from Firestore", error);
+            toast({ title: "Error", description: "Failed to load database content.", variant: "destructive" });
         }
-    }, []);
+    }, [toast]);
 
     useEffect(() => {
-        loadData();
-        setIsMounted(true);
+        loadData().finally(() => setIsMounted(true));
     }, [loadData]);
 
-    const handleUpdateEntity = (entityId: string, dataToUpdate: Partial<Entity>) => {
+    const handleUpdateEntity = async (entityId: string, dataToUpdate: Partial<Entity>) => {
         const entity = allEntities.find(e => e.id === entityId);
-        if (!entity || typeof window === 'undefined') return;
+        if (!entity) return;
 
-        const projectDataStr = localStorage.getItem(`project-${entity.projectId}-data`);
-        if (!projectDataStr) return;
-        
         try {
-            const projectData = JSON.parse(projectDataStr);
-            const updatedEntities = projectData.entities.map((e: Entity) => 
-                e.id === entityId ? { ...e, ...dataToUpdate } : e
-            );
-            projectData.entities = updatedEntities;
-            
-            localStorage.setItem(`project-${entity.projectId}-data`, JSON.stringify(projectData));
-            loadData();
+            const entityRef = doc(db, 'projects', entity.projectId, 'entities', entityId);
+            await updateDoc(entityRef, dataToUpdate);
+            await loadData(); // Reload all data
             setEntityToEdit(null);
         } catch(error) {
             console.error("Failed to update entity:", error);
+            toast({ title: "Error", description: "Could not update the entity.", variant: "destructive" });
         }
     };
     
-    const confirmDelete = () => {
-        if (!entityToDelete || typeof window === 'undefined') return;
+    const confirmDelete = async () => {
+        if (!entityToDelete) return;
 
-        const projectDataStr = localStorage.getItem(`project-${entityToDelete.projectId}-data`);
-        if (!projectDataStr) return;
-        
         try {
-            const projectData = JSON.parse(projectDataStr);
-            
-            const entitiesToDelete = new Set<string>([entityToDelete.id]);
-            let changed = true;
-            while(changed) {
-                changed = false;
-                const currentSize = entitiesToDelete.size;
-                projectData.entities.forEach((e: Entity) => {
-                    if (e.parentId && entitiesToDelete.has(e.parentId)) {
-                        entitiesToDelete.add(e.id);
+            const getDescendantIds = (startId: string, all: EnrichedEntity[]): string[] => {
+                const descendants = new Set<string>();
+                const queue = [startId];
+                while(queue.length > 0) {
+                    const currentId = queue.shift()!;
+                    const children = all.filter(e => e.parentId === currentId);
+                    for (const child of children) {
+                        descendants.add(child.id);
+                        queue.push(child.id);
                     }
-                });
-                if (entitiesToDelete.size > currentSize) {
-                    changed = true;
                 }
-            }
+                return Array.from(descendants);
+            };
             
-            const entitiesToDeleteArray = Array.from(entitiesToDelete);
-            
-            entitiesToDeleteArray.forEach(idToDelete => {
-                const entityData = projectData.entities.find((e: Entity) => e.id === idToDelete);
-                if(entityData?.views) {
-                    entityData.views.forEach((view: any) => {
-                        localStorage.removeItem(`project-${entityToDelete.projectId}-view-image-${getStorageSafeViewId(view.id)}`);
-                        localStorage.removeItem(`project-${entityToDelete.projectId}-view-selections-${getStorageSafeViewId(view.id)}`);
-                    });
-                }
+            const allIdsToDelete = [entityToDelete.id, ...getDescendantIds(entityToDelete.id, allEntities)];
+            const batch = writeBatch(db);
+
+            allIdsToDelete.forEach(id => {
+                const entityRef = doc(db, 'projects', entityToDelete.projectId, 'entities', id);
+                batch.delete(entityRef);
             });
             
-            projectData.entities = projectData.entities.filter((e: Entity) => !entitiesToDelete.has(e.id));
-            
-            localStorage.setItem(`project-${entityToDelete.projectId}-data`, JSON.stringify(projectData));
-            loadData();
+            await batch.commit();
+            await loadData();
             setEntityToDelete(null);
+            toast({ title: "Success", description: "Entity and its children have been deleted." });
         } catch (error) {
             console.error("Failed to delete entity:", error);
+            toast({ title: "Error", description: "Could not delete the entity.", variant: "destructive" });
         }
     };
 
@@ -210,36 +178,40 @@ export default function DatabasePage() {
         }
     };
 
-    const handleSaveTemplate = (templateData: Omit<ProjectTemplate, 'id'>, id?: string) => {
-        setTemplates(prev => {
-            let updatedTemplates;
-            if (id) {
-                updatedTemplates = prev.map(t => t.id === id ? { ...t, ...templateData, id } : t);
-            } else {
+    const handleSaveTemplate = async (templateData: Omit<ProjectTemplate, 'id'>, id?: string) => {
+        try {
+            let templateId = id;
+            if (!templateId) {
                 const newId = templateData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-                 if (prev.some(t => t.id === newId)) {
-                    alert('A template with a similar name already exists, generating the same ID.');
-                    return prev;
+                if (templates.some(t => t.id === newId)) {
+                    toast({ title: "Error", description: "A template with a similar name already exists.", variant: "destructive" });
+                    return;
                 }
-                const newTemplate: ProjectTemplate = { id: newId, ...templateData };
-                updatedTemplates = [...prev, newTemplate];
+                templateId = newId;
             }
-            localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updatedTemplates));
-            return updatedTemplates;
-        });
-        setTemplateToEdit(null);
+            const templateRef = doc(db, 'project_templates', templateId);
+            await setDoc(templateRef, templateData, { merge: !!id });
+            await loadData();
+            setTemplateToEdit(null);
+            toast({ title: "Success", description: "Template saved." });
+        } catch (error) {
+            console.error("Failed to save template:", error);
+            toast({ title: "Error", description: "Could not save the template.", variant: "destructive" });
+        }
     };
 
-    const confirmDeleteTemplate = () => {
+    const confirmDeleteTemplate = async () => {
         if (!templateToDelete) return;
-        setTemplates(prev => {
-            const updatedTemplates = prev.filter(t => t.id !== templateToDelete.id);
-            localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updatedTemplates));
-            return updatedTemplates;
-        });
-        setTemplateToDelete(null);
+        try {
+            await deleteDoc(doc(db, 'project_templates', templateToDelete.id));
+            await loadData();
+            setTemplateToDelete(null);
+            toast({ title: "Success", description: "Template deleted." });
+        } catch (error) {
+            console.error("Failed to delete template:", error);
+            toast({ title: "Error", description: "Could not delete the template.", variant: "destructive" });
+        }
     };
-
 
     const filteredEntities = useMemo(() => {
         return allEntities
