@@ -5,14 +5,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Save, ArrowLeft } from 'lucide-react';
+import { Upload, Save, ArrowLeft, Eye, Edit, Trash2 } from 'lucide-react';
 import ImageEditor, { type ImageEditorRef, type Hotspot } from '@/components/admin/image-editor';
 import { useProjectData, type EntityType } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
 import HotspotDetailsModal from './hotspot-details-modal';
 import { Viewer, TypedEvent } from '@photo-sphere-viewer/core';
 import type { ClickData } from '@photo-sphere-viewer/core';
-import { MarkersPlugin, Marker } from '@photo-sphere-viewer/markers-plugin';
+import { MarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -22,16 +22,16 @@ interface ViewEditorClientProps {
   viewId: string;
 }
 
-// SVG for the hotspot marker
-const hotspotIconSvg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye drop-shadow-lg">
+const getHotspotSvg = (color: string) => `
+<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye drop-shadow-lg">
   <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-  <circle cx="12" cy="12" r="3"/>
+  <circle cx="12" cy="12" r="3" fill="${color}" fill-opacity="0.3"/>
 </svg>
 `;
 
+
 export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEditorClientProps) {
-  const { getView, updateViewImage, updateViewSelections, updateViewHotspots, addEntity, getEntity } = useProjectData();
+  const { getView, updateViewImage, updateViewSelections, updateViewHotspots, addEntity, getEntity, entities: allEntities } = useProjectData();
   const router = useRouter();
   const { toast } = useToast();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
@@ -46,8 +46,11 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
   // State for 360 viewer
   const viewerContainerRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<Viewer | null>(null);
   const [markersPlugin, setMarkersPlugin] = useState<MarkersPlugin | null>(null);
   const [viewerHotspots, setViewerHotspots] = useState<Hotspot[]>([]);
+  const [selectedHotspotId, setSelectedHotspotId] = useState<number | null>(null);
+
 
   useEffect(() => {
     if (!view) {
@@ -60,6 +63,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     } else {
       setImageToEdit(null);
     }
+    setSelectedHotspotId(null);
   }, [view, router, projectId, entityId]);
 
   // Effect to manage the 360 viewer lifecycle
@@ -68,7 +72,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         return;
     }
 
-    const viewer = new Viewer({
+    viewerRef.current = new Viewer({
         container: viewerContainerRef.current,
         panorama: imageToEdit,
         caption: view.name,
@@ -77,13 +81,17 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         plugins: [[MarkersPlugin, {}]],
     });
 
-    const currentMarkersPlugin = viewer.getPlugin(MarkersPlugin);
+    const currentMarkersPlugin = viewerRef.current.getPlugin(MarkersPlugin);
     if (currentMarkersPlugin) {
       setMarkersPlugin(currentMarkersPlugin);
 
       const findViewName = (h: Hotspot) => {
-        const targetEntity = getEntity(h.linkedViewId.split('__')[0]);
-        return targetEntity?.views.find(v => v.id === h.linkedViewId)?.name || 'Link';
+        if (!h.linkedViewId) return 'Unlinked Hotspot';
+        for (const entity of allEntities) {
+            const foundView = entity.views.find(v => v.id === h.linkedViewId);
+            if (foundView) return foundView.name;
+        }
+        return 'Link';
       };
 
       const initialMarkers = (view.hotspots || []).map(hotspot => ({
@@ -92,7 +100,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             yaw: (hotspot.x - 0.5) * 2 * Math.PI, 
             pitch: (hotspot.y - 0.5) * -Math.PI 
           },
-          html: hotspotIconSvg,
+          html: getHotspotSvg('white'),
           size: { width: 50, height: 50 },
           anchor: 'center center',
           tooltip: findViewName(hotspot),
@@ -100,37 +108,54 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       }));
       currentMarkersPlugin.setMarkers(initialMarkers);
 
-      viewer.addEventListener('click', ((e: TypedEvent<Viewer, ClickData>) => {
-        const { yaw, pitch } = e.data;
-        if (!yaw || !pitch) return;
-        
-        const newHotspot: Hotspot = {
-          id: Date.now(),
-          x: (yaw / (2 * Math.PI)) + 0.5,
-          y: (pitch / -Math.PI) + 0.5,
-          linkedViewId: '',
-        };
-        setHotspotToEdit(newHotspot);
-        setIsHotspotModalOpen(true);
+      viewerRef.current.addEventListener('click', ((e: TypedEvent<Viewer, ClickData>) => {
+        if (!e.data.marker) {
+          setSelectedHotspotId(null);
+        }
       }) as (evt: TypedEvent<Viewer, any>) => void);
 
       currentMarkersPlugin.addEventListener('select-marker', (e) => {
-        setHotspotToEdit(e.marker.data as Hotspot);
-        setIsHotspotModalOpen(true);
+        setSelectedHotspotId(e.marker.data.id as number);
       });
     }
 
     return () => {
-      viewer.destroy();
+      viewerRef.current?.destroy();
+      viewerRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view?.type, view?.name, view?.hotspots, imageToEdit, getEntity]);
+
+    useEffect(() => {
+        if (!markersPlugin) return;
+
+        viewerHotspots.forEach(hotspot => {
+            markersPlugin.updateMarker({
+                id: String(hotspot.id),
+                html: getHotspotSvg('white'),
+            });
+        });
+    
+        if (selectedHotspotId) {
+            markersPlugin.updateMarker({
+                id: String(selectedHotspotId),
+                html: getHotspotSvg('#facc15'), // yellow-400
+            });
+        }
+    }, [selectedHotspotId, markersPlugin, viewerHotspots]);
 
 
   const handleSaveHotspot = (hotspotData: { linkedViewId: string }) => {
     if (hotspotToEdit && markersPlugin) {
       const updatedHotspot = { ...hotspotToEdit, ...hotspotData };
-      const findViewName = (h: Hotspot) => getEntity(h.linkedViewId.split('__')[0])?.views.find(v => v.id === h.linkedViewId)?.name || 'Link';
+      const findViewName = (h: Hotspot) => {
+        if (!h.linkedViewId) return 'Unlinked Hotspot';
+        for (const entity of allEntities) {
+            const foundView = entity.views.find(v => v.id === h.linkedViewId);
+            if (foundView) return foundView.name;
+        }
+        return 'Link';
+      };
       
       const existingIndex = viewerHotspots.findIndex(h => h.id === updatedHotspot.id);
 
@@ -149,7 +174,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 yaw: (updatedHotspot.x - 0.5) * 2 * Math.PI, 
                 pitch: (updatedHotspot.y - 0.5) * -Math.PI 
             },
-            html: hotspotIconSvg,
+            html: getHotspotSvg('white'),
             size: { width: 50, height: 50 },
             anchor: 'center center',
             tooltip: findViewName(updatedHotspot),
@@ -159,6 +184,35 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       toast({ title: 'Hotspot saved!' });
       setHotspotToEdit(null);
     }
+  };
+
+  const handleAddNewHotspot = () => {
+    if (!viewerRef.current) return;
+    const position = viewerRef.current.getPosition();
+    const newHotspot: Hotspot = {
+        id: Date.now(),
+        x: (position.yaw / (2 * Math.PI)) + 0.5,
+        y: (position.pitch / -Math.PI) + 0.5,
+        linkedViewId: '',
+    };
+    setHotspotToEdit(newHotspot);
+    setIsHotspotModalOpen(true);
+  };
+
+  const handleEditSelectedHotspot = () => {
+    if (!selectedHotspotId) return;
+    const spotToEdit = viewerHotspots.find(h => h.id === selectedHotspotId);
+    if (spotToEdit) {
+        setHotspotToEdit(spotToEdit);
+        setIsHotspotModalOpen(true);
+    }
+  };
+
+  const handleDeleteSelectedHotspot = () => {
+    if (!selectedHotspotId || !markersPlugin) return;
+    markersPlugin.removeMarker(String(selectedHotspotId));
+    setViewerHotspots(prev => prev.filter(h => h.id !== selectedHotspotId));
+    setSelectedHotspotId(null);
   };
   
   if (!view || !entity) {
@@ -293,8 +347,22 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
            </div>
            {view.type === '360' ? (
               <div>
+                <div className="flex gap-2 mb-4">
+                    <Button onClick={handleAddNewHotspot} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Eye className="mr-2 h-4 w-4" />
+                        New Hotspot
+                    </Button>
+                    <Button variant="outline" onClick={handleEditSelectedHotspot} disabled={!selectedHotspotId}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit Hotspot
+                    </Button>
+                    <Button variant="destructive" onClick={handleDeleteSelectedHotspot} disabled={!selectedHotspotId}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                    </Button>
+                </div>
                 <div ref={viewerContainerRef} className="w-full h-[70vh] relative bg-black rounded-lg border border-neutral-600" />
-                <p className="text-center text-sm text-neutral-400 mt-2">Click on the view to add a hotspot. Click an existing hotspot to edit it.</p>
+                <p className="text-center text-sm text-neutral-400 mt-2">Click on a hotspot to select it, or use the buttons above.</p>
               </div>
            ) : (
             <ImageEditor
