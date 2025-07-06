@@ -358,6 +358,30 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             if (image) image.removeEventListener('load', calculateRect);
         };
     }, [calculateRect]);
+
+    const handleHotspotNavigate = useCallback((viewId: string) => {
+        if (!viewId) return;
+        const newView = findViewInEntities(allEntities, viewId);
+        
+        if (newView) {
+            if (currentView) {
+                setViewHistory(prev => [...prev, currentView.id]);
+            }
+            setCurrentViewType(newView.type);
+            setCurrentView(newView);
+            const parentEntity = allEntities.find(e => e.id === newView.entityId);
+            if (parentEntity) {
+                setEntityViews(parentEntity.views);
+            }
+            closeDetails();
+            setHoveredSelectionId(null);
+            setRenderedImageRect(null);
+            setTimeout(calculateRect, 0);
+        } else {
+             console.warn(`Could not find the view with ID "${viewId}".`);
+             closeDetails();
+        }
+    }, [allEntities, currentView, closeDetails, calculateRect]);
     
     // Effect to manage the 360 viewer lifecycle
     useEffect(() => {
@@ -491,30 +515,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             closeDetails();
         }
     };
-
-    const handleHotspotNavigate = useCallback((viewId: string) => {
-        if (!viewId) return;
-        const newView = findViewInEntities(allEntities, viewId);
-        
-        if (newView) {
-            if (currentView) {
-                setViewHistory(prev => [...prev, currentView.id]);
-            }
-            setCurrentViewType(newView.type);
-            setCurrentView(newView);
-            const parentEntity = allEntities.find(e => e.id === newView.entityId);
-            if (parentEntity) {
-                setEntityViews(parentEntity.views);
-            }
-            closeDetails();
-            setHoveredSelectionId(null);
-            setRenderedImageRect(null);
-            setTimeout(calculateRect, 0);
-        } else {
-             console.warn(`Could not find the view with ID "${viewId}".`);
-             closeDetails();
-        }
-    }, [allEntities, currentView, closeDetails, calculateRect]);
 
     const handleBack = () => {
         if (viewHistory.length === 0) return;
