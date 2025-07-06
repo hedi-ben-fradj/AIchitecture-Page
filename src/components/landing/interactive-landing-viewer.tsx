@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo, Fragment } from 'react';
@@ -10,6 +11,7 @@ import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, Sli
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Slider } from '@/components/ui/slider';
 
 interface RenderedImageRect {
     x: number;
@@ -109,6 +111,9 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [planOverlayView, setPlanOverlayView] = useState<View | null>(null);
     const [isPlanExpanded, setIsPlanExpanded] = useState(false);
     const [planOverlayImageRect, setPlanOverlayImageRect] = useState<RenderedImageRect | null>(null);
+    const [volume, setVolume] = useState(0.5);
+    const [isVolumeControlVisible, setIsVolumeControlVisible] = useState(false);
+
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
@@ -358,7 +363,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             if (image) image.removeEventListener('load', calculateRect);
         };
     }, [calculateRect]);
-
+    
     const handleHotspotNavigate = useCallback((viewId: string) => {
         if (!viewId) return;
         const newView = findViewInEntities(allEntities, viewId);
@@ -382,7 +387,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
              closeDetails();
         }
     }, [allEntities, currentView, closeDetails, calculateRect]);
-    
+
     // Effect to manage the 360 viewer lifecycle
     useEffect(() => {
         if (currentViewType !== '360' || !currentView?.imageUrl || !viewerContainerRef.current) {
@@ -435,17 +440,31 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         };
     }, [currentView, currentViewType, allEntities, handleHotspotNavigate]);
     
+    const handleVolumeChange = (value: number[]) => {
+        const newVolume = value[0];
+        setVolume(newVolume);
+        if (audioRef.current) {
+            audioRef.current.volume = newVolume;
+            if (newVolume > 0 && isMuted) {
+                setIsMuted(false);
+            } else if (newVolume === 0 && !isMuted) {
+                setIsMuted(true);
+            }
+        }
+    };
+    
     // Effect to control audio playback
     useEffect(() => {
         const audio = audioRef.current;
         if (audio) {
             if (currentViewType === '360') {
+                audio.volume = volume;
                 // Let user interaction (unmuting) start the playback
             } else {
                 audio.pause();
             }
         }
-    }, [currentViewType]);
+    }, [currentViewType, volume]);
 
     // Effect to handle muting/unmuting
     useEffect(() => {
@@ -712,7 +731,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     
     return (
  <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={closeDetails}>
-    <audio ref={audioRef} src="https://cdn.pixabay.com/audio/2022/10/18/audio_731a547a8a.mp3" loop />
+    <audio ref={audioRef} src="/assets/audio.mp3" loop />
  {entityViews.some(view => view.type === '360') && entityViews.some(view => view.type !== '360') && (
  <div className="absolute top-4 right-4 z-50 flex items-center bg-black/50 text-white rounded-full p-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleViewType(); }}>
  <span className={cn("px-3 py-1 text-sm font-medium flex items-center gap-1", currentViewType !== '360' && "bg-white text-black rounded-full")}>
@@ -749,28 +768,48 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             <div className="absolute bottom-20 left-4 z-50 flex flex-col gap-3">
                 <TooltipProvider>
                     {currentViewType === '360' && (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        const audio = audioRef.current;
-                                        if (audio && isMuted && audio.paused) {
-                                            audio.play().catch(error => console.warn("Audio play failed:", error));
-                                        }
-                                        setIsMuted(!isMuted);
-                                    }}
-                                >
-                                    {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">
-                                <p>{isMuted ? 'Unmute' : 'Mute'}</p>
-                            </TooltipContent>
-                        </Tooltip>
+                         <div
+                            className="relative"
+                            onMouseEnter={() => setIsVolumeControlVisible(true)}
+                            onMouseLeave={() => setIsVolumeControlVisible(false)}
+                        >
+                            {isVolumeControlVisible && (
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 p-4 pt-2 pb-2 bg-black/50 rounded-full backdrop-blur-sm">
+                                    <Slider
+                                        orientation="vertical"
+                                        value={[volume]}
+                                        max={1}
+                                        step={0.05}
+                                        onValueChange={handleVolumeChange}
+                                        className="h-24"
+                                    />
+                                </div>
+                            )}
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const audio = audioRef.current;
+                                            if (audio) {
+                                                if(isMuted && audio.paused) {
+                                                    audio.play().catch(error => console.warn("Audio play failed:", error));
+                                                }
+                                                setIsMuted(!isMuted);
+                                            }
+                                        }}
+                                    >
+                                        {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="right">
+                                    <p>{isMuted ? 'Unmute' : 'Mute'}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
                     )}
 
                     {entityViews.some(view => view.type.toLowerCase() === '2d plan') && (
@@ -844,7 +883,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                                 className="group cursor-pointer"
                                                 onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
                                             >
-                                                <circle cx={0} cy={0} r={eyeIconSize} fill="transparent" />
+                                                <circle cx={0} cy={0} r={eyeIconSize} className="pointer-events-auto" fill="transparent" />
                                                 <g className="pointer-events-none">
                                                     <path
                                                         d="M0-7C-3.87 0-7-3.87-7-0S-3.87 7 0 7s7-3.87 7-0S3.87-7 0-7zM0 3.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"
