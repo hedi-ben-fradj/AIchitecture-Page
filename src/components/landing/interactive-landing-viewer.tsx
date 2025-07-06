@@ -6,10 +6,12 @@ import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ReactPhotoSphereViewer } from 'react-photo-sphere-viewer'
+import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
 import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize, Eye } from 'lucide-react'; // Importing specific icons
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import "@photo-sphere-viewer/markers-plugin/index.css";
 
 interface RenderedImageRect {
     x: number;
@@ -107,6 +109,36 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const imageRef = useRef<HTMLImageElement>(null);
     const prevEntityIdRef = useRef<string | null>(null);
     const planOverlayContainerRef = useRef<HTMLDivElement>(null);
+    const photoSphereRef = useRef<HTMLDivElement>(null);
+
+    const handleReady = (instance : any) => {
+        const markersPlugs = instance.getPlugin(MarkersPlugin);
+        if (!markersPlugs) return;
+        console.log(markersPlugs);
+        markersPlugs.addEventListener("select-marker", () => {
+          console.log("asd");
+        });
+      };
+
+    const plugins = [
+        [
+          MarkersPlugin,
+          {
+            // list of markers
+            markers: [
+              {
+                // image marker that opens the panel when clicked
+                id: "image",
+                position: { yaw: "95deg", pitch: "16deg" },
+                image: "assets/pin-red.png",
+                anchor: "bottom center",
+                size: { width: 32, height: 32 },
+                tooltip: "TESTING",
+              },
+            ],
+          },
+        ]
+      ];
 
     const isFilterApplied = useMemo(() => {
         return Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
@@ -810,10 +842,13 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
             {currentViewType === '360' ?
                 <ReactPhotoSphereViewer
+                  ref={photoSphereRef}
                   src={currentView.imageUrl} // Path to your 360 image
                   alt={currentView.name}
                   width="100%"
                   height="100%"
+                  onReady={handleReady}
+                  plugins={plugins}
                 />
                 :
                 <Image ref={imageRef} src={currentView.imageUrl} alt={currentView.name} layout="fill" objectFit="contain" onLoad={calculateRect} key={currentView.id} className="transition-opacity duration-500" style={{ opacity: renderedImageRect ? 1 : 0 }} />
