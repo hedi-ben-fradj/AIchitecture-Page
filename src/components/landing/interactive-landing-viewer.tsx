@@ -112,13 +112,32 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const photoSphereRef = useRef<HTMLDivElement>(null);
 
     const handleReady = (instance : any) => {
-        const markersPlugs = instance.getPlugin(MarkersPlugin);
-        if (!markersPlugs) return;
-        console.log(markersPlugs);
-        markersPlugs.addEventListener("select-marker", () => {
-          console.log("asd");
-        });
-      };
+ if (currentViewType === '360' && currentView?.hotspots) {
+ const markersPlugs = instance.getPlugin(MarkersPlugin);
+ if (markersPlugs) {
+ markersPlugs.setMarkers(currentView.hotspots.map(hotspot => ({
+                        // Map 2D hotspot coordinates (relative to image) to 360 position
+                        // This is a simplified mapping; a true mapping requires understanding
+                        // the panorama projection. A basic assumption here is that the X coordinate
+                        // in the 2D image roughly corresponds to the yaw rotation in 360.
+                        // Y coordinate mapping is more complex, but we can try a simple linear mapping
+                        // based on image height, assuming the horizon is near the vertical center.
+                        id: hotspot.id, // Keep the original hotspot ID
+                        // Simplified mapping: X -> Yaw, Y -> Pitch (adjusting for origin at image center)
+ position: { yaw: hotspot.rotation ? `${hotspot.rotation}deg` : '0deg', pitch: '0deg' }, // Assuming pitch is always 0 for navigation hotspots
+ image: "assets/pin-red.png", // Use a default hotspot image
+ anchor: "bottom center",
+ size: { width: 64, height: 64 },
+ data: { linkedViewId: hotspot.linkedViewId },
+ })));
+ markersPlugs.addEventListener("select-marker", (e: any) => {
+ if (e.marker?.data?.linkedViewId) {
+ handleHotspotNavigate(e.marker.data.linkedViewId);
+ }
+ });
+ }
+ }
+    };
 
     const plugins = [
         [
@@ -126,19 +145,10 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
           {
             // list of markers
             markers: [
-              {
-                // image marker that opens the panel when clicked
-                id: "image",
-                position: { yaw: "95deg", pitch: "16deg" },
-                image: "assets/pin-red.png",
-                anchor: "bottom center",
-                size: { width: 32, height: 32 },
-                tooltip: "TESTING",
-              },
             ],
           },
         ]
-      ];
+ ];
 
     const isFilterApplied = useMemo(() => {
         return Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
