@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo, Fragment } from 'react';
@@ -774,7 +775,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                             onMouseLeave={() => setIsVolumeControlVisible(false)}
                         >
                             {isVolumeControlVisible && (
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 p-4 pt-2 pb-2 bg-black/50 rounded-full backdrop-blur-sm">
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-4 pt-2 pb-2 bg-black/50 rounded-full backdrop-blur-sm">
                                     <Slider
                                         orientation="vertical"
                                         value={[volume]}
