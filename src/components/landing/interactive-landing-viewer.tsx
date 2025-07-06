@@ -5,13 +5,12 @@ import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo, Fra
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ReactPhotoSphereViewer } from 'react-photo-sphere-viewer'
+import { Viewer } from '@photo-sphere-viewer/core';
 import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
 import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize, Eye } from 'lucide-react'; // Importing specific icons
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import "@photo-sphere-viewer/markers-plugin/index.css";
 
 interface RenderedImageRect {
     x: number;
@@ -82,6 +81,13 @@ export interface Entity {
   detailedRooms?: RoomDetail[];
 }
 
+const getHotspotSvg = (color: string) => `
+<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye drop-shadow-lg">
+  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+  <circle cx="12" cy="12" r="3" fill="${color}" fill-opacity="0.3"/>
+</svg>
+`;
+
 
 export default function InteractiveLandingViewer({ setActiveView }: { setActiveView: (view: string) => void }) {
     const [currentView, setCurrentView] = useState<FullView | null>(null);
@@ -109,46 +115,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const imageRef = useRef<HTMLImageElement>(null);
     const prevEntityIdRef = useRef<string | null>(null);
     const planOverlayContainerRef = useRef<HTMLDivElement>(null);
-    const photoSphereRef = useRef<HTMLDivElement>(null);
-
-    const handleReady = (instance : any) => {
- if (currentViewType === '360' && currentView?.hotspots) {
- const markersPlugs = instance.getPlugin(MarkersPlugin);
- if (markersPlugs) {
- markersPlugs.setMarkers(currentView.hotspots.map(hotspot => ({
-                        // Map 2D hotspot coordinates (relative to image) to 360 position
-                        // This is a simplified mapping; a true mapping requires understanding
-                        // the panorama projection. A basic assumption here is that the X coordinate
-                        // in the 2D image roughly corresponds to the yaw rotation in 360.
-                        // Y coordinate mapping is more complex, but we can try a simple linear mapping
-                        // based on image height, assuming the horizon is near the vertical center.
-                        id: hotspot.id, // Keep the original hotspot ID
-                        // Simplified mapping: X -> Yaw, Y -> Pitch (adjusting for origin at image center)
- position: { yaw: hotspot.rotation ? `${hotspot.rotation}deg` : '0deg', pitch: '0deg' }, // Assuming pitch is always 0 for navigation hotspots
- image: "assets/pin-red.png", // Use a default hotspot image
- anchor: "bottom center",
- size: { width: 64, height: 64 },
- data: { linkedViewId: hotspot.linkedViewId },
- })));
- markersPlugs.addEventListener("select-marker", (e: any) => {
- if (e.marker?.data?.linkedViewId) {
- handleHotspotNavigate(e.marker.data.linkedViewId);
- }
- });
- }
- }
-    };
-
-    const plugins = [
-        [
-          MarkersPlugin,
-          {
-            // list of markers
-            markers: [
-            ],
-          },
-        ]
- ];
+    const viewerContainerRef = useRef<HTMLDivElement>(null);
 
     const isFilterApplied = useMemo(() => {
         return Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
@@ -391,6 +358,59 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             if (image) image.removeEventListener('load', calculateRect);
         };
     }, [calculateRect]);
+    
+    // Effect to manage the 360 viewer lifecycle
+    useEffect(() => {
+        if (currentViewType !== '360' || !currentView?.imageUrl || !viewerContainerRef.current) {
+            return;
+        }
+
+        const viewer = new Viewer({
+            container: viewerContainerRef.current,
+            panorama: currentView.imageUrl,
+            caption: currentView.name,
+            touchmoveTwoFingers: true,
+            navbar: ['zoom', 'move', 'caption', 'fullscreen'],
+            plugins: [[MarkersPlugin, {}]],
+        });
+
+        const markersPlugin = viewer.getPlugin(MarkersPlugin);
+        if (markersPlugin) {
+            const findViewName = (h: Hotspot) => {
+                if (!h.linkedViewId) return 'Unlinked Hotspot';
+                for (const entity of allEntities) {
+                    const foundView = entity.views.find(v => v.id === h.linkedViewId);
+                    if (foundView) return foundView.name;
+                }
+                return 'Link';
+            };
+
+            const initialMarkers = (currentView.hotspots || []).map(hotspot => ({
+                id: String(hotspot.id),
+                position: {
+                    yaw: (hotspot.x - 0.5) * 2 * Math.PI,
+                    pitch: (hotspot.y - 0.5) * -Math.PI
+                },
+                html: getHotspotSvg('white'),
+                size: { width: 50, height: 50 },
+                anchor: 'center center',
+                tooltip: findViewName(hotspot),
+                data: { linkedViewId: hotspot.linkedViewId },
+            }));
+            markersPlugin.setMarkers(initialMarkers);
+
+            markersPlugin.addEventListener('select-marker', (e) => {
+                if (e.marker.data?.linkedViewId) {
+                    handleHotspotNavigate(e.marker.data.linkedViewId);
+                }
+            });
+        }
+
+        return () => {
+            viewer.destroy();
+        };
+    }, [currentView, currentViewType, allEntities, handleHotspotNavigate]);
+
 
     const handleSelectionClick = (e: MouseEvent, selection: Polygon) => {
         e.stopPropagation();
@@ -472,7 +492,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         }
     };
 
-    const handleHotspotNavigate = (viewId: string) => {
+    const handleHotspotNavigate = useCallback((viewId: string) => {
         if (!viewId) return;
         const newView = findViewInEntities(allEntities, viewId);
         
@@ -494,7 +514,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
              console.warn(`Could not find the view with ID "${viewId}".`);
              closeDetails();
         }
-    };
+    }, [allEntities, currentView, closeDetails, calculateRect]);
 
     const handleBack = () => {
         if (viewHistory.length === 0) return;
@@ -851,15 +871,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
 
             {currentViewType === '360' ?
-                <ReactPhotoSphereViewer
-                  ref={photoSphereRef}
-                  src={currentView.imageUrl} // Path to your 360 image
-                  alt={currentView.name}
-                  width="100%"
-                  height="100%"
-                  onReady={handleReady}
-                  plugins={plugins}
-                />
+                <div ref={viewerContainerRef} key={currentView.id} className="w-full h-full" />
                 :
                 <Image ref={imageRef} src={currentView.imageUrl} alt={currentView.name} layout="fill" objectFit="contain" onLoad={calculateRect} key={currentView.id} className="transition-opacity duration-500" style={{ opacity: renderedImageRect ? 1 : 0 }} />
             }
