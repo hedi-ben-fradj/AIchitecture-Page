@@ -809,13 +809,13 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         const absX = hotspot.x * planOverlayImageRect.width;
                                         const absY = hotspot.y * planOverlayImageRect.height;
                                         
-                                        const rotation = hotspot.rotation || 0;
-                                        const fov = hotspot.fov || 60;
-                                        
                                         const eyeIconSize = isPlanExpanded ? 48 : 24;
                                         const innerRadius = eyeIconSize * 0.4;
                                         const outerRadius = eyeIconSize * 0.7;
 
+                                        const rotation = hotspot.rotation || 0;
+                                        const fov = hotspot.fov || 60;
+                                        
                                         const rotationRad = rotation * (Math.PI / 180);
                                         const fovRad = fov * (Math.PI / 180);
 
@@ -850,6 +850,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                                         transform={`translate(-${eyeIconSize/2}, -${eyeIconSize/2})`}
                                                     />
                                                 </g>
+                                                <circle cx="0" cy="0" r={outerRadius} fill="transparent" />
                                             </g>
                                         );
                                     })}
@@ -1026,6 +1027,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         transform="translate(-28, -28)"
                                     />
                                 </g>
+                                <circle cx="0" cy="0" r="35" fill="transparent" />
                             </g>
                         );
                     })}
