@@ -130,6 +130,9 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       currentMarkersPlugin.setMarkers(initialMarkers);
 
       currentMarkersPlugin.addEventListener('select-marker', (e) => {
+        if (e.marker.data.id !== selectedHotspotIdRef.current) {
+            toast({ title: 'Hotspot Selected', description: 'Click anywhere to move it, or click "Edit Hotspot".' });
+        }
         setIsPlacingHotspot(false);
         setSelectedHotspotId(e.marker.data.id as number);
       });
@@ -230,8 +233,9 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         tooltip: findViewName(updatedHotspot),
       });
 
-      toast({ title: 'Hotspot saved!' });
+      setSelectedHotspotId(null);
       setHotspotToEdit(null);
+      toast({ title: 'Hotspot saved!' });
     }
   };
 
