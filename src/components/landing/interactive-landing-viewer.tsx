@@ -835,22 +835,28 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                             <g 
                                                 key={`plan-hotspot-${hotspot.id}`} 
                                                 transform={`translate(${absX}, ${absY})`}
-                                                onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
-                                                className="cursor-pointer group"
+                                                className="group"
                                             >
                                                 <path
                                                     d={pathData}
-                                                    className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors"
+                                                    className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors pointer-events-none"
                                                     strokeWidth="1"
                                                 />
-                                                <g>
+                                                <g className="pointer-events-none">
                                                     <Eye 
                                                         className="drop-shadow-lg text-blue-500 group-hover:text-yellow-500 transition-colors"
                                                         style={{ width: eyeIconSize, height: eyeIconSize }} 
                                                         transform={`translate(-${eyeIconSize/2}, -${eyeIconSize/2})`}
                                                     />
                                                 </g>
-                                                <circle cx="0" cy="0" r={outerRadius} fill="transparent" />
+                                                <circle 
+                                                    cx="0" 
+                                                    cy="0" 
+                                                    r={outerRadius} 
+                                                    fill="transparent"
+                                                    onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
+                                                    className="cursor-pointer"
+                                                />
                                             </g>
                                         );
                                     })}
@@ -1013,21 +1019,27 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                             <g 
                                 key={hotspot.id} 
                                 transform={`translate(${absX}, ${absY})`}
-                                onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
-                                className="cursor-pointer group"
+                                className="group"
                             >
                                 <path
                                     d={pathData}
-                                    className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors"
+                                    className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors pointer-events-none"
                                     strokeWidth="1"
                                 />
-                                <g>
+                                <g className="pointer-events-none">
                                     <Eye 
                                         className="w-14 h-14 drop-shadow-lg text-blue-500 group-hover:text-yellow-500 transition-colors" 
                                         transform="translate(-28, -28)"
                                     />
                                 </g>
-                                <circle cx="0" cy="0" r="35" fill="transparent" />
+                                <circle 
+                                    cx="0" 
+                                    cy="0" 
+                                    r="35" 
+                                    fill="transparent"
+                                    onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
+                                    className="cursor-pointer"
+                                />
                             </g>
                         );
                     })}
