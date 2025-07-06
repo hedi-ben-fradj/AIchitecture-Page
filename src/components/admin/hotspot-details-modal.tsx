@@ -126,9 +126,9 @@ export default function HotspotDetailsModal({ isOpen, onClose, onSave, entity, h
             const newViewId = decodeURIComponent(newViewHref.split('/').pop()!);
 
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 const imageUrl = e.target?.result as string;
-                updateViewImage(entity.id, newViewId, imageUrl);
+                await updateViewImage(entity.id, newViewId, imageUrl);
                 onSave({ linkedViewId: newViewId });
                 toast({ title: 'Success!', description: `Hotspot linked to new view "${newViewName}".`});
                 onClose();

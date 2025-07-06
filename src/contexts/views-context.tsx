@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useCallback, type ReactNode, useEffect } from 'react';
 import type { Polygon } from '@/components/admin/image-editor';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { 
     collection,
     doc,
@@ -19,6 +19,7 @@ import {
     arrayUnion,
     arrayRemove
 } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 export type EntityType = string;
 export type ViewType = string;
@@ -84,7 +85,7 @@ interface ProjectContextType {
   addView: (entityId: string, viewName: string, viewType: ViewType) => Promise<string>;
   deleteView: (entityId: string, viewId: string) => void;
   getView: (entityId: string, viewId: string) => View | undefined;
-  updateViewImage: (entityId: string, viewId: string, imageUrl: string) => void;
+  updateViewImage: (entityId: string, viewId: string, imageUrl: string) => Promise<void>;
   updateViewSelections: (entityId: string, viewId: string, selections: Polygon[]) => void;
   updateViewHotspots: (entityId: string, viewId: string, hotspots: Hotspot[]) => void;
   setDefaultViewId: (entityId: string, viewId: string) => void;
@@ -223,12 +224,19 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         return;
     }
 
-    const newEntityData: Partial<Entity> = {
+    const newEntityData: Omit<Entity, 'id'> = {
       name: entityName,
       entityType: entityType,
       parentId: parentId,
       views: [],
       defaultViewId: null,
+      plotArea: undefined,
+      houseArea: undefined,
+      price: undefined,
+      status: undefined,
+      availableDate: undefined,
+      floors: undefined,
+      rooms: undefined,
       detailedRooms: [],
     };
     
@@ -237,9 +245,12 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         newEntityData.floors = 1;
         newEntityData.rooms = 1;
     }
+    
+    // Filter out undefined values
+    const finalData = Object.fromEntries(Object.entries(newEntityData).filter(([_, v]) => v !== undefined));
 
-    await setDoc(entityRef, newEntityData);
-    setEntities(prev => [...prev, { id: slug, ...newEntityData } as Entity]);
+    await setDoc(entityRef, finalData);
+    setEntities(prev => [...prev, { id: slug, ...finalData } as Entity]);
 
   }, [projectId]);
 
@@ -398,7 +409,18 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     setEntities(prev => prev.map(e => e.id === entityId ? { ...e, views: updatedViews } : e));
   };
 
-  const updateViewImage = (entityId: string, viewId: string, imageUrl: string) => updateViewData(entityId, viewId, { imageUrl });
+  const updateViewImage = async (entityId: string, viewId: string, imageDataUrl: string) => {
+    if (!projectId) return;
+    const storageRef = ref(storage, `projects/${projectId}/views/${viewId}.jpg`);
+    try {
+        const snapshot = await uploadString(storageRef, imageDataUrl, 'data_url');
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        await updateViewData(entityId, viewId, { imageUrl: downloadURL });
+    } catch (error) {
+        console.error("Error uploading image:", error);
+    }
+  };
+  
   const updateViewSelections = (entityId: string, viewId: string, selections: Polygon[]) => updateViewData(entityId, viewId, { selections });
   const updateViewHotspots = (entityId: string, viewId: string, hotspots: Hotspot[]) => updateViewData(entityId, viewId, { hotspots });
   

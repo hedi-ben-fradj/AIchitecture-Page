@@ -298,7 +298,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       reader.onload = (e) => {
         const imageUrl = e.target?.result as string;
         const img = document.createElement('img');
-        img.onload = () => {
+        img.onload = async () => {
           const canvas = document.createElement('canvas');
           const MAX_WIDTH = view.type === '360' ? 4096 : 1920;
           const MAX_HEIGHT = view.type === '360' ? 2048 : 1080;
@@ -325,7 +325,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
           
           const resizedImageUrl = canvas.toDataURL('image/jpeg', 0.85);
           setImageToEdit(resizedImageUrl);
-          updateViewImage(entityId, viewId, resizedImageUrl);
+          await updateViewImage(entityId, viewId, resizedImageUrl);
         };
         img.onerror = () => alert("Failed to load the image file.");
         img.src = imageUrl;
