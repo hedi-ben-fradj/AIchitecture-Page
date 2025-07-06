@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { ProjectTemplate } from './add-edit-template-modal';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
-import { useProjectData } from '@/contexts/views-context';
+import { useProjectData, type Entity } from '@/contexts/views-context';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VisualTemplateEditor } from './visual-template-editor';
 import { db } from '@/lib/firebase';

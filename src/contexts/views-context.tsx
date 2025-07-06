@@ -223,30 +223,23 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         return;
     }
 
-    const newEntity: Omit<Entity, 'id'> = {
+    const newEntityData: Partial<Entity> = {
       name: entityName,
       entityType: entityType,
       parentId: parentId,
       views: [],
       defaultViewId: null,
-      plotArea: undefined,
-      houseArea: undefined,
-      price: undefined,
-      status: undefined,
-      availableDate: undefined,
-      floors: undefined,
-      rooms: undefined,
       detailedRooms: [],
     };
     
     if (entityType === 'Apartment' || entityType === 'house') {
-        newEntity.status = 'available';
-        newEntity.floors = 1;
-        newEntity.rooms = 1;
+        newEntityData.status = 'available';
+        newEntityData.floors = 1;
+        newEntityData.rooms = 1;
     }
 
-    await setDoc(entityRef, newEntity);
-    setEntities(prev => [...prev, { id: slug, ...newEntity }]);
+    await setDoc(entityRef, newEntityData);
+    setEntities(prev => [...prev, { id: slug, ...newEntityData } as Entity]);
 
   }, [projectId]);
 
