@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Save, ArrowLeft, Eye, Edit, Trash2 } from 'lucide-react';
+import { Upload, Save, ArrowLeft, Eye, Edit, Trash2, Move } from 'lucide-react';
 import ImageEditor, { type ImageEditorRef, type Hotspot } from '@/components/admin/image-editor';
 import { useProjectData, type EntityType } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
@@ -50,6 +50,16 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const [markersPlugin, setMarkersPlugin] = useState<MarkersPlugin | null>(null);
   const [viewerHotspots, setViewerHotspots] = useState<Hotspot[]>([]);
   const [selectedHotspotId, setSelectedHotspotId] = useState<number | null>(null);
+  
+  // New state for hotspot creation/moving workflow
+  const [isPlacingHotspot, setIsPlacingHotspot] = useState(false);
+  const [movingHotspotId, setMovingHotspotId] = useState<number | null>(null);
+
+  // Refs to hold current mode for event listeners, preventing re-renders
+  const placementModeRef = useRef(isPlacingHotspot);
+  const moveModeRef = useRef(movingHotspotId);
+  useEffect(() => { placementModeRef.current = isPlacingHotspot; }, [isPlacingHotspot]);
+  useEffect(() => { moveModeRef.current = movingHotspotId; }, [movingHotspotId]);
 
 
   useEffect(() => {
@@ -65,6 +75,18 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     }
     setSelectedHotspotId(null);
   }, [view, router, projectId, entityId]);
+
+  // Effect to manage cursor style
+  useEffect(() => {
+      if (viewerContainerRef.current) {
+          if (isPlacingHotspot || movingHotspotId) {
+              viewerContainerRef.current.style.cursor = 'crosshair';
+          } else {
+              viewerContainerRef.current.style.cursor = 'default';
+          }
+      }
+  }, [isPlacingHotspot, movingHotspotId]);
+
 
   // Effect to manage the 360 viewer lifecycle
   useEffect(() => {
@@ -108,15 +130,59 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       }));
       currentMarkersPlugin.setMarkers(initialMarkers);
 
+      currentMarkersPlugin.addEventListener('select-marker', (e) => {
+        if (placementModeRef.current || moveModeRef.current) return;
+        setSelectedHotspotId(e.marker.data.id as number);
+      });
+
       viewerRef.current.addEventListener('click', ((e: TypedEvent<Viewer, ClickData>) => {
+        if (placementModeRef.current) {
+            if (e.data.marker) return;
+            
+            const newHotspot: Hotspot = {
+                id: Date.now(),
+                x: (e.data.yaw / (2 * Math.PI)) + 0.5,
+                y: (e.data.pitch / -Math.PI) + 0.5,
+                linkedViewId: '',
+            };
+            
+            setViewerHotspots(prev => [...prev, newHotspot]);
+            currentMarkersPlugin.addMarker({
+                id: String(newHotspot.id),
+                position: { yaw: e.data.yaw, pitch: e.data.pitch },
+                html: getHotspotSvg('white'),
+                size: { width: 50, height: 50 },
+                anchor: 'center center',
+                tooltip: 'New Hotspot (unsaved)',
+                data: newHotspot,
+            });
+
+            setIsPlacingHotspot(false);
+            setSelectedHotspotId(newHotspot.id);
+            toast({ title: 'Hotspot Placed', description: "Now click 'Edit Hotspot' to link it." });
+            return;
+        }
+        
+        if (moveModeRef.current) {
+            if (e.data.marker) return;
+
+            const newPosition = { yaw: e.data.yaw, pitch: e.data.pitch };
+            const newNormalizedCoords = {
+                x: (newPosition.yaw / (2 * Math.PI)) + 0.5,
+                y: (newPosition.pitch / -Math.PI) + 0.5,
+            };
+
+            setViewerHotspots(prev => prev.map(h => h.id === moveModeRef.current ? { ...h, ...newNormalizedCoords } : h));
+            currentMarkersPlugin.updateMarker({ id: String(moveModeRef.current), position: newPosition });
+            setMovingHotspotId(null);
+            toast({ title: 'Hotspot Moved', description: 'Position updated.' });
+            return;
+        }
+
         if (!e.data.marker) {
           setSelectedHotspotId(null);
         }
       }) as (evt: TypedEvent<Viewer, any>) => void);
-
-      currentMarkersPlugin.addEventListener('select-marker', (e) => {
-        setSelectedHotspotId(e.marker.data.id as number);
-      });
     }
 
     return () => {
@@ -124,7 +190,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       viewerRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view?.type, view?.name, view?.hotspots, imageToEdit, getEntity]);
+  }, [view?.type, view?.name, view?.hotspots, imageToEdit, getEntity, allEntities]);
 
     useEffect(() => {
         if (!markersPlugin) return;
@@ -157,46 +223,31 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         return 'Link';
       };
       
-      const existingIndex = viewerHotspots.findIndex(h => h.id === updatedHotspot.id);
+      setViewerHotspots(prev => prev.map(h => h.id === updatedHotspot.id ? updatedHotspot : h));
+      
+      markersPlugin.updateMarker({
+        id: String(updatedHotspot.id),
+        data: updatedHotspot,
+        tooltip: findViewName(updatedHotspot),
+      });
 
-      if (existingIndex > -1) {
-        setViewerHotspots(prev => prev.map(h => h.id === updatedHotspot.id ? updatedHotspot : h));
-        markersPlugin.updateMarker({
-          id: String(updatedHotspot.id),
-          data: updatedHotspot,
-          tooltip: findViewName(updatedHotspot),
-        });
-      } else {
-        setViewerHotspots(prev => [...prev, updatedHotspot]);
-        markersPlugin.addMarker({
-            id: String(updatedHotspot.id),
-            position: { 
-                yaw: (updatedHotspot.x - 0.5) * 2 * Math.PI, 
-                pitch: (updatedHotspot.y - 0.5) * -Math.PI 
-            },
-            html: getHotspotSvg('white'),
-            size: { width: 50, height: 50 },
-            anchor: 'center center',
-            tooltip: findViewName(updatedHotspot),
-            data: updatedHotspot,
-        });
-      }
       toast({ title: 'Hotspot saved!' });
       setHotspotToEdit(null);
     }
   };
 
   const handleAddNewHotspot = () => {
-    if (!viewerRef.current) return;
-    const position = viewerRef.current.getPosition();
-    const newHotspot: Hotspot = {
-        id: Date.now(),
-        x: (position.yaw / (2 * Math.PI)) + 0.5,
-        y: (position.pitch / -Math.PI) + 0.5,
-        linkedViewId: '',
-    };
-    setHotspotToEdit(newHotspot);
-    setIsHotspotModalOpen(true);
+    setIsPlacingHotspot(true);
+    setMovingHotspotId(null);
+    setSelectedHotspotId(null);
+    toast({ title: 'Placement Mode Active', description: 'Click anywhere on the panorama to place the new hotspot.' });
+  };
+  
+  const handleMoveSelectedHotspot = () => {
+    if (!selectedHotspotId) return;
+    setMovingHotspotId(selectedHotspotId);
+    setIsPlacingHotspot(false);
+    toast({ title: 'Repositioning Hotspot', description: 'Click on the new location for the hotspot.' });
   };
 
   const handleEditSelectedHotspot = () => {
@@ -348,15 +399,19 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
            {view.type === '360' ? (
               <div>
                 <div className="flex gap-2 mb-4">
-                    <Button onClick={handleAddNewHotspot} className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <Button onClick={handleAddNewHotspot} className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isPlacingHotspot || !!movingHotspotId}>
                         <Eye className="mr-2 h-4 w-4" />
                         New Hotspot
                     </Button>
-                    <Button variant="outline" onClick={handleEditSelectedHotspot} disabled={!selectedHotspotId}>
+                    <Button variant="outline" onClick={handleMoveSelectedHotspot} disabled={!selectedHotspotId || isPlacingHotspot || !!movingHotspotId}>
+                        <Move className="mr-2 h-4 w-4" />
+                        Move Hotspot
+                    </Button>
+                    <Button variant="outline" onClick={handleEditSelectedHotspot} disabled={!selectedHotspotId || isPlacingHotspot || !!movingHotspotId}>
                         <Edit className="mr-2 h-4 w-4" />
                         Edit Hotspot
                     </Button>
-                    <Button variant="destructive" onClick={handleDeleteSelectedHotspot} disabled={!selectedHotspotId}>
+                    <Button variant="destructive" onClick={handleDeleteSelectedHotspot} disabled={!selectedHotspotId || isPlacingHotspot || !!movingHotspotId}>
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                     </Button>
