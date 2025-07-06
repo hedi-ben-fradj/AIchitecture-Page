@@ -104,7 +104,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [detailsPosition, setDetailsPosition] = useState<React.CSSProperties>({ opacity: 0 });
     const [currentViewType, setCurrentViewType] = useState<string>('2d');
     const [viewTypes, setViewTypes] = useState<string[]>([]);
-    const [isMuted, setIsMuted] = useState(false);
+    const [isMuted, setIsMuted] = useState(true);
     const [isPlanOverlayVisible, setIsPlanOverlayVisible] = useState(false);
     const [planOverlayView, setPlanOverlayView] = useState<View | null>(null);
     const [isPlanExpanded, setIsPlanExpanded] = useState(false);
@@ -115,6 +115,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const prevEntityIdRef = useRef<string | null>(null);
     const planOverlayContainerRef = useRef<HTMLDivElement>(null);
     const viewerContainerRef = useRef<HTMLDivElement>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
 
     const isFilterApplied = useMemo(() => {
         return Object.values(appliedFilters).some(val => val !== '' && val !== undefined && val !== 'all');
@@ -433,6 +434,25 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             viewer.destroy();
         };
     }, [currentView, currentViewType, allEntities, handleHotspotNavigate]);
+    
+    // Effect to control audio playback
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (audio) {
+            if (currentViewType === '360') {
+                // Let user interaction (unmuting) start the playback
+            } else {
+                audio.pause();
+            }
+        }
+    }, [currentViewType]);
+
+    // Effect to handle muting/unmuting
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.muted = isMuted;
+        }
+    }, [isMuted]);
 
 
     const handleSelectionClick = (e: MouseEvent, selection: Polygon) => {
@@ -692,6 +712,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     
     return (
  <div ref={containerRef} className="relative h-full w-full bg-black overflow-hidden" onClick={closeDetails}>
+    <audio ref={audioRef} src="https://cdn.pixabay.com/audio/2022/10/18/audio_731a547a8a.mp3" loop />
  {entityViews.some(view => view.type === '360') && entityViews.some(view => view.type !== '360') && (
  <div className="absolute top-4 right-4 z-50 flex items-center bg-black/50 text-white rounded-full p-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleViewType(); }}>
  <span className={cn("px-3 py-1 text-sm font-medium flex items-center gap-1", currentViewType !== '360' && "bg-white text-black rounded-full")}>
@@ -736,6 +757,10 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     className="h-12 w-12 bg-black/50 hover:bg-black/75 text-white rounded-full backdrop-blur-sm"
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        const audio = audioRef.current;
+                                        if (audio && isMuted && audio.paused) {
+                                            audio.play().catch(error => console.warn("Audio play failed:", error));
+                                        }
                                         setIsMuted(!isMuted);
                                     }}
                                 >
@@ -959,7 +984,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 className="group cursor-pointer"
                                 onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }}
                             >
-                                <circle cx={0} cy={0} r={eyeIconSize / 2} fill="transparent" />
+                                <circle cx={0} cy={0} r={eyeIconSize / 2} className="pointer-events-auto" fill="transparent" />
                                 <g className="pointer-events-none">
                                     <path
                                         d="M0-7C-3.87 0-7-3.87-7-0S-3.87 7 0 7s7-3.87 7-0S3.87-7 0-7zM0 3.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"
