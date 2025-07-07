@@ -326,19 +326,20 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         return '';
     }
 
-    const newView: View = { id: newViewId, name: viewName, type: viewType };
+    const newView: View = {
+        id: newViewId,
+        name: viewName,
+        type: viewType,
+        selections: [],
+        hotspots: [],
+    };
     
     const entityRef = doc(db, 'entities', entityId);
-    const viewData = {
-        id: newView.id,
-        name: newView.name,
-        type: newView.type
-    };
     
     const newDefaultViewId = targetEntity.views.length === 0 ? newViewId : targetEntity.defaultViewId;
 
     await updateDoc(entityRef, {
-        views: arrayUnion(viewData),
+        views: arrayUnion(newView),
         defaultViewId: newDefaultViewId
     });
 
@@ -357,11 +358,9 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     const viewToDelete = entity?.views.find(v => v.id === viewId);
     if (!entity || !viewToDelete) return;
 
-    const viewMetadata = { id: viewToDelete.id, name: viewToDelete.name, type: viewToDelete.type };
-
     const entityRef = doc(db, 'entities', entityId);
     await updateDoc(entityRef, {
-        views: arrayRemove(viewMetadata)
+        views: arrayRemove(viewToDelete)
     });
 
     // If deleted view was the default, set a new default

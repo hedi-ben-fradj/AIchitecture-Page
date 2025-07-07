@@ -153,6 +153,12 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 }
                 setProjectId(landingProjectId);
 
+                // Load view types
+                const viewTypesDoc = await getDoc(doc(db, 'app_config', 'view_types'));
+                if (viewTypesDoc.exists()) {
+                    setViewTypes(viewTypesDoc.data().types);
+                }
+
                 // 2. Load project data
                 const projectDoc = await getDoc(doc(db, 'projects', landingProjectId));
                 if (!projectDoc.exists()) {
@@ -731,19 +737,21 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             <div className="absolute bottom-20 left-4 z-50 flex flex-col gap-3">
                 <TooltipProvider>
                     {currentViewType === '360' && (
-                        <div className="relative">
-                            {!isMuted && (
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-4 pt-2 pb-2 bg-black/50 rounded-full backdrop-blur-sm">
-                                    <Slider
-                                        orientation="vertical"
-                                        value={[volume]}
-                                        max={1}
-                                        step={0.05}
-                                        onValueChange={handleVolumeChange}
-                                        className="h-24"
-                                    />
-                                </div>
-                            )}
+                        <div className="relative group/volume-control">
+                            <div className={cn(
+                                "absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-4 pt-2 pb-2 bg-black/50 rounded-full backdrop-blur-sm",
+                                "transition-opacity duration-300",
+                                isMuted ? "opacity-0 pointer-events-none" : "opacity-100"
+                            )}>
+                                <Slider
+                                    orientation="vertical"
+                                    value={[volume]}
+                                    max={1}
+                                    step={0.05}
+                                    onValueChange={handleVolumeChange}
+                                    className="h-24"
+                                />
+                            </div>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
