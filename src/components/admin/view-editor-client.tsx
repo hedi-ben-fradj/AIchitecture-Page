@@ -195,19 +195,15 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     useEffect(() => {
         if (!markersPlugin) return;
 
-        viewerHotspots.forEach(hotspot => {
+        const currentMarkers = markersPlugin.getMarkers();
+
+        currentMarkers.forEach(marker => {
+            const isSelected = marker.id === String(selectedHotspotId);
             markersPlugin.updateMarker({
-                id: String(hotspot.id),
-                html: getHotspotSvg('white'),
+                id: marker.id,
+                html: getHotspotSvg(isSelected ? '#facc15' : 'white'),
             });
         });
-    
-        if (selectedHotspotId) {
-            markersPlugin.updateMarker({
-                id: String(selectedHotspotId),
-                html: getHotspotSvg('#facc15'), // yellow-400
-            });
-        }
     }, [selectedHotspotId, markersPlugin, viewerHotspots]);
 
 
