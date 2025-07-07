@@ -179,7 +179,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   }
   
   return (
-    <ViewsProvider>
+    <ViewsProvider projectId={projectId}>
       <div className="bg-neutral-900 text-foreground min-h-screen flex">
         <aside className="w-80 bg-[#212121] flex flex-col border-r border-neutral-700 flex-shrink-0">
           <div className="h-16 flex items-center px-6">
