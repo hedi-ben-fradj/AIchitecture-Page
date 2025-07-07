@@ -162,10 +162,12 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, onMakeE
             }
             saveData = {
                 title: linkedEntity.name,
-                description: linkedEntity.name,
+                description: `A link to the entity: ${linkedEntity.name}`,
                 makeAsEntity: true,
                 entityType: linkedEntity.entityType,
                 linkedEntityId: linkedEntity.id,
+                defineSize: !!linkedEntity.houseArea,
+                area: linkedEntity.houseArea,
             };
         } else {
             let newEntityId: string | null = null;

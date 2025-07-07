@@ -359,54 +359,53 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
     // Effect to manage the 360 viewer lifecycle
     useEffect(() => {
-        if (currentViewType !== '360' || !currentView?.imageUrl || !viewerContainerRef.current) {
-            return;
-        }
-        
-        const panoramaUrl = `/api/image-proxy?url=${encodeURIComponent(currentView.imageUrl)}`;
-        const viewer = new Viewer({
-            container: viewerContainerRef.current,
-            panorama: panoramaUrl,
-            caption: currentView.name,
-            touchmoveTwoFingers: true,
-            navbar: ['zoom', 'move', 'caption', 'fullscreen'],
-            plugins: [[MarkersPlugin, {}]],
-        });
-
-        const markersPlugin = viewer.getPlugin(MarkersPlugin);
-        if (markersPlugin) {
-            const findViewName = (h: Hotspot) => {
-                if (!h.linkedViewId) return 'Unlinked Hotspot';
-                for (const entity of allEntities) {
-                    const foundView = entity.views.find(v => v.id === h.linkedViewId);
-                    if (foundView) return foundView.name;
-                }
-                return 'Link';
-            };
-
-            const initialMarkers = (currentView.hotspots || []).map(hotspot => ({
-                id: String(hotspot.id),
-                position: {
-                    yaw: (hotspot.x - 0.5) * 2 * Math.PI,
-                    pitch: (hotspot.y - 0.5) * -Math.PI
-                },
-                html: getHotspotSvg('white'),
-                size: { width: 50, height: 50 },
-                anchor: 'center center',
-                tooltip: findViewName(hotspot),
-                data: { linkedViewId: hotspot.linkedViewId },
-            }));
-            markersPlugin.setMarkers(initialMarkers);
-
-            markersPlugin.addEventListener('select-marker', (e) => {
-                if (e.marker.data?.linkedViewId) {
-                    handleHotspotNavigate(e.marker.data.linkedViewId);
-                }
+        let viewer: Viewer | null = null;
+        if (currentViewType === '360' && currentView?.imageUrl && viewerContainerRef.current) {
+            const panoramaUrl = `/api/image-proxy?url=${encodeURIComponent(currentView.imageUrl)}`;
+             viewer = new Viewer({
+                container: viewerContainerRef.current,
+                panorama: panoramaUrl,
+                caption: currentView.name,
+                touchmoveTwoFingers: true,
+                navbar: ['zoom', 'move', 'caption', 'fullscreen'],
+                plugins: [[MarkersPlugin, {}]],
             });
+
+            const markersPlugin = viewer.getPlugin(MarkersPlugin);
+            if (markersPlugin) {
+                const findViewName = (h: Hotspot) => {
+                    if (!h.linkedViewId) return 'Unlinked Hotspot';
+                    for (const entity of allEntities) {
+                        const foundView = entity.views.find(v => v.id === h.linkedViewId);
+                        if (foundView) return foundView.name;
+                    }
+                    return 'Link';
+                };
+
+                const initialMarkers = (currentView.hotspots || []).map(hotspot => ({
+                    id: String(hotspot.id),
+                    position: {
+                        yaw: (hotspot.x - 0.5) * 2 * Math.PI,
+                        pitch: (hotspot.y - 0.5) * -Math.PI
+                    },
+                    html: getHotspotSvg('white'),
+                    size: { width: 50, height: 50 },
+                    anchor: 'center center',
+                    tooltip: findViewName(hotspot),
+                    data: { linkedViewId: hotspot.linkedViewId },
+                }));
+                markersPlugin.setMarkers(initialMarkers);
+
+                markersPlugin.addEventListener('select-marker', (e) => {
+                    if (e.marker.data?.linkedViewId) {
+                        handleHotspotNavigate(e.marker.data.linkedViewId);
+                    }
+                });
+            }
         }
 
         return () => {
-            viewer.destroy();
+            viewer?.destroy();
         };
     }, [currentView, currentViewType, allEntities, handleHotspotNavigate]);
     
@@ -878,11 +877,21 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             )}
 
 
-            {currentViewType === '360' ?
+            {currentViewType === '360' ? (
                 <div ref={viewerContainerRef} key={currentView.id} className="w-full h-full" />
-                :
-                <Image ref={imageRef} src={currentView.imageUrl} alt={currentView.name} layout="fill" objectFit="contain" onLoad={calculateRect} key={currentView.id} className="transition-opacity duration-500" style={{ opacity: renderedImageRect ? 1 : 0 }} />
-            }
+            ) : (
+                <Image
+                    ref={imageRef}
+                    src={`/api/image-proxy?url=${encodeURIComponent(currentView.imageUrl)}`}
+                    alt={currentView.name}
+                    layout="fill"
+                    objectFit="contain"
+                    onLoad={calculateRect}
+                    key={currentView.id}
+                    className="transition-opacity duration-500"
+                    style={{ opacity: renderedImageRect ? 1 : 0 }}
+                />
+            )}
             
             {/* Overlay for 2D view interactions */}
             {currentViewType !== '360' && renderedImageRect && (
@@ -1144,7 +1153,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                             >
                                                 <div className="aspect-video relative">
                                                     {view.imageUrl ? (
-                                                        <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
+                                                        <Image src={`/api/image-proxy?url=${encodeURIComponent(view.imageUrl)}`} alt={view.name} layout="fill" objectFit="cover" />
                                                     ) : (
                                                         <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
                                                     )}
@@ -1202,7 +1211,12 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     onClick={(e) => { e.stopPropagation(); handleSelectionClick(e, selection); }}
                                 >
                                     <CardHeader className="p-4"><CardTitle className="text-base truncate">{selection.details?.title}</CardTitle></CardHeader>
-                                    {selection.details?.description && ( <CardContent className="p-4 pt-0"><p className="text-xs text-neutral-400 line-clamp-2">{selection.details.description}</p></CardContent> )}
+                                    {(selection.details?.area || selection.details?.description) && 
+                                        <CardContent className="p-4 pt-0">
+                                            {selection.details.area && <p className="text-sm font-semibold">{selection.details.area} m²</p>}
+                                            {selection.details.description && <p className="text-xs text-neutral-400 line-clamp-2 mt-1">{selection.details.description}</p>}
+                                        </CardContent>
+                                    }
                                 </Card>
                             )})}
                         </div>

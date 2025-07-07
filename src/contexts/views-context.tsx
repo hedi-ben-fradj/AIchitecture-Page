@@ -217,11 +217,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         return null;
     }
 
-    const entityRef = doc(db, 'entities', slug);
+    const newEntityId = parentId ? `${parentId}__${slug}` : slug;
+
+    const entityRef = doc(db, 'entities', newEntityId);
     const entitySnap = await getDoc(entityRef);
 
     if (entitySnap.exists()) {
-        alert(`Entity with name "${entityName}" already exists or name is invalid.`);
+        alert(`An entity with name "${entityName}" already exists under this parent, resulting in a duplicate ID "${newEntityId}". Please use a different name.`);
         return null;
     }
 
@@ -244,8 +246,8 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     const finalData = Object.fromEntries(Object.entries(newEntityData).filter(([, v]) => v !== undefined));
 
     await setDoc(entityRef, finalData);
-    setEntities(prev => [...prev, { id: slug, ...finalData } as Entity]);
-    return slug;
+    setEntities(prev => [...prev, { id: newEntityId, ...finalData } as Entity]);
+    return newEntityId;
 
   }, [projectId]);
 
@@ -356,8 +358,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
   const deleteView = useCallback(async (entityId: string, viewId: string) => {
     const entity = getEntity(entityId);
-    const viewToDelete = entity?.views.find(v => v.id === viewId);
-    if (!entity || !viewToDelete) return;
+    if (!entity) return;
+
+    const viewToDelete = entity.views.find(v => v.id === viewId);
+    if (!viewToDelete) return;
 
     const entityRef = doc(db, 'entities', entityId);
     await updateDoc(entityRef, {
@@ -370,10 +374,6 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         const newDefault = remainingViews.length > 0 ? remainingViews[0].id : null;
         await updateDoc(entityRef, { defaultViewId: newDefault });
     }
-    
-    // This is a special case since we store all view data inside the entity doc for simplicity now.
-    // If view data were in separate docs, we would delete them here.
-    // The update to the entity doc is sufficient with the current model.
 
     // Refresh local state
     setEntities(prev => prev.map(e => {
