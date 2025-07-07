@@ -455,8 +455,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                 const rotation = hotspot.rotation || 0;
                 const fov = hotspot.fov || 60;
                 
-                const innerRadius = 22;
-                const outerRadius = 35;
+                const innerRadius = 12;
+                const outerRadius = 24;
 
                 const rotationRad = rotation * (Math.PI / 180);
                 const fovRad = fov * (Math.PI / 180);
@@ -519,8 +519,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
                                     className="cursor-move"
                                 >
                                     <Eye 
-                                        className={cn("w-14 h-14 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-yellow-500' : 'text-blue-500')} 
-                                        transform="translate(-28, -28)"
+                                        className={cn("w-6 h-6 drop-shadow-lg transition-colors", selectedHotspotId === hotspot.id ? 'text-yellow-500' : 'text-blue-500')} 
+                                        transform="translate(-12, -12)"
                                     />
                                 </g>
                                 {selectedHotspotId === hotspot.id && (

@@ -988,8 +988,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         const rotation = hotspot.rotation || 0;
                         const fov = hotspot.fov || 60;
                         
-                        const innerRadius = 22;
-                        const outerRadius = 35;
+                        const innerRadius = 12;
+                        const outerRadius = 24;
 
                         const rotationRad = rotation * (Math.PI / 180);
                         const fovRad = fov * (Math.PI / 180);
@@ -1026,8 +1026,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         strokeWidth="1"
                                     />
                                     <Eye 
-                                        className="w-14 h-14 drop-shadow-lg text-blue-500 group-hover:text-yellow-500 transition-colors" 
-                                        transform="translate(-28, -28)"
+                                        className="w-6 h-6 drop-shadow-lg text-blue-500 group-hover:text-yellow-500 transition-colors" 
+                                        transform="translate(-12, -12)"
                                     />
                                 </g>
                                 <circle cx={0} cy={0} r={outerRadius} className="pointer-events-auto" fill="transparent" onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }} />
