@@ -1,2 +1,12 @@
-// This file re-exports the layout from the (dashboard) route group to resolve the routing conflict.
-export { default } from './(dashboard)/layout';
+
+'use client';
+
+import { AuthProvider } from '@/contexts/auth-context';
+
+export default function AdminRootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <AuthProvider>{children}</AuthProvider>;
+}

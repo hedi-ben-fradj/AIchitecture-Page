@@ -10,7 +10,7 @@ import { usePathname, useParams, useRouter } from 'next/navigation';
 import { ViewsProvider } from '@/contexts/views-context';
 import { db, auth } from '@/lib/firebase';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
-import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/contexts/auth-context';
 import { signOut } from 'firebase/auth';
 
 // Minimal type for sidebar display
@@ -277,9 +277,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <AuthProvider>
-      <AdminLayoutContent>{children}</AdminLayoutContent>
-    </AuthProvider>
-  );
+  return <AdminLayoutContent>{children}</AdminLayoutContent>;
 }
