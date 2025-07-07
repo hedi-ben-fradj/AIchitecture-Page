@@ -51,16 +51,19 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const [viewerHotspots, setViewerHotspots] = useState<Hotspot[]>([]);
   const [selectedHotspotId, setSelectedHotspotId] = useState<number | null>(null);
   
-  // New state for hotspot creation/moving workflow
   const [isPlacingHotspot, setIsPlacingHotspot] = useState(false);
 
-  // Refs to hold current mode for event listeners, preventing re-renders
   const placementModeRef = useRef(isPlacingHotspot);
   const selectedHotspotIdRef = useRef(selectedHotspotId);
   useEffect(() => { placementModeRef.current = isPlacingHotspot; }, [isPlacingHotspot]);
   useEffect(() => { selectedHotspotIdRef.current = selectedHotspotId; }, [selectedHotspotId]);
 
+  const allEntitiesRef = useRef(allEntities);
+  allEntitiesRef.current = allEntities;
 
+
+  // Effect to initialize local state from view props.
+  // Only re-runs when the actual view ID changes, preventing state wipes during edits.
   useEffect(() => {
     if (!view) {
       router.replace(`/admin/projects/${projectId}/entities/${entityId}`);
@@ -71,9 +74,11 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       setViewerHotspots(view.hotspots || []);
     } else {
       setImageToEdit(null);
+      setViewerHotspots([]);
     }
     setSelectedHotspotId(null);
-  }, [view, router, projectId, entityId]);
+    setIsPlacingHotspot(false);
+  }, [view?.id, router, projectId, entityId]);
 
   // Effect to manage cursor style
   useEffect(() => {
@@ -110,14 +115,14 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
           const findViewName = (h: Hotspot) => {
             if (!h.linkedViewId) return 'Unlinked Hotspot';
-            for (const entity of allEntities) {
+            for (const entity of allEntitiesRef.current) {
                 const foundView = entity.views.find(v => v.id === h.linkedViewId);
                 if (foundView) return foundView.name;
             }
             return 'Link';
           };
-
-          const initialMarkers = (view.hotspots || []).map(hotspot => {
+          
+          const initialMarkers = viewerHotspots.map(hotspot => {
             const tooltipText = findViewName(hotspot);
             return {
               id: String(hotspot.id),
@@ -192,15 +197,17 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       viewerRef.current?.destroy();
       viewerRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view?.type, view?.name, view?.hotspots, imageToEdit, getEntity, allEntities]);
+  // This dependency array is now minimal to prevent unnecessary re-initialization.
+  }, [view?.id, imageToEdit]);
 
+    // Effect to update marker visuals (e.g., color on selection, tooltip text)
     useEffect(() => {
         if (!markersPlugin) return;
 
         const findViewName = (h: Hotspot) => {
             if (!h.linkedViewId) return 'Unlinked Hotspot';
-            for (const entity of allEntities) {
+            // Use ref to get latest data without causing re-renders
+            for (const entity of allEntitiesRef.current) {
                 const foundView = entity.views.find(v => v.id === h.linkedViewId);
                 if (foundView) return foundView.name;
             }
@@ -222,13 +229,10 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                     });
                 }
             } catch (e) {
-                console.warn(`Could not update marker ${marker.id}, it might have been removed.`, e);
-                if (isSelected) {
-                    setSelectedHotspotId(null);
-                }
+                // This can happen if a marker is deleted, which is safe to ignore.
             }
         });
-    }, [selectedHotspotId, markersPlugin, viewerHotspots, allEntities]);
+    }, [selectedHotspotId, markersPlugin, viewerHotspots]);
 
 
   const handleSaveHotspot = (hotspotData: { linkedViewId: string }) => {
@@ -241,14 +245,11 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         setViewerHotspots((prev) =>
           prev.map((h) => (h.id === updatedHotspot.id ? updatedHotspot : h))
         );
-        // The useEffect will handle the visual update
       }
     } else {
-      // Logic for 2D editor
       editorRef.current?.updateHotspot(updatedHotspot);
     }
     
-    // Common logic to close modal and reset state
     setSelectedHotspotId(null);
     setHotspotToEdit(null);
     setIsHotspotModalOpen(false);
