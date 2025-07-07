@@ -89,106 +89,135 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
   // Effect to manage the 360 viewer lifecycle
   useEffect(() => {
-    if (view?.type !== '360' || !imageToEdit || !viewerContainerRef.current) {
-        return;
-    }
+    let viewer: Viewer | null = null;
+    let objectUrl: string | null = null;
 
-    viewerRef.current = new Viewer({
-        container: viewerContainerRef.current,
-        panorama: imageToEdit,
-        caption: view.name,
-        touchmoveTwoFingers: true,
-        navbar: ['zoom', 'move', 'caption', 'fullscreen'],
-        plugins: [[MarkersPlugin, {}]],
-    });
-
-    const currentMarkersPlugin = viewerRef.current.getPlugin(MarkersPlugin);
-    if (currentMarkersPlugin) {
-      setMarkersPlugin(currentMarkersPlugin);
-
-      const findViewName = (h: Hotspot) => {
-        if (!h.linkedViewId) return 'Unlinked Hotspot';
-        for (const entity of allEntities) {
-            const foundView = entity.views.find(v => v.id === h.linkedViewId);
-            if (foundView) return foundView.name;
-        }
-        return 'Link';
-      };
-
-      const initialMarkers = (view.hotspots || []).map(hotspot => ({
-          id: String(hotspot.id),
-          position: { 
-            yaw: (hotspot.x - 0.5) * 2 * Math.PI, 
-            pitch: (hotspot.y - 0.5) * -Math.PI 
-          },
-          html: getHotspotSvg('white'),
-          size: { width: 50, height: 50 },
-          anchor: 'center center',
-          tooltip: findViewName(hotspot),
-          data: hotspot,
-      }));
-      currentMarkersPlugin.setMarkers(initialMarkers);
-
-      currentMarkersPlugin.addEventListener('select-marker', (e) => {
-        toast({ title: 'Hotspot Selected', description: 'Click anywhere to move it, or click "Edit Hotspot".' });
-        setIsPlacingHotspot(false);
-        setSelectedHotspotId(e.marker.data.id as number);
-      });
-
-      viewerRef.current.addEventListener('click', ((e: TypedEvent<Viewer, ClickData>) => {
-        // If a marker was clicked, the select-marker event handles it. Do nothing here.
-        if (e.data.marker) {
+    const initViewer = async () => {
+        if (view?.type !== '360' || !imageToEdit || !viewerContainerRef.current) {
             return;
         }
-        
-        // Case 1: Placing a new hotspot.
-        if (placementModeRef.current) {
-            const newHotspot: Hotspot = {
-                id: Date.now(),
-                x: (e.data.yaw / (2 * Math.PI)) + 0.5,
-                y: (e.data.pitch / -Math.PI) + 0.5,
-                linkedViewId: '',
-            };
-            
-            setViewerHotspots(prev => [...prev, newHotspot]);
-            currentMarkersPlugin.addMarker({
-                id: String(newHotspot.id),
-                position: { yaw: e.data.yaw, pitch: e.data.pitch },
-                html: getHotspotSvg('white'),
-                size: { width: 50, height: 50 },
-                anchor: 'center center',
-                tooltip: 'New Hotspot (unsaved)',
-                data: newHotspot,
-            });
 
+        let panoramaData = imageToEdit;
+
+        // If it's a remote URL, fetch it as a blob to bypass potential CORS issues
+        if (imageToEdit.startsWith('http')) {
+            try {
+                const response = await fetch(imageToEdit);
+                if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+                const blob = await response.blob();
+                objectUrl = URL.createObjectURL(blob);
+                panoramaData = objectUrl;
+            } catch (err) {
+                console.error("Error fetching panorama for viewer:", err);
+                toast({
+                    title: "Error loading 360 view",
+                    description: "Could not load the panorama image.",
+                    variant: "destructive",
+                });
+                return;
+            }
+        }
+
+        viewer = new Viewer({
+            container: viewerContainerRef.current!,
+            panorama: panoramaData,
+            caption: view.name,
+            touchmoveTwoFingers: true,
+            navbar: ['zoom', 'move', 'caption', 'fullscreen'],
+            plugins: [[MarkersPlugin, {}]],
+        });
+
+        viewerRef.current = viewer;
+
+        const currentMarkersPlugin = viewer.getPlugin(MarkersPlugin);
+        if (currentMarkersPlugin) {
+          setMarkersPlugin(currentMarkersPlugin);
+
+          const findViewName = (h: Hotspot) => {
+            if (!h.linkedViewId) return 'Unlinked Hotspot';
+            for (const entity of allEntities) {
+                const foundView = entity.views.find(v => v.id === h.linkedViewId);
+                if (foundView) return foundView.name;
+            }
+            return 'Link';
+          };
+
+          const initialMarkers = (view.hotspots || []).map(hotspot => ({
+              id: String(hotspot.id),
+              position: { 
+                yaw: (hotspot.x - 0.5) * 2 * Math.PI, 
+                pitch: (hotspot.y - 0.5) * -Math.PI 
+              },
+              html: getHotspotSvg('white'),
+              size: { width: 50, height: 50 },
+              anchor: 'center center',
+              tooltip: findViewName(hotspot),
+              data: hotspot,
+          }));
+          currentMarkersPlugin.setMarkers(initialMarkers);
+
+          currentMarkersPlugin.addEventListener('select-marker', (e) => {
+            toast({ title: 'Hotspot Selected', description: 'Click anywhere to move it, or click "Edit Hotspot".' });
             setIsPlacingHotspot(false);
-            setSelectedHotspotId(newHotspot.id);
-            toast({ title: 'Hotspot Placed', description: "Click to move, or click 'Edit Hotspot' to link it." });
-            return;
-        }
-        
-        // Case 2: A hotspot is selected, move it to the new clicked location.
-        if (selectedHotspotIdRef.current) {
-            const newPosition = { yaw: e.data.yaw, pitch: e.data.pitch };
-            const newNormalizedCoords = {
-                x: (newPosition.yaw / (2 * Math.PI)) + 0.5,
-                y: (newPosition.pitch / -Math.PI) + 0.5,
-            };
+            setSelectedHotspotId(e.marker.data.id as number);
+          });
 
-            setViewerHotspots(prev => prev.map(h => h.id === selectedHotspotIdRef.current ? { ...h, ...newNormalizedCoords } : h));
-            currentMarkersPlugin.updateMarker({ id: String(selectedHotspotIdRef.current), position: newPosition });
-            toast({ title: 'Hotspot Moved' });
-            return;
-        }
+          viewer.addEventListener('click', ((e: TypedEvent<Viewer, ClickData>) => {
+            if (e.data.marker) {
+                return;
+            }
+            
+            if (placementModeRef.current) {
+                const newHotspot: Hotspot = {
+                    id: Date.now(),
+                    x: (e.data.yaw / (2 * Math.PI)) + 0.5,
+                    y: (e.data.pitch / -Math.PI) + 0.5,
+                    linkedViewId: '',
+                };
+                
+                setViewerHotspots(prev => [...prev, newHotspot]);
+                currentMarkersPlugin.addMarker({
+                    id: String(newHotspot.id),
+                    position: { yaw: e.data.yaw, pitch: e.data.pitch },
+                    html: getHotspotSvg('white'),
+                    size: { width: 50, height: 50 },
+                    anchor: 'center center',
+                    tooltip: 'New Hotspot (unsaved)',
+                    data: newHotspot,
+                });
 
-        // Case 3: Clicked on background with nothing selected, so deselect.
-        setSelectedHotspotId(null);
-      }) as (evt: TypedEvent<Viewer, any>) => void);
-    }
+                setIsPlacingHotspot(false);
+                setSelectedHotspotId(newHotspot.id);
+                toast({ title: 'Hotspot Placed', description: "Click to move, or click 'Edit Hotspot' to link it." });
+                return;
+            }
+            
+            if (selectedHotspotIdRef.current) {
+                const newPosition = { yaw: e.data.yaw, pitch: e.data.pitch };
+                const newNormalizedCoords = {
+                    x: (newPosition.yaw / (2 * Math.PI)) + 0.5,
+                    y: (newPosition.pitch / -Math.PI) + 0.5,
+                };
+
+                setViewerHotspots(prev => prev.map(h => h.id === selectedHotspotIdRef.current ? { ...h, ...newNormalizedCoords } : h));
+                currentMarkersPlugin.updateMarker({ id: String(selectedHotspotIdRef.current), position: newPosition });
+                toast({ title: 'Hotspot Moved' });
+                return;
+            }
+
+            setSelectedHotspotId(null);
+          }) as (evt: TypedEvent<Viewer, any>) => void);
+        }
+    };
+    
+    initViewer();
 
     return () => {
       viewerRef.current?.destroy();
       viewerRef.current = null;
+      if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view?.type, view?.name, view?.hotspots, imageToEdit, getEntity, allEntities]);
