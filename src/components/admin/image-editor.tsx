@@ -60,6 +60,8 @@ interface ImageEditorProps {
     parentEntityType?: EntityType;
     entityId?: string;
     onEditHotspot: (hotspot: Hotspot) => void;
+    onPolygonsChange?: (polygons: Polygon[]) => void;
+    onHotspotsChange?: (hotspots: Hotspot[]) => void;
 }
 
 export interface ImageEditorRef {
@@ -79,13 +81,11 @@ function distToSegmentSquared(p: Point, v: Point, w: Point): number {
 }
 
 const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
-  ({ imageUrl, onMakeEntity, initialPolygons = [], initialHotspots = [], parentEntityType, entityId, onEditHotspot }, ref) => {
+  ({ imageUrl, onMakeEntity, initialPolygons = [], initialHotspots = [], parentEntityType, entityId, onEditHotspot, onPolygonsChange, onHotspotsChange }, ref) => {
   const { getView, getEntity } = useProjectData();
   const [polygons, setPolygons] = useState<Polygon[]>([]);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
-  const [history, setHistory] = useState<(Polygon[] | Hotspot[])[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(0);
-
+  
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedPolygonId, setSelectedPolygonId] = useState<number | null>(null);
@@ -97,6 +97,27 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   const initialPolygonsKey = useMemo(() => JSON.stringify(initialPolygons), [initialPolygons]);
   const initialHotspotsKey = useMemo(() => JSON.stringify(initialHotspots), [initialHotspots]);
   
+  const getRelativePolygonsFromAbsolute = useCallback((absolutePolygons: Polygon[]): Polygon[] => {
+    if (!svgRef.current) return [];
+    const { width, height } = svgRef.current.getBoundingClientRect();
+    if (width === 0 || height === 0) return [];
+    return absolutePolygons.map(poly => ({
+        ...poly,
+        points: poly.points.map(p => ({ x: p.x / width, y: p.y / height })),
+    }));
+  }, []);
+
+  const getRelativeHotspotsFromAbsolute = useCallback((absoluteHotspots: Hotspot[]): Hotspot[] => {
+      if (!svgRef.current) return [];
+      const { width, height } = svgRef.current.getBoundingClientRect();
+      if (width === 0 || height === 0) return [];
+      return absoluteHotspots.map(spot => ({
+          ...spot,
+          x: spot.x / width,
+          y: spot.y / height,
+      }));
+  }, []);
+
   useEffect(() => {
     const currentInitialPolygons = JSON.parse(initialPolygonsKey) as Polygon[];
     const currentInitialHotspots = JSON.parse(initialHotspotsKey) as Hotspot[];
@@ -115,47 +136,24 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
         }));
         setPolygons(absolutePolygons);
         setHotspots(absoluteHotspots);
-        setHistory([absolutePolygons, absoluteHotspots]);
-        setHistoryIndex(0);
       }
     } else if (!imageUrl) {
       setPolygons([]);
       setHotspots([]);
-      setHistory([[], []]);
-      setHistoryIndex(0);
     }
   }, [initialPolygonsKey, initialHotspotsKey, imageUrl]);
 
   useImperativeHandle(ref, () => ({
-    getRelativePolygons: () => {
-      if (!svgRef.current) return [];
-      const { width, height } = svgRef.current.getBoundingClientRect();
-      if (width === 0 || height === 0) return [];
-      return polygons.map(poly => ({ ...poly, points: poly.points.map(p => ({ x: p.x / width, y: p.y / height })) }));
-    },
-    getRelativeHotspots: () => {
-      if (!svgRef.current) return [];
-      const { width, height } = svgRef.current.getBoundingClientRect();
-      if (width === 0 || height === 0) return [];
-      return hotspots.map(spot => ({ ...spot, x: spot.x / width, y: spot.y / height }));
-    },
+    getRelativePolygons: () => getRelativePolygonsFromAbsolute(polygons),
+    getRelativeHotspots: () => getRelativeHotspotsFromAbsolute(hotspots),
     updateHotspot: (updatedHotspot: Hotspot) => {
         setHotspots(prevHotspots => {
             const newHotspots = prevHotspots.map(h => h.id === updatedHotspot.id ? { ...h, ...updatedHotspot} : h);
-            saveToHistory(polygons, newHotspots);
+            onHotspotsChange?.(getRelativeHotspotsFromAbsolute(newHotspots));
             return newHotspots;
         });
     },
   }));
-
-  const saveToHistory = (newPolygons: Polygon[], newHotspots: Hotspot[]) => {
-    // For simplicity, we can create a single history state, but for now this is fine.
-    // In a real app, a more robust undo/redo manager would be better.
-  };
-
-  const handleUndo = useCallback(() => { /* ... */ }, []);
-
-  useEffect(() => { /* ... */ }, [handleUndo]);
 
   const handleAddPolygon = () => {
     if (!svgRef.current) return;
@@ -166,7 +164,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     };
     const newPolygons = [...polygons, newPolygon];
     setPolygons(newPolygons);
-    saveToHistory(newPolygons, hotspots);
+    onPolygonsChange?.(getRelativePolygonsFromAbsolute(newPolygons));
     setSelectedPolygonId(newPolygon.id);
     setSelectedHotspotId(null);
   };
@@ -175,8 +173,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     if (!selectedPolygonId) return;
     const newPolygons = polygons.filter(p => p.id !== selectedPolygonId);
     setPolygons(newPolygons);
+    onPolygonsChange?.(getRelativePolygonsFromAbsolute(newPolygons));
     setSelectedPolygonId(null);
-    saveToHistory(newPolygons, hotspots);
   }
 
   const handleConfirmSelection = () => {
@@ -197,7 +195,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     };
     const newHotspots = [...hotspots, newHotspot];
     setHotspots(newHotspots);
-    saveToHistory(polygons, newHotspots);
+    onHotspotsChange?.(getRelativeHotspotsFromAbsolute(newHotspots));
     setSelectedHotspotId(newHotspot.id);
     setSelectedPolygonId(null);
   };
@@ -206,8 +204,8 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     if (!selectedHotspotId) return;
     const newHotspots = hotspots.filter(h => h.id !== selectedHotspotId);
     setHotspots(newHotspots);
+    onHotspotsChange?.(getRelativeHotspotsFromAbsolute(newHotspots));
     setSelectedHotspotId(null);
-    saveToHistory(polygons, newHotspots);
   };
 
   const handleConfirmHotspot = () => {
@@ -219,7 +217,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     if (!selectedPolygonId || !data) return;
     const newPolygons = polygons.map(p => p.id === selectedPolygonId ? { ...p, details: data } : p);
     setPolygons(newPolygons);
-    saveToHistory(newPolygons, hotspots);
+    onPolygonsChange?.(getRelativePolygonsFromAbsolute(newPolygons));
   };
 
   const getMousePosition = (e: MouseEvent): Point => {
@@ -330,14 +328,18 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   };
 
   const handleMouseUp = () => {
-    if (dragInfo) saveToHistory(polygons, hotspots);
+    if (dragInfo) {
+      if (dragInfo.type === 'hotspot' || dragInfo.type === 'hotspot-rotation') {
+        onHotspotsChange?.(getRelativeHotspotsFromAbsolute(hotspots));
+      } else {
+        onPolygonsChange?.(getRelativePolygonsFromAbsolute(polygons));
+      }
+    }
     setDragInfo(null);
   };
 
   const handlePolygonDoubleClick = (e: MouseEvent, polygonId: number) => {
     e.preventDefault();
-    setSelectedPolygonId(polygonId);
-    setSelectedHotspotId(null);
     const mousePos = getMousePosition(e);
     const thresholdSquared = 100;
 
@@ -364,7 +366,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
         newPoints.splice(closestEdgeIndex + 1, 0, mousePos);
         newPolygons[polyIndex] = { ...polygon, points: newPoints };
         setPolygons(newPolygons);
-        saveToHistory(newPolygons, hotspots);
+        onPolygonsChange?.(getRelativePolygonsFromAbsolute(newPolygons));
     }
   };
   

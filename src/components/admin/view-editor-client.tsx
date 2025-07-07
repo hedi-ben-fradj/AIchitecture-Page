@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, Save, ArrowLeft, Eye, Edit, Trash2 } from 'lucide-react';
-import ImageEditor, { type ImageEditorRef, type Hotspot } from '@/components/admin/image-editor';
+import ImageEditor, { type ImageEditorRef, type Hotspot, type Polygon } from '@/components/admin/image-editor';
 import { useProjectData, type EntityType } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
 import HotspotDetailsModal from './hotspot-details-modal';
@@ -272,6 +272,18 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       setSelectedHotspotId(null);
     }
   };
+
+  const handlePolygonsChange = useCallback((newRelativePolygons: Polygon[]) => {
+    if (view) {
+      updateViewSelections(entityId, view.id, newRelativePolygons);
+    }
+  }, [updateViewSelections, entityId, view]);
+
+  const handleHotspotsChange = useCallback((newRelativeHotspots: Hotspot[]) => {
+      if (view) {
+        updateViewHotspots(entityId, view.id, newRelativeHotspots);
+      }
+  }, [updateViewHotspots, entityId, view]);
   
   if (!view || !entity) {
     return (
@@ -285,7 +297,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > 4 * 1024 * 1024) { 
-        alert("File size exceeds 4MB. Please choose a smaller image.");
+        toast({ variant: 'destructive', title: 'File too large', description: "File size exceeds 4MB. Please choose a smaller image."});
         if(fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
@@ -313,7 +325,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-             alert('Could not process image.');
+             toast({ variant: 'destructive', title: 'Error', description: 'Could not process image.' });
              return;
           }
           ctx.drawImage(img, 0, 0, width, height);
@@ -322,7 +334,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
           setImageToEdit(resizedImageUrl);
           await updateViewImage(entityId, viewId, resizedImageUrl);
         };
-        img.onerror = () => alert("Failed to load the image file.");
+        img.onerror = () => toast({ variant: 'destructive', title: 'Error', description: 'Failed to load the image file.'});
         img.src = imageUrl;
       };
       reader.readAsDataURL(file);
@@ -435,6 +447,8 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                   setHotspotToEdit(hotspot);
                   setIsHotspotModalOpen(true);
                 }}
+                onPolygonsChange={handlePolygonsChange}
+                onHotspotsChange={handleHotspotsChange}
             />
            )}
          </div>
