@@ -36,6 +36,7 @@ interface Project {
 // Minimal type for entity to avoid full context dependency
 interface ProjectEntity {
     id: string;
+    projectId: string;
     entityType: string;
     status?: 'available' | 'sold';
 }
@@ -44,16 +45,6 @@ interface ProjectStats {
     totalUnits: number;
     soldUnits: number;
     availableUnits: number;
-}
-
-const deleteCollection = async (collectionRef: any) => {
-    const q = query(collectionRef);
-    const snapshot = await getDocs(q);
-    const batch = writeBatch(db);
-    snapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
-    });
-    await batch.commit();
 }
 
 export default function AdminProjectsPage() {
@@ -84,7 +75,7 @@ export default function AdminProjectsPage() {
                 // Load stats for each project
                 const stats: Record<string, ProjectStats> = {};
                 for (const project of loadedProjects) {
-                    const entitiesQuery = query(collection(db, 'projects', project.id, 'entities'), where('entityType', 'in', ['Apartment', 'house']));
+                    const entitiesQuery = query(collection(db, 'entities'), where('projectId', '==', project.id), where('entityType', 'in', ['Apartment', 'house']));
                     const entitiesSnapshot = await getDocs(entitiesQuery);
                     
                     let totalUnits = 0;
@@ -118,12 +109,16 @@ export default function AdminProjectsPage() {
         if (!projectToDelete) return;
         
         try {
-            // Firestore does not support deleting subcollections from the client SDK directly.
-            // A common pattern is to use a Cloud Function. For this client-side implementation,
-            // we'll delete collections by querying and batch-deleting documents.
-            // This can be slow for large projects.
-            const entitiesRef = collection(db, 'projects', projectToDelete.id, 'entities');
-            await deleteCollection(entitiesRef);
+            // Delete all entities associated with the project
+            const entitiesQuery = query(collection(db, 'entities'), where('projectId', '==', projectToDelete.id));
+            const entitiesSnapshot = await getDocs(entitiesQuery);
+            if (!entitiesSnapshot.empty) {
+                const batch = writeBatch(db);
+                entitiesSnapshot.docs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+            }
             
             // Delete the main project document
             await deleteDoc(doc(db, 'projects', projectToDelete.id));
@@ -206,7 +201,8 @@ export default function AdminProjectsPage() {
                     }
 
                     const newEntity = {
-                        id: finalId, // Will be used for subcollection path
+                        id: finalId, // Will be used for doc id
+                        projectId: slug,
                         name: templateEntity.entityName,
                         entityType: templateEntity.entityType,
                         parentId: parentId,
@@ -240,9 +236,10 @@ export default function AdminProjectsPage() {
             createEntitiesRecursive(template.projectEntities, null, allNewEntities);
             
             allNewEntities.forEach((entityData, entityId) => {
-                const entityDocRef = doc(db, 'projects', slug, 'entities', entityId);
+                const entityDocRef = doc(db, 'entities', entityId);
                 const { id, ...dataToSave } = entityData; // Don't save id inside the doc itself
-                batch.set(entityDocRef, dataToSave);
+                const finalData = Object.fromEntries(Object.entries(dataToSave).filter(([_, v]) => v !== undefined));
+                batch.set(entityDocRef, finalData);
             });
 
             // Commit the batch

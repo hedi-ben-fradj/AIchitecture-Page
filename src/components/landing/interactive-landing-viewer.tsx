@@ -13,7 +13,7 @@ import FilterSidebar, { type Filters } from './filter-sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, getDocs, query } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 
 
 interface RenderedImageRect {
@@ -70,6 +70,7 @@ export interface RoomDetail {
 }
 export interface Entity {
   id: string;
+  projectId: string;
   name: string;
   entityType: EntityType;
   parentId?: string | null;
@@ -163,7 +164,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 const landingPageEntityId = projectData.landingPageEntityId;
 
                 // 3. Load all entities for that project
-                const entitiesSnapshot = await getDocs(query(collection(db, 'projects', landingProjectId, 'entities')));
+                const entitiesSnapshot = await getDocs(query(collection(db, 'entities'), where('projectId', '==', landingProjectId)));
                 const loadedEntities = entitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Entity[];
                 setAllEntities(loadedEntities);
 

@@ -25,7 +25,6 @@ interface Project {
 }
 
 interface EnrichedEntity extends Entity {
-    projectId: string;
     projectName: string;
     parentName?: string;
 }
@@ -63,18 +62,18 @@ export default function DatabasePage() {
             const loadedProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
             setProjects(loadedProjects);
 
-            // Load all entities from all projects
-            let entitiesFromAllProjects: EnrichedEntity[] = [];
-            for (const project of loadedProjects) {
-                const entitiesSnapshot = await getDocs(collection(db, 'projects', project.id, 'entities'));
-                const projectEntities = entitiesSnapshot.docs.map(doc => ({
+            const projectMap = new Map(loadedProjects.map(p => [p.id, p.name]));
+
+            // Load all entities from the top-level collection
+            const allEntitiesSnapshot = await getDocs(collection(db, 'entities'));
+            const entitiesFromAllProjects = allEntitiesSnapshot.docs.map(doc => {
+                const data = doc.data() as Entity;
+                return {
                     id: doc.id,
-                    ...doc.data(),
-                    projectId: project.id,
-                    projectName: project.name,
-                })) as EnrichedEntity[];
-                entitiesFromAllProjects.push(...projectEntities);
-            }
+                    ...data,
+                    projectName: projectMap.get(data.projectId) || 'Unknown Project',
+                };
+            }) as EnrichedEntity[];
 
             const enrichedEntitiesWithParents = entitiesFromAllProjects.map(entity => {
                 if (entity.parentId) {
@@ -100,11 +99,10 @@ export default function DatabasePage() {
     }, [loadData]);
 
     const handleUpdateEntity = async (entityId: string, dataToUpdate: Partial<Entity>) => {
-        const entity = allEntities.find(e => e.id === entityId);
-        if (!entity) return;
+        if (!allEntities.find(e => e.id === entityId)) return;
 
         try {
-            const entityRef = doc(db, 'projects', entity.projectId, 'entities', entityId);
+            const entityRef = doc(db, 'entities', entityId);
             await updateDoc(entityRef, dataToUpdate);
             await loadData(); // Reload all data
             setEntityToEdit(null);
@@ -136,7 +134,7 @@ export default function DatabasePage() {
             const batch = writeBatch(db);
 
             allIdsToDelete.forEach(id => {
-                const entityRef = doc(db, 'projects', entityToDelete.projectId, 'entities', id);
+                const entityRef = doc(db, 'entities', id);
                 batch.delete(entityRef);
             });
             

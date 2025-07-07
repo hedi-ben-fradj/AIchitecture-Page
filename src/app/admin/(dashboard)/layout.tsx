@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { usePathname, useParams } from 'next/navigation';
 import { ViewsProvider } from '@/contexts/views-context';
 import { db } from '@/lib/firebase';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot, where } from 'firebase/firestore';
 
 // Minimal type for sidebar display
 interface SidebarView {
@@ -126,7 +126,7 @@ export default function AdminLayout({
         setEntities([]);
         return;
     }
-    const entitiesQuery = query(collection(db, 'projects', projectId, 'entities'));
+    const entitiesQuery = query(collection(db, 'entities'), where('projectId', '==', projectId));
 
     const unsubscribe = onSnapshot(entitiesQuery, (querySnapshot) => {
         const entitiesForSidebar = querySnapshot.docs.map(doc => ({

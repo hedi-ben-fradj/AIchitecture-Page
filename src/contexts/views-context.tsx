@@ -51,6 +51,7 @@ export interface RoomDetail {
 
 export interface Entity {
   id: string;
+  projectId: string;
   name: string;
   entityType: EntityType;
   parentId?: string | null;
@@ -177,8 +178,8 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
             const projectData = projectDoc.exists() ? projectDoc.data() : {};
             setLandingPageEntityIdState(projectData.landingPageEntityId || null);
 
-            // Fetch all entities for the project
-            const entitiesQuery = query(collection(db, 'projects', projectId, 'entities'));
+            // Fetch all entities for the project from the top-level collection
+            const entitiesQuery = query(collection(db, 'entities'), where('projectId', '==', projectId));
             const entitiesSnapshot = await getDocs(entitiesQuery);
             const fetchedEntities = entitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Entity[];
             
@@ -216,7 +217,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         return;
     }
 
-    const entityRef = doc(db, 'projects', projectId, 'entities', slug);
+    const entityRef = doc(db, 'entities', slug);
     const entitySnap = await getDoc(entityRef);
 
     if (entitySnap.exists()) {
@@ -225,6 +226,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     }
 
     const newEntityData: Omit<Entity, 'id'> = {
+      projectId: projectId,
       name: entityName,
       entityType: entityType,
       parentId: parentId,
@@ -255,11 +257,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, [projectId]);
 
   const updateEntity = useCallback(async (entityId: string, data: Partial<Entity>) => {
-    if (!projectId) return;
-    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    const entityRef = doc(db, 'entities', entityId);
     await updateDoc(entityRef, data);
     setEntities(prev => prev.map(e => e.id === entityId ? { ...e, ...data } : e));
-  }, [projectId]);
+  }, []);
 
   const deleteEntity = useCallback(async (entityId: string) => {
     if (!projectId) return;
@@ -270,7 +271,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     const batch = writeBatch(db);
 
     allIdsToDelete.forEach(id => {
-        const entityRef = doc(db, 'projects', projectId, 'entities', id);
+        const entityRef = doc(db, 'entities', id);
         batch.delete(entityRef);
     });
 
@@ -325,7 +326,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
     const newView: View = { id: newViewId, name: viewName, type: viewType };
     
-    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    const entityRef = doc(db, 'entities', entityId);
     const viewData = {
         id: newView.id,
         name: newView.name,
@@ -350,15 +351,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, [projectId, entities]);
 
   const deleteView = useCallback(async (entityId: string, viewId: string) => {
-    if (!projectId) return;
-
     const entity = getEntity(entityId);
     const viewToDelete = entity?.views.find(v => v.id === viewId);
     if (!entity || !viewToDelete) return;
 
     const viewMetadata = { id: viewToDelete.id, name: viewToDelete.name, type: viewToDelete.type };
 
-    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    const entityRef = doc(db, 'entities', entityId);
     await updateDoc(entityRef, {
         views: arrayRemove(viewMetadata)
     });
@@ -387,11 +386,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         return e;
     }));
 
-  }, [projectId, getEntity]);
+  }, [getEntity]);
 
   const updateViewData = async (entityId: string, viewId: string, data: Partial<View>) => {
-    if (!projectId) return;
-    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    const entityRef = doc(db, 'entities', entityId);
     const entitySnap = await getDoc(entityRef);
     if (!entitySnap.exists()) return;
 
@@ -425,11 +423,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   const updateViewHotspots = (entityId: string, viewId: string, hotspots: Hotspot[]) => updateViewData(entityId, viewId, { hotspots });
   
   const setDefaultViewId = useCallback(async (entityId: string, viewId: string) => {
-    if (!projectId) return;
-    const entityRef = doc(db, 'projects', projectId, 'entities', entityId);
+    const entityRef = doc(db, 'entities', entityId);
     await updateDoc(entityRef, { defaultViewId: viewId });
     setEntities(prev => prev.map(e => e.id === entityId ? { ...e, defaultViewId: viewId } : e));
-  }, [projectId]);
+  }, []);
 
   const addEntityType = useCallback(async (typeName: string) => {
     if (entityTypes.map(t => t.toLowerCase()).includes(typeName.toLowerCase())) {
