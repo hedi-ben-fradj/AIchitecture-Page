@@ -86,6 +86,13 @@ export interface View {
   hotspots?: Hotspot[];
 }
 
+const getHotspotMarkerHtml = (text: string) => `
+  <div style="text-align: center; color: white; font-family: sans-serif; font-size: 14px; text-shadow: 0 0 5px black;">
+    <img src="/assets/orb.png" width="80" height="80" style="filter: drop-shadow(0 0 8px white); transition: filter 0.2s ease-in-out; margin-bottom: 5px;" />
+    <p style="margin: 0; padding: 2px 8px; background-color: rgba(0,0,0,0.6); border-radius: 4px; display: inline-block;">${text}</p>
+  </div>
+`;
+
 
 export default function InteractiveLandingViewer({ setActiveView }: { setActiveView: (view: string) => void }) {
     const [currentView, setCurrentView] = useState<FullView | null>(null);
@@ -374,18 +381,21 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     return 'Link';
                 };
 
-                const initialMarkers = (currentView.hotspots || []).map(hotspot => ({
-                    id: String(hotspot.id),
-                    position: {
-                        yaw: (hotspot.x - 0.5) * 2 * Math.PI,
-                        pitch: (hotspot.y - 0.5) * -Math.PI
-                    },
-                    html: `<img src="/assets/orb.png" width="50" height="50" style="filter: drop-shadow(0 0 8px white);" />`,
-                    size: { width: 50, height: 50 },
-                    anchor: 'center center',
-                    tooltip: findViewName(hotspot),
-                    data: { linkedViewId: hotspot.linkedViewId },
-                }));
+                const initialMarkers = (currentView.hotspots || []).map(hotspot => {
+                    const tooltipText = findViewName(hotspot);
+                    return {
+                        id: String(hotspot.id),
+                        position: {
+                            yaw: (hotspot.x - 0.5) * 2 * Math.PI,
+                            pitch: (hotspot.y - 0.5) * -Math.PI
+                        },
+                        html: getHotspotMarkerHtml(tooltipText),
+                        size: { width: 80, height: 110 },
+                        anchor: 'center center',
+                        tooltip: null,
+                        data: { linkedViewId: hotspot.linkedViewId },
+                    };
+                });
                 markersPlugin.setMarkers(initialMarkers);
 
                 markersPlugin.addEventListener('select-marker', (e) => {
@@ -980,8 +990,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         const rotation = hotspot.rotation || 0;
                         const fov = hotspot.fov || 60;
                         
-                        const innerRadius = 15;
-                        const outerRadius = 30;
+                        const innerRadius = 20;
+                        const outerRadius = 35;
 
                         const rotationRad = rotation * (Math.PI / 180);
                         const fovRad = fov * (Math.PI / 180);

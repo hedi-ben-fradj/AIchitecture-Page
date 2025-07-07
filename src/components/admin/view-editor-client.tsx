@@ -22,8 +22,12 @@ interface ViewEditorClientProps {
   viewId: string;
 }
 
-const getHotspotMarkerHtml = (color: string) =>
-  `<img src="/assets/orb.png" width="50" height="50" style="filter: drop-shadow(0 0 8px ${color}); transition: filter 0.2s ease-in-out;" />`;
+const getHotspotMarkerHtml = (color: string, text: string) => `
+  <div style="text-align: center; color: white; font-family: sans-serif; font-size: 14px; text-shadow: 0 0 5px black;">
+    <img src="/assets/orb.png" width="80" height="80" style="filter: drop-shadow(0 0 8px ${color}); transition: filter 0.2s ease-in-out; margin-bottom: 5px;" />
+    <p style="margin: 0; padding: 2px 8px; background-color: rgba(0,0,0,0.6); border-radius: 4px; display: inline-block;">${text}</p>
+  </div>
+`;
 
 
 export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEditorClientProps) {
@@ -113,18 +117,21 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             return 'Link';
           };
 
-          const initialMarkers = (view.hotspots || []).map(hotspot => ({
+          const initialMarkers = (view.hotspots || []).map(hotspot => {
+            const tooltipText = findViewName(hotspot);
+            return {
               id: String(hotspot.id),
               position: { 
                 yaw: (hotspot.x - 0.5) * 2 * Math.PI, 
                 pitch: (hotspot.y - 0.5) * -Math.PI 
               },
-              html: getHotspotMarkerHtml('white'),
-              size: { width: 50, height: 50 },
+              html: getHotspotMarkerHtml('white', tooltipText),
+              size: { width: 80, height: 110 },
               anchor: 'center center',
-              tooltip: findViewName(hotspot),
+              tooltip: null,
               data: hotspot,
-          }));
+            }
+          });
           currentMarkersPlugin.setMarkers(initialMarkers);
 
           currentMarkersPlugin.addEventListener('select-marker', (e) => {
@@ -150,10 +157,10 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 currentMarkersPlugin.addMarker({
                     id: String(newHotspot.id),
                     position: { yaw: e.data.yaw, pitch: e.data.pitch },
-                    html: getHotspotMarkerHtml('white'),
-                    size: { width: 50, height: 50 },
+                    html: getHotspotMarkerHtml('white', 'New Hotspot'),
+                    size: { width: 80, height: 110 },
                     anchor: 'center center',
-                    tooltip: 'New Hotspot (unsaved)',
+                    tooltip: null,
                     data: newHotspot,
                 });
 
@@ -191,15 +198,27 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     useEffect(() => {
         if (!markersPlugin) return;
 
+        const findViewName = (h: Hotspot) => {
+            if (!h.linkedViewId) return 'Unlinked Hotspot';
+            for (const entity of allEntities) {
+                const foundView = entity.views.find(v => v.id === h.linkedViewId);
+                if (foundView) return foundView.name;
+            }
+            return 'Link';
+        };
+        
         const currentMarkers = markersPlugin.getMarkers();
 
         currentMarkers.forEach(marker => {
             const isSelected = marker.id === String(selectedHotspotId);
+            const hotspotData = viewerHotspots.find(h => String(h.id) === marker.id);
+            const tooltipText = hotspotData ? findViewName(hotspotData) : 'New Hotspot';
+            
             try {
                 if (markersPlugin.getMarker(marker.id)) {
                     markersPlugin.updateMarker({
                         id: marker.id,
-                        html: getHotspotMarkerHtml(isSelected ? '#facc15' : 'white'),
+                        html: getHotspotMarkerHtml(isSelected ? '#facc15' : 'white', tooltipText),
                     });
                 }
             } catch (e) {
@@ -209,7 +228,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 }
             }
         });
-    }, [selectedHotspotId, markersPlugin, viewerHotspots]);
+    }, [selectedHotspotId, markersPlugin, viewerHotspots, allEntities]);
 
 
   const handleSaveHotspot = (hotspotData: { linkedViewId: string }) => {
@@ -219,29 +238,10 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
     if (view?.type === '360') {
       if (markersPlugin) {
-        const findViewName = (h: Hotspot) => {
-          if (!h.linkedViewId) return 'Unlinked Hotspot';
-          for (const entity of allEntities) {
-            const foundView = entity.views.find((v) => v.id === h.linkedViewId);
-            if (foundView) return foundView.name;
-          }
-          return 'Link';
-        };
-
         setViewerHotspots((prev) =>
           prev.map((h) => (h.id === updatedHotspot.id ? updatedHotspot : h))
         );
-        try {
-          if (markersPlugin.getMarker(String(updatedHotspot.id))) {
-              markersPlugin.updateMarker({
-                  id: String(updatedHotspot.id),
-                  data: updatedHotspot,
-                  tooltip: findViewName(updatedHotspot),
-              });
-          }
-        } catch (e) {
-          console.warn(`Could not update marker on save: ${updatedHotspot.id}`, e)
-        }
+        // The useEffect will handle the visual update
       }
     } else {
       // Logic for 2D editor
