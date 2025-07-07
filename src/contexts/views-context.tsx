@@ -400,7 +400,10 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     const viewIndex = views.findIndex(v => v.id === viewId);
     if (viewIndex === -1) return;
 
-    const updatedView = { ...views[viewIndex], ...data };
+    // This is a simple way to deep clone and remove any `undefined` values.
+    const cleanedData = JSON.parse(JSON.stringify(data));
+
+    const updatedView = { ...views[viewIndex], ...cleanedData };
     const updatedViews = [...views];
     updatedViews[viewIndex] = updatedView;
 
