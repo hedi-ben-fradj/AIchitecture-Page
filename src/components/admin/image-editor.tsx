@@ -28,6 +28,7 @@ export interface Polygon {
     area?: number;
     makeAsEntity?: boolean;
     entityType?: EntityType;
+    linkedEntityId?: string;
   };
 }
 
@@ -53,7 +54,7 @@ interface DragInfo {
 
 interface ImageEditorProps {
     imageUrl: string;
-    onMakeEntity?: (entityName: string, entityType: EntityType) => void;
+    onMakeEntity?: (entityName: string, entityType: EntityType) => Promise<string | null>;
     initialPolygons?: Polygon[];
     initialHotspots?: Hotspot[];
     parentEntityType?: EntityType;

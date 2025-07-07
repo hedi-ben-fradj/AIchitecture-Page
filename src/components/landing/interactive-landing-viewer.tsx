@@ -37,16 +37,6 @@ export interface Hotspot {
   fov?: number;
 }
 
-// Define types for View, Polygon, and Entity if not already imported from a central location
-export interface View {
-  id: string;
-  name: string;
-  imageUrl?: string;
-  type: string;
-  selections?: Polygon[];
-  hotspots?: Hotspot[];
-}
-
 export interface Polygon {
   id: number;
   points: { x: number; y: number; }[];
@@ -58,6 +48,7 @@ export interface Polygon {
     area?: number;
     makeAsEntity?: boolean;
     entityType?: EntityType;
+    linkedEntityId?: string;
   };
 }
 
@@ -85,6 +76,16 @@ export interface Entity {
   rooms?: number;
   detailedRooms?: RoomDetail[];
 }
+// Define types for View if not already imported from a central location
+export interface View {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  type: string;
+  selections?: Polygon[];
+  hotspots?: Hotspot[];
+}
+
 
 const getHotspotSvg = (color: string) => `
 <svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye drop-shadow-lg">
@@ -448,14 +449,12 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         if (selection.details) {
             setClickedSelection(selection);
 
-             if (selection.details.makeAsEntity && selection.details.title) {
-                const parentId = currentView?.entityId;
-                const targetEntity = allEntities.find(e => e.parentId === parentId && e.name === selection.details?.title);
+            if (selection.details.makeAsEntity && selection.details.linkedEntityId) {
+                const targetEntity = allEntities.find(e => e.id === selection.details!.linkedEntityId);
                 setClickedEntity(targetEntity || null);
             } else {
                 setClickedEntity(null);
             }
-
 
             if (renderedImageRect && containerRef.current) {
                 const { x: imgX, y: imgY, width: imgWidth, height: imgHeight } = renderedImageRect;
@@ -513,11 +512,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                  closeDetails();
             }
         } else {
-            const entityForSelection = allEntities.find(e => e.parentId === currentView?.entityId && e.name === entityId);
-            if (entityForSelection && entityForSelection.defaultViewId) {
-                handleNavigate(entityForSelection.id);
-                return;
-            }
             alert(`The entity with ID "${entityId}" or its default view could not be found.`);
             closeDetails();
         }
@@ -919,7 +913,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
                         if (!hasDetails) return null;
 
-                        const entityForSelection = allEntities.find(e => e.parentId === currentView.entityId && e.name === selection.details?.title);
+                        const entityForSelection = allEntities.find(e => e.id === selection.details?.linkedEntityId);
                         const isProperty = entityForSelection && (entityForSelection.entityType === 'Apartment' || entityForSelection.entityType === 'house');
 
                         const getHighlightClasses = () => {
@@ -1172,7 +1166,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     <div className="pointer-events-auto overflow-x-auto pb-2 -mb-2 flex justify-center">
                         <div className="flex gap-4 w-max">
                             {(!isFilterApplied ? currentView.selections?.filter(s => s.details?.title) || [] : filteredSelections.map(f => f.selection)).map((selection) => {
-                                const entityForSelection = allEntities.find(e => e.parentId === currentView.entityId && e.name === selection.details?.title);
+                                const entityForSelection = allEntities.find(e => e.id === selection.details?.linkedEntityId);
                                 const isProperty = entityForSelection && (entityForSelection.entityType === 'Apartment' || entityForSelection.entityType === 'house');
                                 
                                 const isClicked = clickedSelection?.id === selection.id;

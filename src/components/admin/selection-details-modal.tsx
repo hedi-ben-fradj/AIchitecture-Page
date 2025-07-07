@@ -49,7 +49,7 @@ interface SelectionDetailsModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (data: Polygon['details']) => void;
-    onMakeEntity?: (entityName: string, entityType: EntityType) => void;
+    onMakeEntity?: (entityName: string, entityType: EntityType) => Promise<string | null>;
     selectionData?: Polygon | null;
     parentEntityType?: EntityType;
     entityId?: string;
@@ -125,7 +125,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, onMakeE
 
     useEffect(() => {
         if (selectionData?.details) {
-            const isLinked = childEntities.some(child => child.name === selectionData.details!.title && selectionData.details!.makeAsEntity);
+            const isLinked = !!selectionData.details.linkedEntityId && childEntities.some(child => child.id === selectionData.details!.linkedEntityId);
             
             form.reset({
                 ...selectionData.details,
@@ -133,7 +133,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, onMakeE
                 height: selectionData.details.height || '',
                 area: selectionData.details.area || '',
                 linkToExisting: isLinked,
-                linkedEntityId: isLinked ? childEntities.find(c => c.name === selectionData.details!.title)?.id : '',
+                linkedEntityId: isLinked ? selectionData.details.linkedEntityId : '',
             });
         } else {
             form.reset({
@@ -151,7 +151,7 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, onMakeE
         }
     }, [selectionData, form, getDefaultEntityType, childEntities]);
 
-    const onSubmit = (data: SelectionDetailsFormValues) => {
+    const onSubmit = async (data: SelectionDetailsFormValues) => {
         let saveData: Polygon['details'];
 
         if (data.linkToExisting && data.linkedEntityId) {
@@ -162,11 +162,22 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, onMakeE
             }
             saveData = {
                 title: linkedEntity.name,
+                description: linkedEntity.name,
                 makeAsEntity: true,
                 entityType: linkedEntity.entityType,
-                description: linkedEntity.name, // Or some other default
+                linkedEntityId: linkedEntity.id,
             };
         } else {
+            let newEntityId: string | null = null;
+            if (data.makeAsEntity && data.title && data.entityType && onMakeEntity) {
+                newEntityId = await onMakeEntity(data.title, data.entityType as EntityType);
+                if (!newEntityId) {
+                    console.error("Failed to create entity.");
+                    // Optionally: show a toast to the user
+                    return;
+                }
+            }
+
             saveData = {
                 title: data.title!,
                 description: data.description,
@@ -176,10 +187,8 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, onMakeE
                 area: data.area ? Number(data.area) : undefined,
                 makeAsEntity: data.makeAsEntity,
                 entityType: data.makeAsEntity ? (data.entityType as EntityType) : undefined,
+                linkedEntityId: newEntityId ?? undefined,
             };
-            if (data.makeAsEntity && data.title && data.entityType && onMakeEntity) {
-                onMakeEntity(data.title, data.entityType as EntityType);
-            }
         }
         
         onSave(saveData);

@@ -330,8 +330,8 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     if (event.target) event.target.value = '';
   };
 
-  const handleMakeEntity = (newEntityName: string, newEntityType: EntityType) => {
-    addEntity(newEntityName, newEntityType, entityId);
+  const handleMakeEntity = async (newEntityName: string, newEntityType: EntityType): Promise<string | null> => {
+    return await addEntity(newEntityName, newEntityType, entityId);
   };
 
   const triggerFileInput = () => {

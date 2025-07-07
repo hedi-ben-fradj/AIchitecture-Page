@@ -76,7 +76,7 @@ interface ProjectContextType {
   viewTypes: ViewType[];
   
   // Entity methods
-  addEntity: (entityName: string, entityType: EntityType, parentId?: string | null) => void;
+  addEntity: (entityName: string, entityType: EntityType, parentId?: string | null) => Promise<string | null>;
   deleteEntity: (entityId: string) => void;
   updateEntity: (entityId: string, data: Partial<Entity>) => void;
   getEntity: (entityId: string) => Entity | undefined;
@@ -208,13 +208,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     return entity?.views.find(v => v.id === viewId);
   }, [getEntity]);
 
-  const addEntity = useCallback(async (entityName: string, entityType: EntityType, parentId: string | null = null) => {
-    if (!projectId) return;
+  const addEntity = useCallback(async (entityName: string, entityType: EntityType, parentId: string | null = null): Promise<string | null> => {
+    if (!projectId) return null;
 
     const slug = entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     if (!slug) {
         alert("Invalid entity name.");
-        return;
+        return null;
     }
 
     const entityRef = doc(db, 'entities', slug);
@@ -222,7 +222,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
     if (entitySnap.exists()) {
         alert(`Entity with name "${entityName}" already exists or name is invalid.`);
-        return;
+        return null;
     }
 
     const newEntityData: Omit<Entity, 'id'> = {
@@ -241,25 +241,20 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     }
     
     // Filter out undefined values
-    const finalData = Object.fromEntries(Object.entries(newEntityData).filter(([_, v]) => v !== undefined));
+    const finalData = Object.fromEntries(Object.entries(newEntityData).filter(([, v]) => v !== undefined));
 
     await setDoc(entityRef, finalData);
     setEntities(prev => [...prev, { id: slug, ...finalData } as Entity]);
+    return slug;
 
   }, [projectId]);
 
   const updateEntity = useCallback(async (entityId: string, data: Partial<Entity>) => {
-    // Create a new object with only defined values to prevent Firestore errors.
     const cleanData = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
     
-    // Only update if there is data to update. This prevents empty updates.
     if (Object.keys(cleanData).length > 0) {
         const entityRef = doc(db, 'entities', entityId);
         await updateDoc(entityRef, cleanData);
-        
-        // Update the local state with the cleaned data.
-        // This ensures the local state is consistent with what was saved to Firestore
-        // and prevents overwriting existing values with 'undefined'.
         setEntities(prev => prev.map(e => e.id === entityId ? { ...e, ...cleanData } : e));
     }
   }, []);
