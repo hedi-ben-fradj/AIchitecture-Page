@@ -20,7 +20,7 @@ import { collection, getDocs } from 'firebase/firestore';
 interface AddProjectFromTemplateModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAddProject: (name: string, description: string, templateContent: string) => void;
+    onAddProject: (name: string, description: string, templateContent: string) => Promise<void>;
 }
 
 // Recursive function to check for placeholder values like "<...>"
@@ -56,6 +56,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
     const { entityTypes } = useProjectData();
     const [editorMode, setEditorMode] = useState<'json' | 'visual'>('json');
     const [projectData, setProjectData] = useState<any>(null);
+    const [isCreating, setIsCreating] = useState(false);
 
 
     const templateSchema = useMemo(() => {
@@ -121,6 +122,7 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
             setProjectData(null);
             setIsVerified(false);
             setEditorMode('json');
+            setIsCreating(false);
         }
     }, [isOpen]);
 
@@ -184,8 +186,8 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
     };
 
 
-    const handleCreate = () => {
-        if (!isVerified) {
+    const handleCreate = async () => {
+        if (!isVerified || isCreating) {
              toast({
                 title: "Not Verified",
                 description: "Please verify the template before creating the project.",
@@ -194,12 +196,13 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
             return;
         }
 
+        setIsCreating(true);
         try {
             const parsedTemplate = JSON.parse(templateContent);
             const name = parsedTemplate.projectName;
             const description = parsedTemplate.projectDescription;
 
-            onAddProject(name, description || '', templateContent);
+            await onAddProject(name, description || '', templateContent);
             onClose();
 
         } catch (e) {
@@ -209,6 +212,8 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
                 variant: "destructive",
             });
             console.error("JSON parsing error during creation:", e);
+        } finally {
+            setIsCreating(false);
         }
     };
 
@@ -276,7 +281,9 @@ export function AddProjectFromTemplateModal({ isOpen, onClose, onAddProject }: A
                 <DialogFooter>
                     <Button type="button" variant="ghost" onClick={onClose} className="hover:bg-neutral-700">Cancel</Button>
                     <Button type="button" onClick={handleVerify} variant="outline" disabled={!selectedTemplateId || !templateContent}>Verify Template</Button>
-                    <Button type="button" onClick={handleCreate} disabled={!isVerified} className="bg-yellow-500 hover:bg-yellow-600 text-black">Create Project</Button>
+                    <Button type="button" onClick={handleCreate} disabled={!isVerified} loading={isCreating} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                        Create Project
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

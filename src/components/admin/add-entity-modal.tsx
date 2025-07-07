@@ -19,14 +19,23 @@ export function AddEntityModal({ isOpen, onClose, parentId = null }: AddEntityMo
     const [entityName, setEntityName] = useState('');
     const { addEntity, entityTypes } = useProjectData();
     const [entityType, setEntityType] = useState<EntityType>(entityTypes.includes('Apartment') ? 'Apartment' : entityTypes[0]);
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleCreate = () => {
-        if (!entityName.trim()) {
+    const handleCreate = async () => {
+        if (!entityName.trim() || isLoading) {
             return;
         }
-        addEntity(entityName, entityType, parentId);
-        onClose();
-        setEntityName('');
+        setIsLoading(true);
+        try {
+            await addEntity(entityName, entityType, parentId);
+            onClose();
+            setEntityName('');
+        } catch (error) {
+            console.error("Failed to add entity:", error);
+            // Optionally show a toast message here
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -73,7 +82,9 @@ export function AddEntityModal({ isOpen, onClose, parentId = null }: AddEntityMo
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="ghost" onClick={onClose} className="hover:bg-neutral-700">Cancel</Button>
-                    <Button type="submit" onClick={handleCreate} disabled={!entityName.trim()} className="bg-yellow-500 hover:bg-yellow-600 text-black">Create Entity</Button>
+                    <Button type="submit" onClick={handleCreate} disabled={!entityName.trim()} loading={isLoading} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                        Create Entity
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

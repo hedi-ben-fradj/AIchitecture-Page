@@ -40,19 +40,28 @@ export function AddViewModal({ isOpen, onClose, entityId }: AddViewModalProps) {
         },
     });
 
+    const { formState: { isSubmitting } } = form;
+
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        const newViewHref = await addView(entityId, values.name, values.type);
-        if (newViewHref) {
-            onClose();
-            form.reset();
-            // Navigate after state update and modal close
-            setTimeout(() => {
-                router.push(newViewHref);
-            }, 0);
-        } else {
-            toast({
-                title: 'Error creating view',
-                description: 'Failed to add the new view. Please try again.',
+        try {
+            const newViewHref = await addView(entityId, values.name, values.type);
+            if (newViewHref) {
+                onClose();
+                form.reset();
+                setTimeout(() => {
+                    router.push(newViewHref);
+                }, 0);
+            } else {
+                toast({
+                    title: 'Error creating view',
+                    description: 'Failed to add the new view. Please try again.',
+                    variant: 'destructive',
+                });
+            }
+        } catch (error) {
+             toast({
+                title: 'Error',
+                description: 'An unexpected error occurred.',
                 variant: 'destructive',
             });
         }
@@ -106,7 +115,9 @@ export function AddViewModal({ isOpen, onClose, entityId }: AddViewModalProps) {
                         />
                         <DialogFooter>
                             <Button type="button" variant="ghost" onClick={onClose} className="hover:bg-neutral-700 text-white">Cancel</Button>
-                            <Button type="submit" className="bg-yellow-500 hover:bg-yellow-600 text-black">Add View</Button>
+                            <Button type="submit" loading={isSubmitting} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                                Add View
+                            </Button>
                         </DialogFooter>
                     </form>
                 </Form>

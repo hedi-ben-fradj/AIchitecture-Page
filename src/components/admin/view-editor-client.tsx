@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Save, ArrowLeft, Eye, Edit, Trash2 } from 'lucide-react';
+import { Upload, Save, ArrowLeft, Eye, Edit, Trash2, Loader2 } from 'lucide-react';
 import ImageEditor, { type ImageEditorRef, type Hotspot, type Polygon } from '@/components/admin/image-editor';
 import { useProjectData, type EntityType } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
@@ -14,6 +14,7 @@ import { Viewer, TypedEvent } from '@photo-sphere-viewer/core';
 import type { ClickData } from '@photo-sphere-viewer/core';
 import { MarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '../ui/skeleton';
 
 
 interface ViewEditorClientProps {
@@ -44,6 +45,9 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const view = getView(entityId, viewId);
   const entity = getEntity(entityId);
 
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   // State for 360 viewer
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -62,8 +66,6 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   allEntitiesRef.current = allEntities;
 
 
-  // Effect to initialize local state from view props.
-  // Only re-runs when the actual view ID changes, preventing state wipes during edits.
   useEffect(() => {
     if (!view) {
       router.replace(`/admin/projects/${projectId}/entities/${entityId}`);
@@ -80,7 +82,6 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     setIsPlacingHotspot(false);
   }, [view?.id, router, projectId, entityId]);
 
-  // Effect to manage cursor style
   useEffect(() => {
       if (viewerContainerRef.current) {
           if (isPlacingHotspot || selectedHotspotId) {
@@ -92,7 +93,6 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   }, [isPlacingHotspot, selectedHotspotId]);
 
 
-  // Effect to manage the 360 viewer lifecycle
   useEffect(() => {
     let viewer: Viewer | null = null;
     
@@ -102,6 +102,8 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             container: viewerContainerRef.current,
             panorama: panoramaUrl,
             caption: view.name,
+            loadingImg: '/assets/orb.png',
+            loadingTxt: 'Loading panorama...',
             touchmoveTwoFingers: true,
             navbar: ['zoom', 'move', 'caption', 'fullscreen'],
             plugins: [[MarkersPlugin, {}]],
@@ -197,16 +199,13 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       viewerRef.current?.destroy();
       viewerRef.current = null;
     };
-  // This dependency array is now minimal to prevent unnecessary re-initialization.
   }, [view?.id, imageToEdit]);
 
-    // Effect to update marker visuals (e.g., color on selection, tooltip text)
     useEffect(() => {
         if (!markersPlugin) return;
 
         const findViewName = (h: Hotspot) => {
             if (!h.linkedViewId) return 'Unlinked Hotspot';
-            // Use ref to get latest data without causing re-renders
             for (const entity of allEntitiesRef.current) {
                 const foundView = entity.views.find(v => v.id === h.linkedViewId);
                 if (foundView) return foundView.name;
@@ -299,56 +298,68 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   if (!view || !entity) {
     return (
         <div className="flex flex-col h-full bg-[#313131] items-center justify-center text-white">
-            <p>Loading view...</p>
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <p className="mt-4">Loading view...</p>
         </div>
     );
   }
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > 4 * 1024 * 1024) { 
+    if (!file) return;
+
+    if (file.size > 4 * 1024 * 1024) { 
         toast({ variant: 'destructive', title: 'File too large', description: "File size exceeds 4MB. Please choose a smaller image."});
         if(fileInputRef.current) fileInputRef.current.value = "";
         return;
-      }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const imageUrl = e.target?.result as string;
-        const img = document.createElement('img');
-        img.onload = async () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = view.type === '360' ? 4096 : 1920;
-          const MAX_HEIGHT = view.type === '360' ? 2048 : 1080;
-          let width = img.width;
-          let height = img.height;
+    }
+    
+    setIsUploading(true);
+    try {
+        const imageUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
 
-          if (width > MAX_WIDTH) {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = reject;
+            image.src = imageUrl;
+        });
+
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = view.type === '360' ? 4096 : 1920;
+        const MAX_HEIGHT = view.type === '360' ? 2048 : 1080;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
             height *= MAX_WIDTH / width;
             width = MAX_WIDTH;
-          }
-          if (height > MAX_HEIGHT) {
+        }
+        if (height > MAX_HEIGHT) {
             width *= MAX_HEIGHT / height;
             height = MAX_HEIGHT;
-          }
+        }
 
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-             toast({ variant: 'destructive', title: 'Error', description: 'Could not process image.' });
-             return;
-          }
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          const resizedImageUrl = canvas.toDataURL('image/jpeg', 0.85);
-          setImageToEdit(resizedImageUrl);
-          await updateViewImage(entityId, viewId, resizedImageUrl);
-        };
-        img.onerror = () => toast({ variant: 'destructive', title: 'Error', description: 'Failed to load the image file.'});
-        img.src = imageUrl;
-      };
-      reader.readAsDataURL(file);
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Could not get canvas context');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        const resizedImageUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setImageToEdit(resizedImageUrl);
+        await updateViewImage(entityId, viewId, resizedImageUrl);
+        toast({ title: 'Success', description: 'Image updated successfully.' });
+    } catch (error) {
+        console.error("Image processing failed:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to process the image file.'});
+    } finally {
+        setIsUploading(false);
     }
     if (event.target) event.target.value = '';
   };
@@ -361,19 +372,29 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     fileInputRef.current?.click();
   };
 
-  const handleSaveAndExit = () => {
-    if (view.type === '360') {
-      updateViewHotspots(entityId, viewId, viewerHotspots);
-    } else {
-      const currentPolygons = editorRef.current?.getRelativePolygons();
-      const currentHotspots = editorRef.current?.getRelativeHotspots();
-      if (currentPolygons && currentHotspots) {
-          updateViewSelections(entityId, view.id, currentPolygons);
-          updateViewHotspots(entityId, view.id, currentHotspots);
-      }
+  const handleSaveAndExit = async () => {
+    setIsSaving(true);
+    try {
+        if (view.type === '360') {
+            await updateViewHotspots(entityId, viewId, viewerHotspots);
+        } else {
+            const currentPolygons = editorRef.current?.getRelativePolygons();
+            const currentHotspots = editorRef.current?.getRelativeHotspots();
+            if (currentPolygons) {
+                await updateViewSelections(entityId, view.id, currentPolygons);
+            }
+            if (currentHotspots) {
+                await updateViewHotspots(entityId, view.id, currentHotspots);
+            }
+        }
+        toast({ title: 'Success', description: 'Your changes have been saved.' });
+        router.push(`/admin/projects/${projectId}/entities/${entityId}`);
+    } catch (error) {
+        toast({ title: 'Error', description: 'Failed to save changes.', variant: 'destructive' });
+        console.error("Save error:", error);
+    } finally {
+        setIsSaving(false);
     }
-    toast({ title: 'Success', description: 'Your changes have been saved.' });
-    router.push(`/admin/projects/${projectId}/entities/${entityId}`);
   };
 
   const viewName = view.name;
@@ -400,8 +421,14 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             <div className="flex items-center justify-center w-full">
               <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-neutral-600 border-dashed rounded-lg cursor-pointer bg-[#313131] hover:bg-neutral-700">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <Upload className="w-8 h-8 mb-4 text-neutral-400" />
-                  <p className="mb-2 text-sm text-neutral-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                  {isUploading ? (
+                     <Loader2 className="w-8 h-8 mb-4 text-neutral-400 animate-spin" />
+                  ) : (
+                     <Upload className="w-8 h-8 mb-4 text-neutral-400" />
+                  )}
+                  <p className="mb-2 text-sm text-neutral-400">
+                    {isUploading ? "Uploading..." : <><span className="font-semibold">Click to upload</span> or drag and drop</>}
+                  </p>
                   <p className="text-xs text-neutral-500">PNG, JPG, or WEBP (MAX. 4MB)</p>
                 </div>
               </label>
@@ -416,11 +443,10 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 {view.type === '360' ? `Editing Hotspots for ${viewName}` : `Define Selections & Hotspots for ${viewName}`}
               </h2>
               <div className="flex justify-end gap-2">
-                  <Button onClick={triggerFileInput} variant="outline">
-                      <Upload className="mr-2 h-4 w-4" />
+                  <Button onClick={triggerFileInput} variant="outline" loading={isUploading}>
                       Change Image
                   </Button>
-                  <Button onClick={handleSaveAndExit} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                  <Button onClick={handleSaveAndExit} className="bg-yellow-500 hover:bg-yellow-600 text-black" loading={isSaving}>
                       <Save className="mr-2 h-4 w-4" />
                       Save and Exit
                   </Button>
@@ -446,21 +472,28 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 <p className="text-center text-sm text-neutral-400 mt-2">Click on a hotspot to select it, or use the buttons above.</p>
               </div>
            ) : (
-            <ImageEditor
-                ref={editorRef}
-                imageUrl={imageToEdit}
-                onMakeEntity={handleMakeEntity}
-                initialPolygons={view?.selections}
-                initialHotspots={view?.hotspots}
-                parentEntityType={entity.entityType}
-                entityId={entityId}
-                onEditHotspot={(hotspot) => {
-                  setHotspotToEdit(hotspot);
-                  setIsHotspotModalOpen(true);
-                }}
-                onPolygonsChange={handlePolygonsChange}
-                onHotspotsChange={handleHotspotsChange}
-            />
+            <div className='relative'>
+                {isUploading && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 rounded-lg">
+                        <Loader2 className="w-10 h-10 text-white animate-spin" />
+                    </div>
+                )}
+                <ImageEditor
+                    ref={editorRef}
+                    imageUrl={imageToEdit}
+                    onMakeEntity={handleMakeEntity}
+                    initialPolygons={view?.selections}
+                    initialHotspots={view?.hotspots}
+                    parentEntityType={entity.entityType}
+                    entityId={entityId}
+                    onEditHotspot={(hotspot) => {
+                    setHotspotToEdit(hotspot);
+                    setIsHotspotModalOpen(true);
+                    }}
+                    onPolygonsChange={handlePolygonsChange}
+                    onHotspotsChange={handleHotspotsChange}
+                />
+            </div>
            )}
          </div>
       )}

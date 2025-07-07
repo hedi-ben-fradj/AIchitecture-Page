@@ -22,7 +22,7 @@ interface EditEntityModalProps {
     isOpen: boolean;
     onClose: () => void;
     entity: Entity | null;
-    onUpdate: (entityId: string, data: Partial<Entity>) => void;
+    onUpdate: (entityId: string, data: Partial<Entity>) => Promise<void>;
 }
 
 const roomDetailSchema = z.object({
@@ -59,17 +59,20 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
         resolver: zodResolver(formSchema),
     });
 
+    const { control, register, handleSubmit, formState, watch, reset } = form;
+    const { isSubmitting } = formState;
+
     const { fields: detailedRoomFields, append: appendRoom, remove: removeRoom } = useFieldArray({
-        control: form.control,
+        control: control,
         name: "detailedRooms",
     });
 
-    const entityType = form.watch('entityType');
-    const enterDetailedRoomSpecs = form.watch('enterDetailedRoomSpecs');
+    const entityType = watch('entityType');
+    const enterDetailedRoomSpecs = watch('enterDetailedRoomSpecs');
 
     useEffect(() => {
         if (entity) {
-            form.reset({
+            reset({
                 name: entity.name,
                 entityType: entity.entityType,
                 plotArea: entity.plotArea ?? undefined,
@@ -85,7 +88,7 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
         }
         setNewRoomName('');
         setNewRoomSize('');
-    }, [entity, form]);
+    }, [entity, reset]);
     
     const handleAddRoom = () => {
         if (newRoomName.trim() && newRoomSize.trim() && !isNaN(Number(newRoomSize))) {
@@ -99,7 +102,7 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
         }
     };
     
-    const processSave = (data: FormValues) => {
+    const processSave = async (data: FormValues) => {
         if (!entity) return;
         
         const rawFinalData: Partial<Entity> = { ...data };
@@ -111,12 +114,11 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
           rawFinalData.detailedRooms = [];
         }
         
-        // IMPORTANT: Clean the entire object to remove any `undefined` values before sending to Firestore.
         const finalData = Object.fromEntries(
             Object.entries(rawFinalData).filter(([, value]) => value !== undefined)
         );
 
-        onUpdate(entity.id, finalData);
+        await onUpdate(entity.id, finalData);
 
         toast({
             title: 'Entity Updated',
@@ -125,7 +127,7 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
         onClose();
     };
 
-    const handleSave = (data: FormValues) => {
+    const onFormSubmit = (data: FormValues) => {
         if (data.enterDetailedRoomSpecs && data.detailedRooms && data.rooms !== data.detailedRooms.length) {
             setMismatchData(data);
             return;
@@ -178,23 +180,23 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
                             Update the details for your entity.
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={form.handleSubmit(handleSave)}>
+                    <form onSubmit={handleSubmit(onFormSubmit)}>
                         <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto pr-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label htmlFor="entity-name">Name</Label>
                                     <Input
                                         id="entity-name"
-                                        {...form.register('name')}
+                                        {...register('name')}
                                         className="mt-2 bg-[#313131] border-neutral-600"
                                         placeholder="e.g., Apartment A-12"
                                     />
-                                    {form.formState.errors.name && <p className="text-red-500 text-xs mt-1">{form.formState.errors.name.message}</p>}
+                                    {formState.errors.name && <p className="text-red-500 text-xs mt-1">{formState.errors.name.message}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="entity-type">Type</Label>
                                     <Controller
-                                        control={form.control}
+                                        control={control}
                                         name="entityType"
                                         render={({ field }) => (
                                             <Select onValueChange={field.onChange} value={field.value}>
@@ -218,12 +220,12 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
                                     <div className="grid grid-cols-3 gap-4">
                                         <div>
                                             <Label htmlFor="price">Price (EUR)</Label>
-                                            <Input id="price" type="number" {...form.register('price')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="150000" />
+                                            <Input id="price" type="number" {...register('price')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="150000" />
                                         </div>
                                         <div>
                                             <Label htmlFor="status">Status</Label>
                                             <Controller
-                                                control={form.control}
+                                                control={control}
                                                 name="status"
                                                 render={({ field }) => (
                                                     <Select onValueChange={field.onChange} value={field.value}>
@@ -240,33 +242,33 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
                                         </div>
                                         <div>
                                             <Label htmlFor="availableDate">Available Date</Label>
-                                            <Input id="availableDate" {...form.register('availableDate')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="e.g., 3Q/2024" />
+                                            <Input id="availableDate" {...register('availableDate')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="e.g., 3Q/2024" />
                                         </div>
                                     </div>
                                     <div className={cn("grid gap-4", entityType === 'house' ? "grid-cols-4" : "grid-cols-3")}>
                                         {entityType === 'house' && (
                                             <div>
                                                 <Label htmlFor="plotArea">Plot Area (m²)</Label>
-                                                <Input id="plotArea" type="number" {...form.register('plotArea')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="900" />
+                                                <Input id="plotArea" type="number" {...register('plotArea')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="900" />
                                             </div>
                                         )}
                                         <div>
                                             <Label htmlFor="houseArea">{entityType === 'house' ? 'House Area (m²)' : 'Area (m²)'}</Label>
-                                            <Input id="houseArea" type="number" {...form.register('houseArea')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="150" />
+                                            <Input id="houseArea" type="number" {...register('houseArea')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="150" />
                                         </div>
                                         <div>
                                             <Label htmlFor="floors">Floors</Label>
-                                            <Input id="floors" type="number" {...form.register('floors')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="1" />
+                                            <Input id="floors" type="number" {...register('floors')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="1" />
                                         </div>
                                         <div>
                                             <Label htmlFor="rooms">Rooms</Label>
-                                            <Input id="rooms" type="number" {...form.register('rooms')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="3" />
+                                            <Input id="rooms" type="number" {...register('rooms')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="3" />
                                         </div>
                                     </div>
                                     <Separator className="bg-neutral-600" />
                                     <div className="flex items-center space-x-2">
                                         <Controller
-                                            control={form.control}
+                                            control={control}
                                             name="enterDetailedRoomSpecs"
                                             render={({ field }) => (
                                                 <Checkbox
@@ -323,7 +325,9 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
                         </div>
                         <DialogFooter className="mt-6">
                             <Button type="button" variant="ghost" onClick={handleModalClose} className="hover:bg-neutral-700">Cancel</Button>
-                            <Button type="submit" disabled={!form.formState.isDirty && !form.formState.isSubmitting} className="bg-yellow-500 hover:bg-yellow-600 text-black">Save Changes</Button>
+                            <Button type="submit" loading={isSubmitting} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                                Save Changes
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>

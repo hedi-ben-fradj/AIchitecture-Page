@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -10,21 +11,29 @@ import { Textarea } from '@/components/ui/textarea';
 interface AddProjectModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAddProject: (name: string, description: string) => void;
+    onAddProject: (name: string, description: string) => Promise<void>;
 }
 
 export function AddProjectModal({ isOpen, onClose, onAddProject }: AddProjectModalProps) {
     const [projectName, setProjectName] = useState('');
     const [projectDescription, setProjectDescription] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleCreate = () => {
-        if (!projectName.trim()) {
+    const handleCreate = async () => {
+        if (!projectName.trim() || isLoading) {
             return;
         }
-        onAddProject(projectName, projectDescription);
-        onClose();
-        setProjectName('');
-        setProjectDescription('');
+        setIsLoading(true);
+        try {
+            await onAddProject(projectName, projectDescription);
+            onClose();
+            setProjectName('');
+            setProjectDescription('');
+        } catch (error) {
+            console.error("Failed to add project:", error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -63,7 +72,9 @@ export function AddProjectModal({ isOpen, onClose, onAddProject }: AddProjectMod
                 </div>
                 <DialogFooter>
                     <Button type="button" variant="ghost" onClick={onClose} className="hover:bg-neutral-700">Cancel</Button>
-                    <Button type="submit" onClick={handleCreate} disabled={!projectName.trim()} className="bg-yellow-500 hover:bg-yellow-600 text-black">Create Project</Button>
+                    <Button type="submit" onClick={handleCreate} disabled={!projectName.trim()} loading={isLoading} className="bg-yellow-500 hover:bg-yellow-600 text-black">
+                        Create Project
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

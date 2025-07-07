@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type Entity, type EntityType } from '@/contexts/views-context';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, Plus } from 'lucide-react';
+import { Edit, Trash2, Plus, Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { EditEntityModal } from '@/components/admin/edit-entity-modal';
 import { AddEditTemplateModal, type ProjectTemplate } from '@/components/admin/add-edit-template-modal';
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, updateDoc, deleteDoc, writeBatch, setDoc, query } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Project {
     id: string;
@@ -235,7 +236,16 @@ export default function DatabasePage() {
     }, [isPropertyType]);
 
     if (!isMounted) {
-        return <div className="text-center p-8 text-white">Loading database...</div>;
+        return (
+            <div className="flex-1 p-8 bg-[#313131]">
+                <header className="h-16 flex items-center px-6 border-b border-neutral-700 bg-[#2a2a2a] flex-shrink-0 -mx-8 -mt-8 mb-8">
+                     <h1 className="text-xl font-semibold text-white">Database</h1>
+                </header>
+                <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-white" />
+                </div>
+            </div>
+        );
     }
 
     return (

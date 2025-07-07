@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Home, BadgeCheck, CircleDot } from 'lucide-react';
+import { Plus, Trash2, Home, BadgeCheck, CircleDot, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -26,6 +26,7 @@ import type { ProjectTemplate } from '@/components/admin/add-edit-template-modal
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, getDoc, setDoc, writeBatch, deleteDoc, query, where } from 'firebase/firestore';
 import { ViewsProvider } from '@/contexts/views-context';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 interface Project {
@@ -46,6 +47,25 @@ interface ProjectStats {
     totalUnits: number;
     soldUnits: number;
     availableUnits: number;
+}
+
+function ProjectCardSkeleton() {
+    return (
+        <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-[280px] flex flex-col justify-between">
+            <CardHeader>
+                <Skeleton className="h-6 w-3/5" />
+                <Skeleton className="h-4 w-4/5 mt-2" />
+            </CardHeader>
+            <CardContent>
+                <Separator className="my-2 bg-neutral-600" />
+                <div className="mt-4 space-y-4">
+                    <div className="flex justify-between items-center"><Skeleton className="h-4 w-24" /><Skeleton className="h-4 w-8" /></div>
+                    <div className="flex justify-between items-center"><Skeleton className="h-4 w-20" /><Skeleton className="h-4 w-8" /></div>
+                    <div className="flex justify-between items-center"><Skeleton className="h-4 w-28" /><Skeleton className="h-4 w-8" /></div>
+                </div>
+            </CardContent>
+        </Card>
+    );
 }
 
 function AdminProjectsPageComponent() {
@@ -136,7 +156,7 @@ function AdminProjectsPageComponent() {
     const handleAddProject = async (name: string, description: string) => {
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         if (!slug) {
-            alert(`Invalid project name.`);
+            toast({ title: "Invalid Name", description: "Project name is invalid.", variant: "destructive" });
             return;
         }
 
@@ -144,7 +164,7 @@ function AdminProjectsPageComponent() {
         const projectSnap = await getDoc(projectRef);
 
         if (projectSnap.exists()) {
-            alert(`A project with a similar name already exists or is invalid.`);
+            toast({ title: "Exists", description: "A project with a similar name already exists.", variant: "destructive" });
             return;
         }
 
@@ -172,14 +192,11 @@ function AdminProjectsPageComponent() {
         try {
             const template = JSON.parse(templateContent);
             
-            // Start a batch write
             const batch = writeBatch(db);
 
-            // 1. Create the main project document
             const newProjectData = { name, description, landingPageEntityId: null };
             batch.set(projectRef, newProjectData);
 
-            // 2. Recursively prepare entity documents for batch write
             const createEntitiesRecursive = (templateEntities: any[], parentId: string | null, allNewEntities: Map<string, any>) => {
                  if (!templateEntities || templateEntities.length === 0) return;
 
@@ -238,12 +255,11 @@ function AdminProjectsPageComponent() {
             
             allNewEntities.forEach((entityData, entityId) => {
                 const entityDocRef = doc(db, 'entities', entityId);
-                const { id, ...dataToSave } = entityData; // Don't save id inside the doc itself
+                const { id, ...dataToSave } = entityData;
                 const finalData = Object.fromEntries(Object.entries(dataToSave).filter(([_, v]) => v !== undefined));
                 batch.set(entityDocRef, finalData);
             });
 
-            // Commit the batch
             await batch.commit();
 
             setProjects(prev => [...prev, { id: slug, name, description }]);
@@ -277,7 +293,18 @@ function AdminProjectsPageComponent() {
     };
 
     if (!isMounted) {
-        return null;
+        return (
+            <>
+                <header className="h-16 flex items-center px-6 border-b border-neutral-700 bg-[#2a2a2a] flex-shrink-0">
+                    <h1 className="text-xl font-semibold text-white">Projects Overview</h1>
+                </header>
+                <main className="flex-1 p-8 bg-[#313131]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {[...Array(3)].map((_, i) => <ProjectCardSkeleton key={i} />)}
+                    </div>
+                </main>
+            </>
+        );
     }
 
     return (
@@ -378,8 +405,6 @@ function AdminProjectsPageComponent() {
 }
 
 export default function AdminProjectsPage() {
-    // projectId is not available on the overview page, so we pass undefined.
-    // The provider is designed to handle this gracefully.
     return (
         <ViewsProvider projectId={undefined}>
             <AdminProjectsPageComponent />

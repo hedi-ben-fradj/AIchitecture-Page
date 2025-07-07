@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, type ChangeEvent } from 'react';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Upload, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
+import { Upload, Sparkles, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 
 const furnitureStyles = ['Modern', 'Minimalist', 'Scandinavian', 'Bohemian', 'Industrial', 'Coastal'];
 
@@ -92,8 +93,13 @@ export default function VirtualStagingClient() {
 
           <div className="flex flex-col gap-4">
             <h3 className="font-headline text-xl font-semibold text-center">3. See the Magic</h3>
-            <Card className="aspect-video w-full flex items-center justify-center bg-muted/50">
-              {isLoading && <Skeleton className="w-full h-full" />}
+            <Card className="aspect-video w-full flex items-center justify-center bg-muted/50 relative">
+              {isLoading && (
+                  <div className='absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground bg-black/10'>
+                      <Loader2 className="h-10 w-10 animate-spin" />
+                      <p>Staging your image...</p>
+                  </div>
+              )}
               {!isLoading && stagedImage && (
                 <div className="relative w-full h-full">
                   <Image src={stagedImage} alt="Staged room" layout="fill" objectFit="contain" />
@@ -106,8 +112,8 @@ export default function VirtualStagingClient() {
                 </div>
               )}
             </Card>
-            <Button onClick={handleSubmit} disabled={isLoading || !originalImage}>
-              {isLoading ? 'Staging...' : 'Generate'}
+            <Button onClick={handleSubmit} disabled={isLoading || !originalImage} loading={isLoading}>
+              Generate
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>

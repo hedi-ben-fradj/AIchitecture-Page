@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -46,7 +47,6 @@ export default function ContactForm() {
       });
       form.reset();
     } else {
-      // This part is for server-side validation errors if you need more complex logic
       toast({
         title: "Error",
         description: result.message || "Something went wrong.",
@@ -103,8 +103,8 @@ export default function ContactForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? 'Sending...' : 'Send Message'}
+            <Button type="submit" className="w-full" loading={form.formState.isSubmitting}>
+              Send Message
             </Button>
           </form>
         </Form>

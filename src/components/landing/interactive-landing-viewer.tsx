@@ -7,13 +7,14 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Viewer } from '@photo-sphere-viewer/core';
 import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
-import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize, Eye } from 'lucide-react'; // Importing specific icons
+import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize, Eye, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { Skeleton } from '../ui/skeleton';
 
 
 interface RenderedImageRect {
@@ -93,6 +94,17 @@ const getHotspotMarkerHtml = (text: string) => `
   </div>
 `;
 
+function InteractiveViewerSkeleton() {
+    return (
+        <div className="h-full w-full flex items-center justify-center bg-neutral-900">
+            <div className="flex flex-col items-center gap-4 text-neutral-500">
+                <Loader2 className="h-10 w-10 animate-spin" />
+                <p>Loading Interactive View...</p>
+            </div>
+        </div>
+    );
+}
+
 
 export default function InteractiveLandingViewer({ setActiveView }: { setActiveView: (view: string) => void }) {
     const [currentView, setCurrentView] = useState<FullView | null>(null);
@@ -103,6 +115,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [clickedEntity, setClickedEntity] = useState<Entity | null>(null);
     const [hoveredSelectionId, setHoveredSelectionId] = useState<number | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [isImageLoading, setIsImageLoading] = useState(true);
     const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [appliedFilters, setAppliedFilters] = useState<Partial<Filters>>({});
@@ -142,7 +155,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                // 1. Find the landing project ID
                 const globalsDoc = await getDoc(doc(db, 'globals', 'config'));
                 const landingProjectId = globalsDoc.exists() ? globalsDoc.data().landingProjectId : null;
                 
@@ -153,13 +165,11 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 }
                 setProjectId(landingProjectId);
 
-                // Load view types
                 const viewTypesDoc = await getDoc(doc(db, 'app_config', 'view_types'));
                 if (viewTypesDoc.exists()) {
                     setViewTypes(viewTypesDoc.data().types);
                 }
 
-                // 2. Load project data
                 const projectDoc = await getDoc(doc(db, 'projects', landingProjectId));
                 if (!projectDoc.exists()) {
                     console.warn(`Landing project with ID "${landingProjectId}" not found.`);
@@ -169,18 +179,19 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 const projectData = projectDoc.data();
                 const landingPageEntityId = projectData.landingPageEntityId;
 
-                // 3. Load all entities for that project
                 const entitiesSnapshot = await getDocs(query(collection(db, 'entities'), where('projectId', '==', landingProjectId)));
                 const loadedEntities = entitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Entity[];
                 setAllEntities(loadedEntities);
 
-                // 4. Set the initial view
                 if (landingPageEntityId) {
                     const landingEntity = loadedEntities.find(e => e.id === landingPageEntityId);
                     if (landingEntity && landingEntity.defaultViewId) {
                         const defaultView = findViewInEntities(loadedEntities, landingEntity.defaultViewId);
                         setCurrentView(defaultView);
-                        if (defaultView) setCurrentViewType(defaultView.type);
+                        if (defaultView) {
+                             setCurrentViewType(defaultView.type);
+                             setIsImageLoading(true);
+                        }
                         setEntityViews(landingEntity.views);
                     }
                 }
@@ -196,16 +207,15 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     
     useEffect(() => {
         const currentEntityId = currentView?.entityId || null;
-        setIsPlanExpanded(false); // Reset on entity change
+        setIsPlanExpanded(false); 
 
-        // Reset overlay visibility when navigating to a new entity
         if (currentEntityId && currentEntityId !== prevEntityIdRef.current) {
             const has2dPlan = entityViews.some(view => view.type.toLowerCase() === '2d plan');
             
             if (has2dPlan) {
                 const twoDPlanView = entityViews.find(view => view.type.toLowerCase() === '2d plan');
                 setPlanOverlayView(twoDPlanView || null);
-                setIsPlanOverlayVisible(true); // Show by default
+                setIsPlanOverlayVisible(true);
             } else {
                 setIsPlanOverlayVisible(false);
                 setPlanOverlayView(null);
@@ -217,7 +227,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const closeDetails = useCallback(() => {
         setClickedSelection(null);
         setClickedEntity(null);
-        setDetailsPosition({ opacity: 0 }); // For fade-out transition
+        setDetailsPosition({ opacity: 0 });
     }, []);
 
     const calculateRect = useCallback(() => {
@@ -246,6 +256,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         }
         
         setRenderedImageRect({ width: renderWidth, height: renderHeight, x, y });
+        setIsImageLoading(false);
     }, []);
 
     const calculatePlanOverlayRect = useCallback(() => {
@@ -286,7 +297,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     }, []);
     
     useEffect(() => {
-        // This effect handles the plan overlay rect calculation
         if (!isPlanOverlayVisible) {
             setPlanOverlayImageRect(null);
             return;
@@ -307,7 +317,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             }
         }
     
-        // Recalculate when expansion state changes because container size changes
         calculatePlanOverlayRect(); 
     
         return () => {
@@ -342,6 +351,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             }
             setCurrentViewType(newView.type);
             setCurrentView(newView);
+            setIsImageLoading(true);
             const parentEntity = allEntities.find(e => e.id === newView.entityId);
             if (parentEntity) {
                 setEntityViews(parentEntity.views);
@@ -356,7 +366,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         }
     }, [allEntities, currentView, closeDetails, calculateRect]);
 
-    // Effect to manage the 360 viewer lifecycle
     useEffect(() => {
         let viewer: Viewer | null = null;
         if (currentViewType === '360' && currentView?.imageUrl && viewerContainerRef.current) {
@@ -365,6 +374,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 container: viewerContainerRef.current,
                 panorama: panoramaUrl,
                 caption: currentView.name,
+                loadingImg: '/assets/orb.png',
+                loadingTxt: 'Loading panorama...',
                 touchmoveTwoFingers: true,
                 navbar: ['zoom', 'move', 'caption', 'fullscreen'],
                 plugins: [[MarkersPlugin, {}]],
@@ -424,20 +435,17 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         }
     };
     
-    // Effect to control audio playback
     useEffect(() => {
         const audio = audioRef.current;
         if (audio) {
             if (currentViewType === '360') {
                 audio.volume = volume;
-                // Let user interaction (unmuting) start the playback
             } else {
                 audio.pause();
             }
         }
     }, [currentViewType, volume]);
 
-    // Effect to handle muting/unmuting
     useEffect(() => {
         if (audioRef.current) {
             audioRef.current.muted = isMuted;
@@ -481,10 +489,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 };
                 
                 if (relativeCenterX > 0.5) {
-                    // Selection is on the right, so panel appears on the left
                     position.right = `${containerWidth - selectionLeftEdge + 16}px`;
                 } else {
-                    // Selection is on the left, so panel appears on the right
                     position.left = `${selectionRightEdge + 16}px`;
                 }
                 setDetailsPosition(position);
@@ -503,6 +509,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 }
                 setCurrentViewType(newView.type);
                 setCurrentView(newView);
+                setIsImageLoading(true);
                 setEntityViews(targetEntity.views);
                 closeDetails();
                 setHoveredSelectionId(null);
@@ -527,6 +534,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         if (previousView) {
             setCurrentViewType(previousView.type);
             setCurrentView(previousView);
+            setIsImageLoading(true);
             const parentEntity = allEntities.find(e => e.id === previousView.entityId);
             if (parentEntity) {
                 setEntityViews(parentEntity.views);
@@ -548,6 +556,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         const newFullView: FullView = { ...view, entityId: currentView.entityId };
         setCurrentViewType(newFullView.type);
         setCurrentView(newFullView);
+        setIsImageLoading(true);
         closeDetails();
         setHoveredSelectionId(null);
         setRenderedImageRect(null);
@@ -658,10 +667,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
         let targetView;
         if (currentViewType === '360') {
-            // Find any non-360 view. Prefer '2d' if available.
             targetView = entityViews.find(view => view.type.toLowerCase() === '2d') || entityViews.find(view => view.type !== '360');
         } else {
-            // Find a 360 view
             targetView = entityViews.find(view => view.type === '360');
         }
 
@@ -686,7 +693,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
 
     if (!isLoaded) {
-        return <div className="h-full w-full flex items-center justify-center bg-neutral-900"><p className="text-muted-foreground animate-pulse">Loading View...</p></div>;
+        return <InteractiveViewerSkeleton />;
     }
 
     if (!projectId || !currentView || !currentView.imageUrl) {
@@ -797,17 +804,13 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 </TooltipProvider>
             </div>
             
-            {/* 2D Plan Overlay */}
             {planOverlayView?.imageUrl && (
                 <div
                     onClick={(e) => e.stopPropagation()}
                     className={cn(
                         "absolute z-40 transition-all duration-500 ease-in-out",
-                        // Minimized state
                         !isPlanExpanded && "bottom-20 left-20 w-96 aspect-video transform-origin-bottom-left",
-                        // Expanded state
                         isPlanExpanded && "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[80vh] max-w-7xl max-h-[85vh]",
-                        // Visibility
                         isPlanOverlayVisible
                             ? "opacity-100 scale-100"
                             : "opacity-0 scale-50 pointer-events-none"
@@ -909,20 +912,28 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             {currentViewType === '360' ? (
                 <div ref={viewerContainerRef} key={currentView.id} className="w-full h-full" />
             ) : (
-                <Image
-                    ref={imageRef}
-                    src={`/api/image-proxy?url=${encodeURIComponent(currentView.imageUrl)}`}
-                    alt={currentView.name}
-                    layout="fill"
-                    objectFit="contain"
-                    onLoad={calculateRect}
-                    key={currentView.id}
-                    className="transition-opacity duration-500"
-                    style={{ opacity: renderedImageRect ? 1 : 0 }}
-                />
+                <>
+                    {isImageLoading && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/20">
+                            <Loader2 className="h-10 w-10 animate-spin text-white" />
+                        </div>
+                    )}
+                    <Image
+                        ref={imageRef}
+                        src={`/api/image-proxy?url=${encodeURIComponent(currentView.imageUrl)}`}
+                        alt={currentView.name}
+                        layout="fill"
+                        objectFit="contain"
+                        onLoad={() => {
+                            calculateRect();
+                            setIsImageLoading(false);
+                        }}
+                        key={currentView.id}
+                        className={cn("transition-opacity duration-300", isImageLoading ? "opacity-0" : "opacity-100")}
+                    />
+                </>
             )}
             
-            {/* Overlay for 2D view interactions */}
             {currentViewType !== '360' && renderedImageRect && (
                 <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>
                     {(isFilterApplied ? filteredSelections.map(f => f.selection) : (currentView.selections || [])).map(selection => {
@@ -969,7 +980,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                 }
                             }
                             
-                            // Default for non-properties or properties without status
                             return 'stroke-yellow-400 fill-yellow-400/50';
                         };
 
@@ -1066,7 +1076,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 </svg>
             )}
 
-            {/* Details card */}
             {clickedSelection?.details && (
                 <div style={detailsPosition} className="z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
                     <Card className="pointer-events-auto bg-black/80 backdrop-blur-md text-white border-none w-auto max-w-2xl shadow-2xl animate-in fade-in-50 rounded-2xl">
@@ -1182,7 +1191,6 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 </div>
             )}
             
-            {/* Views list sidebar */}
             {Object.keys(groupedViews).length > 0 && (
                 <div className="absolute top-1/2 -translate-y-1/2 right-4 h-auto max-h-[calc(100%-8rem)] w-48 z-30 hidden lg:block">
                     <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -99,8 +100,8 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-600 text-black" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Signing In...' : 'Sign In'}
+              <Button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-600 text-black" loading={form.formState.isSubmitting}>
+                Sign In
               </Button>
             </form>
           </Form>
