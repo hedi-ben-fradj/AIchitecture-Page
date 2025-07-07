@@ -355,10 +355,11 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         if (currentViewType !== '360' || !currentView?.imageUrl || !viewerContainerRef.current) {
             return;
         }
-
+        
+        const panoramaUrl = `/api/image-proxy?url=${encodeURIComponent(currentView.imageUrl)}`;
         const viewer = new Viewer({
             container: viewerContainerRef.current,
-            panorama: currentView.imageUrl,
+            panorama: panoramaUrl,
             caption: currentView.name,
             touchmoveTwoFingers: true,
             navbar: ['zoom', 'move', 'caption', 'fullscreen'],

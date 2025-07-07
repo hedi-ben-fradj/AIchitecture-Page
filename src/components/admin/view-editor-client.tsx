@@ -92,9 +92,10 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     let viewer: Viewer | null = null;
     
     if (view?.type === '360' && imageToEdit && viewerContainerRef.current) {
+        const panoramaUrl = `/api/image-proxy?url=${encodeURIComponent(imageToEdit)}`;
         viewer = new Viewer({
             container: viewerContainerRef.current,
-            panorama: imageToEdit,
+            panorama: panoramaUrl,
             caption: view.name,
             touchmoveTwoFingers: true,
             navbar: ['zoom', 'move', 'caption', 'fullscreen'],
