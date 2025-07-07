@@ -984,7 +984,33 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     {(currentView.hotspots || []).map(hotspot => {
                         const absX = hotspot.x * renderedImageRect.width;
                         const absY = hotspot.y * renderedImageRect.height;
-                        const eyeIconSize = 48; // Base size for the icon group
+                        
+                        const rotation = hotspot.rotation || 0;
+                        const fov = hotspot.fov || 60;
+                        
+                        const innerRadius = 22;
+                        const outerRadius = 35;
+
+                        const rotationRad = rotation * (Math.PI / 180);
+                        const fovRad = fov * (Math.PI / 180);
+
+                        const startAngle = rotationRad - fovRad / 2;
+                        const endAngle = rotationRad + fovRad / 2;
+                        
+                        const p1_outer = { x: outerRadius * Math.cos(startAngle), y: outerRadius * Math.sin(startAngle) };
+                        const p2_outer = { x: outerRadius * Math.cos(endAngle), y: outerRadius * Math.sin(endAngle) };
+                        const p1_inner = { x: innerRadius * Math.cos(startAngle), y: innerRadius * Math.sin(startAngle) };
+                        const p2_inner = { x: innerRadius * Math.cos(endAngle), y: innerRadius * Math.sin(endAngle) };
+
+                        const largeArcFlag = fov > 180 ? 1 : 0;
+                        
+                        const pathData = [
+                            `M ${p1_outer.x} ${p1_outer.y}`,
+                            `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${p2_outer.x} ${p2_outer.y}`,
+                            `L ${p2_inner.x} ${p2_inner.y}`,
+                            `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${p1_inner.x} ${p1_inner.y}`,
+                            'Z'
+                        ].join(' ');
 
                         return (
                             <g 
@@ -995,17 +1021,16 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                             >
                                <g className="pointer-events-none">
                                     <path
-                                        d="M0-7C-3.87 0-7-3.87-7-0S-3.87 7 0 7s7-3.87 7-0S3.87-7 0-7zM0 3.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"
+                                        d={pathData}
                                         className="fill-blue-400/30 stroke-blue-400/50 group-hover:fill-yellow-400/40 group-hover:stroke-yellow-400/60 transition-colors"
                                         strokeWidth="1"
-                                        transform={`rotate(${hotspot.rotation || 0}) scale(${eyeIconSize / 14})`} // Adjust scale for desired size
                                     />
                                     <Eye 
                                         className="w-14 h-14 drop-shadow-lg text-blue-500 group-hover:text-yellow-500 transition-colors" 
                                         transform="translate(-28, -28)"
                                     />
                                 </g>
-                                <circle cx={0} cy={0} r={eyeIconSize / 2} className="pointer-events-auto" fill="transparent" onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }} />
+                                <circle cx={0} cy={0} r={outerRadius} className="pointer-events-auto" fill="transparent" onClick={(e) => { e.stopPropagation(); handleHotspotNavigate(hotspot.linkedViewId); }} />
                             </g>
                         );
                     })}
