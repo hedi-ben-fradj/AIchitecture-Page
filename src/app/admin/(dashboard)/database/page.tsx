@@ -103,7 +103,8 @@ export default function DatabasePage() {
 
         try {
             const entityRef = doc(db, 'entities', entityId);
-            await updateDoc(entityRef, dataToUpdate);
+            const cleanData = Object.fromEntries(Object.entries(dataToUpdate).filter(([, value]) => value !== undefined));
+            await updateDoc(entityRef, cleanData);
             await loadData(); // Reload all data
             setEntityToEdit(null);
         } catch(error) {
