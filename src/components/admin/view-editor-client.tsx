@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,8 +42,8 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const [isHotspotModalOpen, setIsHotspotModalOpen] = useState(false);
   const [hotspotToEdit, setHotspotToEdit] = useState<Hotspot | null>(null);
 
-  const view = getView(entityId, viewId);
-  const entity = getEntity(entityId);
+  const view = useMemo(() => getView(entityId, viewId), [getView, entityId, viewId]);
+  const entity = useMemo(() => getEntity(entityId), [getEntity, entityId]);
 
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -80,7 +80,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     }
     setSelectedHotspotId(null);
     setIsPlacingHotspot(false);
-  }, [view?.id, router, projectId, entityId]);
+  }, [view, router, projectId, entityId]);
 
   useEffect(() => {
       if (viewerContainerRef.current) {
@@ -352,7 +352,6 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         ctx.drawImage(img, 0, 0, width, height);
         
         const resizedImageUrl = canvas.toDataURL('image/jpeg', 0.85);
-        setImageToEdit(resizedImageUrl);
         await updateViewImage(entityId, viewId, resizedImageUrl);
         toast({ title: 'Success', description: 'Image updated successfully.' });
     } catch (error) {
@@ -468,7 +467,16 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                         Delete
                     </Button>
                 </div>
-                <div ref={viewerContainerRef} className="w-full h-[70vh] relative bg-black rounded-lg border border-neutral-600" />
+                <div className="w-full h-[70vh] relative bg-black rounded-lg border border-neutral-600 flex items-center justify-center">
+                    {isUploading ? (
+                        <div className="flex flex-col items-center gap-2 text-white">
+                            <Loader2 className="h-10 w-10 animate-spin" />
+                            <p>Uploading and processing image...</p>
+                        </div>
+                    ) : (
+                        <div ref={viewerContainerRef} className="w-full h-full" />
+                    )}
+                </div>
                 <p className="text-center text-sm text-neutral-400 mt-2">Click on a hotspot to select it, or use the buttons above.</p>
               </div>
            ) : (
