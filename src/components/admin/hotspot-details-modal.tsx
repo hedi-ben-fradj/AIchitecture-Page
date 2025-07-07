@@ -36,9 +36,6 @@ const hotspotDetailsSchema = z.object({
         if (!data.newViewType) {
             ctx.addIssue({ code: 'custom', path: ['newViewType'], message: 'View type is required.' });
         }
-        if (!data.newViewImage) {
-            ctx.addIssue({ code: 'custom', path: ['newViewImage'], message: 'An image is required.' });
-        }
     }
 });
 
@@ -97,6 +94,7 @@ export default function HotspotDetailsModal({ isOpen, onClose, onSave, entity, h
             reader.onload = (event) => setPreviewImage(event.target?.result as string);
             reader.readAsDataURL(file);
             form.setValue('newViewImage', file);
+            form.clearErrors('newViewImage');
         }
     };
     
@@ -106,17 +104,24 @@ export default function HotspotDetailsModal({ isOpen, onClose, onSave, entity, h
                 onSave({ linkedViewId: data.linkedViewId });
                 onClose();
             }
-        } else {
-            const { newViewName, newViewType, newViewImage } = data;
-            if (!newViewName || !newViewType || !newViewImage) {
-                toast({ variant: 'destructive', title: 'Missing fields', description: 'Please fill out all fields for the new view.' });
-                return;
-            }
-            if (!entity || !params.projectId) {
-                toast({ variant: 'destructive', title: 'Error', description: 'Could not find entity or project context.' });
-                return;
-            }
-            
+            return;
+        }
+
+        // Logic for creating a new view
+        const { newViewName, newViewType, newViewImage } = data;
+
+        if (!newViewName || !newViewType) {
+            toast({ variant: 'destructive', title: 'Missing fields', description: 'View Name and View Type are required.' });
+            return;
+        }
+
+        if (!entity || !params.projectId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not find entity or project context.' });
+            return;
+        }
+
+        try {
+            // 1. Create the view record in Firestore first
             const newViewHref = await addView(entity.id, newViewName, newViewType);
             if (!newViewHref) {
                 toast({ variant: 'destructive', title: 'Failed to create view', description: 'A view with this name may already exist.' });
@@ -124,16 +129,27 @@ export default function HotspotDetailsModal({ isOpen, onClose, onSave, entity, h
             }
 
             const newViewId = decodeURIComponent(newViewHref.split('/').pop()!);
-
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const imageUrl = e.target?.result as string;
+            
+            // 2. If there is an image, upload it and update the view record
+            if (newViewImage) {
+                const file = newViewImage; // It's a File object from RHF
+                const imageUrl = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => resolve(event.target?.result as string);
+                    reader.onerror = (error) => reject(error);
+                    reader.readAsDataURL(file);
+                });
                 await updateViewImage(entity.id, newViewId, imageUrl);
-                onSave({ linkedViewId: newViewId });
-                toast({ title: 'Success!', description: `Hotspot linked to new view "${newViewName}".`});
-                onClose();
-            };
-            reader.readAsDataURL(newViewImage);
+            }
+            
+            // 3. Now that the view is created (and image uploaded if present), link it to the hotspot
+            onSave({ linkedViewId: newViewId });
+            toast({ title: 'Success!', description: `Hotspot linked to new view "${newViewName}".`});
+            onClose();
+
+        } catch (error) {
+            console.error("Error creating and linking new view:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred. Please try again.' });
         }
     };
 
@@ -231,7 +247,7 @@ export default function HotspotDetailsModal({ isOpen, onClose, onSave, entity, h
                                     name="newViewImage"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>New View Image</FormLabel>
+                                            <FormLabel>New View Image (Optional)</FormLabel>
                                             <FormControl>
                                                 <div>
                                                     <Input type="file" id="newViewImageUpload" className="hidden" onChange={handleFileChange} accept="image/*"/>
