@@ -152,15 +152,16 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, onMakeE
     }, [selectionData, form, getDefaultEntityType, childEntities]);
 
     const onSubmit = async (data: SelectionDetailsFormValues) => {
-        let saveData: Polygon['details'];
-
-        if (data.linkToExisting && data.linkedEntityId) {
+        if (data.linkToExisting) {
+            if (!data.linkedEntityId) return;
+            
             const linkedEntity = childEntities.find(e => e.id === data.linkedEntityId);
             if (!linkedEntity) {
                 console.error("Could not find the linked entity.");
                 return;
             }
-            saveData = {
+
+            const saveData: Polygon['details'] = {
                 title: linkedEntity.name,
                 description: `A link to the entity: ${linkedEntity.name}`,
                 makeAsEntity: true,
@@ -169,18 +170,10 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, onMakeE
                 defineSize: !!linkedEntity.houseArea,
                 area: linkedEntity.houseArea,
             };
-        } else {
-            let newEntityId: string | null = null;
-            if (data.makeAsEntity && data.title && data.entityType && onMakeEntity) {
-                newEntityId = await onMakeEntity(data.title, data.entityType as EntityType);
-                if (!newEntityId) {
-                    console.error("Failed to create entity.");
-                    // Optionally: show a toast to the user
-                    return;
-                }
-            }
+            onSave(saveData);
 
-            saveData = {
+        } else {
+            const saveData: Polygon['details'] = {
                 title: data.title!,
                 description: data.description,
                 defineSize: data.defineSize,
@@ -189,11 +182,20 @@ export default function SelectionDetailsModal({ isOpen, onClose, onSave, onMakeE
                 area: data.area ? Number(data.area) : undefined,
                 makeAsEntity: data.makeAsEntity,
                 entityType: data.makeAsEntity ? (data.entityType as EntityType) : undefined,
-                linkedEntityId: newEntityId ?? undefined,
             };
+
+            if (data.makeAsEntity && data.title && data.entityType && onMakeEntity) {
+                const newEntityId = await onMakeEntity(data.title, data.entityType as EntityType);
+                if (!newEntityId) {
+                    console.error("Failed to create entity.");
+                    return;
+                }
+                saveData.linkedEntityId = newEntityId;
+            }
+            
+            onSave(saveData);
         }
         
-        onSave(saveData);
         onClose();
     };
 
