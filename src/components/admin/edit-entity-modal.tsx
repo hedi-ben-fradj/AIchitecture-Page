@@ -102,13 +102,19 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
     const processSave = (data: FormValues) => {
         if (!entity) return;
         
-        const finalData: Partial<Entity> = { ...data };
-        if (finalData.entityType === 'Apartment') {
-            finalData.plotArea = undefined;
+        const rawFinalData: Partial<Entity> = { ...data };
+
+        if (rawFinalData.entityType === 'Apartment') {
+            delete (rawFinalData as any).plotArea;
         }
-        if (!finalData.enterDetailedRoomSpecs) {
-          finalData.detailedRooms = [];
+        if (!rawFinalData.enterDetailedRoomSpecs) {
+          rawFinalData.detailedRooms = [];
         }
+        
+        // IMPORTANT: Clean the entire object to remove any `undefined` values before sending to Firestore.
+        const finalData = Object.fromEntries(
+            Object.entries(rawFinalData).filter(([, value]) => value !== undefined && value !== '')
+        );
 
         onUpdate(entity.id, finalData);
 
