@@ -232,14 +232,6 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
       parentId: parentId,
       views: [],
       defaultViewId: null,
-      plotArea: undefined,
-      houseArea: undefined,
-      price: undefined,
-      status: undefined,
-      availableDate: undefined,
-      floors: undefined,
-      rooms: undefined,
-      detailedRooms: [],
     };
     
     if (entityType === 'Apartment' || entityType === 'house') {
