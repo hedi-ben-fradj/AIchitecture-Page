@@ -72,13 +72,13 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
             form.reset({
                 name: entity.name,
                 entityType: entity.entityType,
-                plotArea: entity.plotArea || undefined,
-                houseArea: entity.houseArea || undefined,
-                price: entity.price || undefined,
+                plotArea: entity.plotArea ?? undefined,
+                houseArea: entity.houseArea ?? undefined,
+                price: entity.price ?? undefined,
                 status: entity.status || 'available',
                 availableDate: entity.availableDate || '',
-                floors: entity.floors || 1,
-                rooms: entity.rooms || 1,
+                floors: entity.floors ?? 1,
+                rooms: entity.rooms ?? 1,
                 enterDetailedRoomSpecs: !!(entity.detailedRooms && entity.detailedRooms.length > 0),
                 detailedRooms: entity.detailedRooms || [],
             });
@@ -113,7 +113,7 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
         
         // IMPORTANT: Clean the entire object to remove any `undefined` values before sending to Firestore.
         const finalData = Object.fromEntries(
-            Object.entries(rawFinalData).filter(([, value]) => value !== undefined && value !== '')
+            Object.entries(rawFinalData).filter(([, value]) => value !== undefined)
         );
 
         onUpdate(entity.id, finalData);
