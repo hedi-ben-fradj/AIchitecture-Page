@@ -90,37 +90,11 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   // Effect to manage the 360 viewer lifecycle
   useEffect(() => {
     let viewer: Viewer | null = null;
-    let objectUrl: string | null = null;
-
-    const initViewer = async () => {
-        if (view?.type !== '360' || !imageToEdit || !viewerContainerRef.current) {
-            return;
-        }
-
-        let panoramaData = imageToEdit;
-
-        // If it's a remote URL, fetch it as a blob to bypass potential CORS issues
-        if (imageToEdit.startsWith('http')) {
-            try {
-                const response = await fetch(imageToEdit);
-                if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
-                const blob = await response.blob();
-                objectUrl = URL.createObjectURL(blob);
-                panoramaData = objectUrl;
-            } catch (err) {
-                console.error("Error fetching panorama for viewer:", err);
-                toast({
-                    title: "Error loading 360 view",
-                    description: "Could not load the panorama image.",
-                    variant: "destructive",
-                });
-                return;
-            }
-        }
-
+    
+    if (view?.type === '360' && imageToEdit && viewerContainerRef.current) {
         viewer = new Viewer({
-            container: viewerContainerRef.current!,
-            panorama: panoramaData,
+            container: viewerContainerRef.current,
+            panorama: imageToEdit,
             caption: view.name,
             touchmoveTwoFingers: true,
             navbar: ['zoom', 'move', 'caption', 'fullscreen'],
@@ -208,16 +182,11 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             setSelectedHotspotId(null);
           }) as (evt: TypedEvent<Viewer, any>) => void);
         }
-    };
+    }
     
-    initViewer();
-
     return () => {
       viewerRef.current?.destroy();
       viewerRef.current = null;
-      if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view?.type, view?.name, view?.hotspots, imageToEdit, getEntity, allEntities]);
