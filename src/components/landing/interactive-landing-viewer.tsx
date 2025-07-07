@@ -87,14 +87,6 @@ export interface View {
 }
 
 
-const getHotspotSvg = (color: string) => `
-<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye drop-shadow-lg">
-  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-  <circle cx="12" cy="12" r="3" fill="${color}" fill-opacity="0.3"/>
-</svg>
-`;
-
-
 export default function InteractiveLandingViewer({ setActiveView }: { setActiveView: (view: string) => void }) {
     const [currentView, setCurrentView] = useState<FullView | null>(null);
     const [entityViews, setEntityViews] = useState<View[]>([]);
@@ -388,7 +380,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                         yaw: (hotspot.x - 0.5) * 2 * Math.PI,
                         pitch: (hotspot.y - 0.5) * -Math.PI
                     },
-                    html: getHotspotSvg('white'),
+                    html: `<img src="/assets/orb.png" width="50" height="50" style="filter: drop-shadow(0 0 8px white);" />`,
                     size: { width: 50, height: 50 },
                     anchor: 'center center',
                     tooltip: findViewName(hotspot),

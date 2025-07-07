@@ -22,12 +22,8 @@ interface ViewEditorClientProps {
   viewId: string;
 }
 
-const getHotspotSvg = (color: string) => `
-<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye drop-shadow-lg">
-  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-  <circle cx="12" cy="12" r="3" fill="${color}" fill-opacity="0.3"/>
-</svg>
-`;
+const getHotspotMarkerHtml = (color: string) =>
+  `<img src="/assets/orb.png" width="50" height="50" style="filter: drop-shadow(0 0 8px ${color}); transition: filter 0.2s ease-in-out;" />`;
 
 
 export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEditorClientProps) {
@@ -123,7 +119,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 yaw: (hotspot.x - 0.5) * 2 * Math.PI, 
                 pitch: (hotspot.y - 0.5) * -Math.PI 
               },
-              html: getHotspotSvg('white'),
+              html: getHotspotMarkerHtml('white'),
               size: { width: 50, height: 50 },
               anchor: 'center center',
               tooltip: findViewName(hotspot),
@@ -154,7 +150,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 currentMarkersPlugin.addMarker({
                     id: String(newHotspot.id),
                     position: { yaw: e.data.yaw, pitch: e.data.pitch },
-                    html: getHotspotSvg('white'),
+                    html: getHotspotMarkerHtml('white'),
                     size: { width: 50, height: 50 },
                     anchor: 'center center',
                     tooltip: 'New Hotspot (unsaved)',
@@ -199,10 +195,19 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
         currentMarkers.forEach(marker => {
             const isSelected = marker.id === String(selectedHotspotId);
-            markersPlugin.updateMarker({
-                id: marker.id,
-                html: getHotspotSvg(isSelected ? '#facc15' : 'white'),
-            });
+            try {
+                if (markersPlugin.getMarker(marker.id)) {
+                    markersPlugin.updateMarker({
+                        id: marker.id,
+                        html: getHotspotMarkerHtml(isSelected ? '#facc15' : 'white'),
+                    });
+                }
+            } catch (e) {
+                console.warn(`Could not update marker ${marker.id}, it might have been removed.`, e);
+                if (isSelected) {
+                    setSelectedHotspotId(null);
+                }
+            }
         });
     }, [selectedHotspotId, markersPlugin, viewerHotspots]);
 
@@ -226,12 +231,17 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         setViewerHotspots((prev) =>
           prev.map((h) => (h.id === updatedHotspot.id ? updatedHotspot : h))
         );
-
-        markersPlugin.updateMarker({
-          id: String(updatedHotspot.id),
-          data: updatedHotspot,
-          tooltip: findViewName(updatedHotspot),
-        });
+        try {
+          if (markersPlugin.getMarker(String(updatedHotspot.id))) {
+              markersPlugin.updateMarker({
+                  id: String(updatedHotspot.id),
+                  data: updatedHotspot,
+                  tooltip: findViewName(updatedHotspot),
+              });
+          }
+        } catch (e) {
+          console.warn(`Could not update marker on save: ${updatedHotspot.id}`, e)
+        }
       }
     } else {
       // Logic for 2D editor
