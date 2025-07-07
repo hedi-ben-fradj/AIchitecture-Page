@@ -257,9 +257,19 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, [projectId]);
 
   const updateEntity = useCallback(async (entityId: string, data: Partial<Entity>) => {
-    const entityRef = doc(db, 'entities', entityId);
-    await updateDoc(entityRef, data);
-    setEntities(prev => prev.map(e => e.id === entityId ? { ...e, ...data } : e));
+    // Create a new object with only defined values to prevent Firestore errors.
+    const cleanData = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+    
+    // Only update if there is data to update. This prevents empty updates.
+    if (Object.keys(cleanData).length > 0) {
+        const entityRef = doc(db, 'entities', entityId);
+        await updateDoc(entityRef, cleanData);
+        
+        // Update the local state with the cleaned data.
+        // This ensures the local state is consistent with what was saved to Firestore
+        // and prevents overwriting existing values with 'undefined'.
+        setEntities(prev => prev.map(e => e.id === entityId ? { ...e, ...cleanData } : e));
+    }
   }, []);
 
   const deleteEntity = useCallback(async (entityId: string) => {
