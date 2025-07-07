@@ -1,3 +1,8 @@
-import DashboardLayout from '@/components/admin/dashboard-layout';
 
-export default DashboardLayout;
+export default function DashboardSubLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <>{children}</>;
+}
