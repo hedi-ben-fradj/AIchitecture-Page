@@ -216,9 +216,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
 
   const handleSaveDetails = (data: Polygon['details']) => {
     if (!selectedPolygonId || !data) return;
-    const linkedEntityTitle = data.makeAsEntity ? data.title : null;
-    const filteredPolygons = linkedEntityTitle ? polygons.filter(p => !(p.id !== selectedPolygonId && p.details?.makeAsEntity && p.details.title === linkedEntityTitle)) : polygons;
-    const newPolygons = filteredPolygons.map(p => p.id === selectedPolygonId ? { ...p, details: data } : p);
+    const newPolygons = polygons.map(p => p.id === selectedPolygonId ? { ...p, details: data } : p);
     setPolygons(newPolygons);
     saveToHistory(newPolygons, hotspots);
   };
