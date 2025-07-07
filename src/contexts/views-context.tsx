@@ -250,7 +250,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   }, [projectId]);
 
   const updateEntity = useCallback(async (entityId: string, data: Partial<Entity>) => {
-    const cleanData = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+    const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([, value]) => {
+            if (value === undefined) return false;
+            if (typeof value === 'number' && isNaN(value)) return false;
+            return true;
+        })
+    );
     
     if (Object.keys(cleanData).length > 0) {
         const entityRef = doc(db, 'entities', entityId);
