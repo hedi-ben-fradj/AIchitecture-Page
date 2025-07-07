@@ -6,10 +6,12 @@ import type { Entity, View } from '@/contexts/views-context';
 import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Building, Database } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { usePathname, useParams } from 'next/navigation';
+import { usePathname, useParams, useRouter } from 'next/navigation';
 import { ViewsProvider } from '@/contexts/views-context';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { signOut } from 'firebase/auth';
 
 // Minimal type for sidebar display
 interface SidebarView {
@@ -110,16 +112,25 @@ const bottomNavItems = [
     { title: 'Logout', href: '#', icon: LogOut },
 ];
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const pathname = usePathname();
   const params = useParams<{ projectId?: string; entityId?: string }>();
   const { projectId, entityId } = params;
 
   const [entities, setEntities] = useState<SidebarEntity[]>([]);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/admin/login');
+    }
+  }, [user, loading, router]);
+  
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/admin/login');
+  };
 
   useEffect(() => {
     if (!projectId) {
@@ -159,6 +170,14 @@ export default function AdminLayout({
     return ids;
   }, [entityId, entities]);
 
+  if (loading || !user) {
+    return (
+      <div className="bg-neutral-900 flex h-screen w-full items-center justify-center text-white">
+        <p>Loading Authentication...</p>
+      </div>
+    );
+  }
+  
   return (
     <ViewsProvider>
       <div className="bg-neutral-900 text-foreground min-h-screen flex">
@@ -179,7 +198,6 @@ export default function AdminLayout({
                       </Link>
                   ))}
                   
-                  {/* DYNAMIC PROJECTS SECTION */}
                   <div className="space-y-1">
                     <Link
                         href="/admin"
@@ -219,7 +237,20 @@ export default function AdminLayout({
                   </Link>
               </nav>
               <nav className="space-y-1">
-                  {bottomNavItems.map((item) => (
+                  {bottomNavItems.map((item) => {
+                    if (item.title === 'Logout') {
+                      return (
+                        <button
+                          key={item.title}
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white text-left"
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {item.title}
+                        </button>
+                      );
+                    }
+                    return (
                       <Link
                           key={item.title}
                           href={item.href}
@@ -228,7 +259,8 @@ export default function AdminLayout({
                           <item.icon className="h-4 w-4" />
                           {item.title}
                       </Link>
-                  ))}
+                    );
+                  })}
               </nav>
           </div>
         </aside>
@@ -237,5 +269,17 @@ export default function AdminLayout({
         </div>
       </div>
     </ViewsProvider>
+  );
+}
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthProvider>
+      <AdminLayoutContent>{children}</AdminLayoutContent>
+    </AuthProvider>
   );
 }
