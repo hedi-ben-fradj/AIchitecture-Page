@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { ProjectTemplate } from '@/components/admin/add-edit-template-modal';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, getDoc, setDoc, writeBatch, deleteDoc, query, where } from 'firebase/firestore';
+import { ViewsProvider } from '@/contexts/views-context';
 
 
 interface Project {
@@ -47,7 +48,7 @@ interface ProjectStats {
     availableUnits: number;
 }
 
-export default function AdminProjectsPage() {
+function AdminProjectsPageComponent() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [projectStats, setProjectStats] = useState<Record<string, ProjectStats>>({});
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
@@ -373,5 +374,15 @@ export default function AdminProjectsPage() {
                 </div>
             </main>
         </>
+    );
+}
+
+export default function AdminProjectsPage() {
+    // projectId is not available on the overview page, so we pass undefined.
+    // The provider is designed to handle this gracefully.
+    return (
+        <ViewsProvider projectId={undefined}>
+            <AdminProjectsPageComponent />
+        </ViewsProvider>
     );
 }
