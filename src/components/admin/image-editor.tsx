@@ -337,6 +337,11 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     }
     setDragInfo(null);
   };
+  
+  const handleContainerMouseLeave = () => {
+    handleMouseUp();
+    setMagnifierPosition(null);
+  };
 
   const handlePolygonDoubleClick = (e: MouseEvent, polygonId: number) => {
     e.preventDefault();
@@ -420,10 +425,15 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
             </Button>
         </div>
       </div>
-      <div className="relative w-full max-w-5xl mx-auto" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-        <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600">
+      <div className="relative w-full max-w-5xl mx-auto" onMouseLeave={handleContainerMouseLeave}>
+        <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
           <img src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
-          <svg ref={svgRef} className="absolute top-0 left-0 w-full h-full z-10" onClick={() => { setSelectedPolygonId(null); setSelectedHotspotId(null); }}>
+          <svg
+            ref={svgRef}
+            className="absolute top-0 left-0 w-full h-full z-10"
+            onClick={() => { setSelectedPolygonId(null); setSelectedHotspotId(null); }}
+            onMouseLeave={() => setMagnifierPosition(null)}
+          >
             
             {polygons.map(polygon => (
               <Tooltip key={polygon.id} delayDuration={100}>
