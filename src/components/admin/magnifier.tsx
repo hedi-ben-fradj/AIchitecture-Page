@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
+import type { RenderedImageRect } from './image-editor';
 
 // Minimal type definition to avoid circular dependencies
 // This should match the relevant parts of the Polygon type in image-editor.tsx
@@ -15,7 +16,7 @@ interface ActivePolygon {
 interface MagnifierProps {
   imageUrl: string;
   cursorPosition: { x: number; y: number } | null;
-  imageSize: { width: number; height: number };
+  renderedImageRect: RenderedImageRect | null;
   magnifierSize?: number; // Diameter of the magnifier
   zoomFactor?: number;
   activePolygon: ActivePolygon | null;
@@ -26,16 +27,18 @@ const Magnifier = forwardRef<HTMLDivElement, MagnifierProps>(
     {
       imageUrl,
       cursorPosition,
-      imageSize,
+      renderedImageRect,
       magnifierSize = 200,
       zoomFactor = 2.5,
       activePolygon,
     },
     ref
   ) => {
-    if (!cursorPosition || !imageUrl || !imageSize || imageSize.width === 0 || imageSize.height === 0 || !activePolygon) {
+    if (!cursorPosition || !imageUrl || !renderedImageRect || !activePolygon) {
       return null;
     }
+
+    const { x: imageOffsetX, y: imageOffsetY, width: imageWidth, height: imageHeight } = renderedImageRect;
 
     const magnifierStyle: React.CSSProperties = {
       position: 'absolute',
@@ -44,14 +47,13 @@ const Magnifier = forwardRef<HTMLDivElement, MagnifierProps>(
       width: `${magnifierSize}px`,
       height: `${magnifierSize}px`,
       borderRadius: '50%',
-      // Removed hard border
       overflow: 'hidden',
       pointerEvents: 'none',
       zIndex: 50,
       backgroundImage: `url(${imageUrl})`,
       backgroundRepeat: 'no-repeat',
-      backgroundSize: `${imageSize.width * zoomFactor}px ${imageSize.height * zoomFactor}px`,
-      backgroundPosition: `${-(cursorPosition.x * zoomFactor) + magnifierSize / 2}px ${-(cursorPosition.y * zoomFactor) + magnifierSize / 2}px`,
+      backgroundSize: `${imageWidth * zoomFactor}px ${imageHeight * zoomFactor}px`,
+      backgroundPosition: `${-(cursorPosition.x - imageOffsetX) * zoomFactor + magnifierSize / 2}px ${-(cursorPosition.y - imageOffsetY) * zoomFactor + magnifierSize / 2}px`,
     };
 
     const transformPoint = (point: Point) => ({

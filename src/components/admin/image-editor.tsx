@@ -70,7 +70,7 @@ export interface ImageEditorRef {
   updateHotspot: (hotspot: Hotspot) => void;
 }
 
-interface RenderedImageRect {
+export interface RenderedImageRect {
     x: number;
     y: number;
     width: number;
@@ -402,8 +402,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
     setDragInfo(null);
   };
   
-  const handleContainerMouseLeave = () => {
-    handleMouseUp();
+  const handleSvgMouseLeave = () => {
     setMagnifierPosition(null);
   };
 
@@ -489,14 +488,14 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
             </Button>
         </div>
       </div>
-      <div className="relative w-full max-w-5xl mx-auto" onMouseLeave={handleContainerMouseLeave}>
+      <div className="relative w-full max-w-5xl mx-auto">
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
           <img ref={imageRef} src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
           <svg
             ref={svgRef}
             className="absolute top-0 left-0 w-full h-full z-10"
             onClick={() => { setSelectedPolygonId(null); setSelectedHotspotId(null); }}
-            onMouseLeave={() => setMagnifierPosition(null)}
+            onMouseLeave={handleSvgMouseLeave}
           >
             
             {polygons.map(polygon => (
@@ -633,7 +632,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
         <Magnifier
           imageUrl={imageUrl}
           cursorPosition={dragInfo?.type === 'vertex' ? magnifierPosition : null}
-          imageSize={{ width: svgRef.current?.getBoundingClientRect().width || 0, height: svgRef.current?.getBoundingClientRect().height || 0 }}
+          renderedImageRect={renderedImageRect}
           activePolygon={dragInfo?.type === 'vertex' ? selectedPolygon ?? null : null}
         />
       </div>
