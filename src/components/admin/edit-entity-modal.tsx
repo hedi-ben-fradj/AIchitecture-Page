@@ -50,6 +50,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+const orientations = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West'];
 
 export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntityModalProps) {
     const { toast } = useToast();
@@ -283,7 +284,20 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
                                         </div>
                                         <div>
                                             <Label htmlFor="orientation">Orientation</Label>
-                                            <Input id="orientation" {...register('orientation')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="e.g., South-West" />
+                                            <Controller
+                                                control={control}
+                                                name="orientation"
+                                                render={({ field }) => (
+                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                        <SelectTrigger className="mt-2 bg-[#313131] border-neutral-600">
+                                                            <SelectValue placeholder="Select orientation" />
+                                                        </SelectTrigger>
+                                                        <SelectContent className="bg-[#2a2a2a] border-neutral-700 text-white">
+                                                            {orientations.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                                                        </SelectContent>
+                                                    </Select>
+                                                )}
+                                            />
                                         </div>
                                     </div>
                                     <Separator className="bg-neutral-600" />
