@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Viewer, TypedEvent } from '@photo-sphere-viewer/core';
 import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
+import { AutorotatePlugin } from '@photo-sphere-viewer/autorotate-plugin';
 import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize, Eye, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
@@ -368,18 +369,19 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
     useEffect(() => {
         let viewer: Viewer | null = null;
+        let autorotatePlugin: AutorotatePlugin | null = null;
         let idleTimeout: NodeJS.Timeout | null = null;
 
         const startIdleTimer = () => {
             if (idleTimeout) clearTimeout(idleTimeout);
             idleTimeout = setTimeout(() => {
-                viewer?.autorotate.start();
+                autorotatePlugin?.start();
             }, 4000); // 4 seconds
         };
 
         const stopIdleRotation = () => {
-            if (viewer?.autorotate.isStarted()) {
-                viewer.autorotate.stop();
+            if (autorotatePlugin?.isStarted()) {
+                autorotatePlugin.stop();
             }
             startIdleTimer();
         };
@@ -394,10 +396,17 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 loadingTxt: 'Loading panorama...',
                 touchmoveTwoFingers: true,
                 navbar: ['zoom', 'move', 'caption', 'fullscreen'],
-                autorotateSpeed: '0.5rpm',
-                autorotateIdle: false,
-                plugins: [[MarkersPlugin, {}]],
+                plugins: [
+                    [MarkersPlugin, {}],
+                    [AutorotatePlugin, {
+                        autostartDelay: null,
+                        autorotateSpeed: '0.5rpm',
+                        autostartOnIdle: false,
+                    }]
+                ],
             });
+            
+            autorotatePlugin = viewer.getPlugin(AutorotatePlugin);
 
             viewer.addEventListener('ready', () => {
                 startIdleTimer();
