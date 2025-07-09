@@ -70,6 +70,14 @@ export interface ImageEditorRef {
   updateHotspot: (hotspot: Hotspot) => void;
 }
 
+interface RenderedImageRect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+
 function distToSegmentSquared(p: Point, v: Point, w: Point): number {
     const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
     if (l2 === 0) return (p.x - v.x) ** 2 + (p.y - v.y) ** 2;
@@ -88,60 +96,103 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const [selectedPolygonId, setSelectedPolygonId] = useState<number | null>(null);
   const [selectedHotspotId, setSelectedHotspotId] = useState<number | null>(null);
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
   
   const [magnifierPosition, setMagnifierPosition] = useState<{ x: number; y: number } | null>(null);
+  const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
   
   const initialPolygonsKey = useMemo(() => JSON.stringify(initialPolygons), [initialPolygons]);
   const initialHotspotsKey = useMemo(() => JSON.stringify(initialHotspots), [initialHotspots]);
   
   const getRelativePolygonsFromAbsolute = useCallback((absolutePolygons: Polygon[]): Polygon[] => {
-    if (!svgRef.current) return [];
-    const { width, height } = svgRef.current.getBoundingClientRect();
+    if (!svgRef.current || !renderedImageRect) return [];
+    const { width, height, x, y } = renderedImageRect;
     if (width === 0 || height === 0) return [];
     return absolutePolygons.map(poly => ({
         ...poly,
-        points: poly.points.map(p => ({ x: p.x / width, y: p.y / height })),
+        points: poly.points.map(p => ({ x: (p.x - x) / width, y: (p.y - y) / height })),
     }));
-  }, []);
+  }, [renderedImageRect]);
 
   const getRelativeHotspotsFromAbsolute = useCallback((absoluteHotspots: Hotspot[]): Hotspot[] => {
-      if (!svgRef.current) return [];
-      const { width, height } = svgRef.current.getBoundingClientRect();
+      if (!svgRef.current || !renderedImageRect) return [];
+      const { width, height, x, y } = renderedImageRect;
       if (width === 0 || height === 0) return [];
       return absoluteHotspots.map(spot => ({
           ...spot,
-          x: spot.x / width,
-          y: spot.y / height,
+          x: (spot.x - x) / width,
+          y: (spot.y - y) / height,
       }));
+  }, [renderedImageRect]);
+
+  const calculateRect = useCallback(() => {
+    if (!imageRef.current || !svgRef.current) return;
+    
+    const { naturalWidth, naturalHeight } = imageRef.current;
+    if (naturalWidth === 0 || naturalHeight === 0) return;
+
+    const { width: containerWidth, height: containerHeight } = svgRef.current.getBoundingClientRect();
+    
+    const imageAspectRatio = naturalWidth / naturalHeight;
+    const containerAspectRatio = containerWidth / containerHeight;
+    
+    let renderWidth, renderHeight, x, y;
+    
+    if (imageAspectRatio > containerAspectRatio) {
+        renderWidth = containerWidth;
+        renderHeight = containerWidth / imageAspectRatio;
+        x = 0;
+        y = (containerHeight - renderHeight) / 2;
+    } else {
+        renderHeight = containerHeight;
+        renderWidth = containerHeight * imageAspectRatio;
+        y = 0;
+        x = (containerWidth - renderWidth) / 2;
+    }
+    
+    setRenderedImageRect({ width: renderWidth, height: renderHeight, x, y });
   }, []);
+
+  useEffect(() => {
+    calculateRect();
+    const currentImageRef = imageRef.current;
+    if (currentImageRef) {
+        currentImageRef.addEventListener('load', calculateRect);
+        window.addEventListener('resize', calculateRect);
+    }
+    return () => {
+        if (currentImageRef) {
+            currentImageRef.removeEventListener('load', calculateRect);
+            window.removeEventListener('resize', calculateRect);
+        }
+    };
+  }, [calculateRect]);
 
   useEffect(() => {
     const currentInitialPolygons = JSON.parse(initialPolygonsKey) as Polygon[];
     const currentInitialHotspots = JSON.parse(initialHotspotsKey) as Hotspot[];
     
-    if (svgRef.current && imageUrl) {
-      const { width, height } = svgRef.current.getBoundingClientRect();
-      if (width > 0 && height > 0) {
+    if (renderedImageRect) {
+        const { width, height, x, y } = renderedImageRect;
         const absolutePolygons = currentInitialPolygons.map(poly => ({
           ...poly,
-          points: poly.points.map(p => ({ x: p.x * width, y: p.y * height })),
+          points: poly.points.map(p => ({ x: p.x * width + x, y: p.y * height + y })),
         }));
         const absoluteHotspots = currentInitialHotspots.map(spot => ({
           ...spot,
-          x: spot.x * width,
-          y: spot.y * height,
+          x: spot.x * width + x,
+          y: spot.y * height + y,
         }));
         setPolygons(absolutePolygons);
         setHotspots(absoluteHotspots);
-      }
     } else if (!imageUrl) {
       setPolygons([]);
       setHotspots([]);
     }
-  }, [initialPolygonsKey, initialHotspotsKey, imageUrl]);
+  }, [initialPolygonsKey, initialHotspotsKey, imageUrl, renderedImageRect]);
 
   useImperativeHandle(ref, () => ({
     getRelativePolygons: () => getRelativePolygonsFromAbsolute(polygons),
@@ -156,11 +207,11 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   }));
 
   const handleAddPolygon = () => {
-    if (!svgRef.current) return;
-    const { width, height } = svgRef.current.getBoundingClientRect();
+    if (!svgRef.current || !renderedImageRect) return;
+    const { width, height, x, y } = renderedImageRect;
     const newPolygon: Polygon = {
       id: Date.now(),
-      points: [ { x: width * 0.2, y: height * 0.2 }, { x: width * 0.8, y: height * 0.2 }, { x: width * 0.8, y: height * 0.8 }, { x: width * 0.2, y: height * 0.8 } ],
+      points: [ { x: x + width * 0.2, y: y + height * 0.2 }, { x: x + width * 0.8, y: y + height * 0.2 }, { x: x + width * 0.8, y: y + height * 0.8 }, { x: x + width * 0.2, y: y + height * 0.8 } ],
     };
     const newPolygons = [...polygons, newPolygon];
     setPolygons(newPolygons);
@@ -183,12 +234,12 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   };
   
   const handleAddHotspot = () => {
-    if (!svgRef.current) return;
-    const { width, height } = svgRef.current.getBoundingClientRect();
+    if (!svgRef.current || !renderedImageRect) return;
+    const { width, height, x, y } = renderedImageRect;
     const newHotspot: Hotspot = {
       id: Date.now(),
-      x: width * 0.5,
-      y: height * 0.5,
+      x: x + width * 0.5,
+      y: y + height * 0.5,
       linkedViewId: '',
       rotation: 0,
       fov: 60,
@@ -210,7 +261,10 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
 
   const handleConfirmHotspot = () => {
     const spot = hotspots.find(h => h.id === selectedHotspotId);
-    if (spot) onEditHotspot(spot);
+    if (spot) {
+        const relativeHotspot = getRelativeHotspotsFromAbsolute([spot])[0];
+        onEditHotspot(relativeHotspot);
+    }
   };
 
   const handleSaveDetails = (data: Polygon['details']) => {
@@ -279,7 +333,17 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
 
   const handleMouseMove = (e: MouseEvent) => {
     const mousePos = getMousePosition(e);
-    setMagnifierPosition(mousePos);
+
+    if (renderedImageRect) {
+        const { x, y, width, height } = renderedImageRect;
+        if (mousePos.x < x || mousePos.x > x + width || mousePos.y < y || mousePos.y > y + height) {
+            setMagnifierPosition(null);
+        } else {
+            setMagnifierPosition(mousePos);
+        }
+    } else {
+         setMagnifierPosition(mousePos);
+    }
     
     if (!dragInfo) return;
     e.preventDefault();
@@ -427,7 +491,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
       </div>
       <div className="relative w-full max-w-5xl mx-auto" onMouseLeave={handleContainerMouseLeave}>
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-neutral-600" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
-          <img src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
+          <img ref={imageRef} src={imageUrl} alt="Editor background" className="absolute top-0 left-0 w-full h-full object-contain" />
           <svg
             ref={svgRef}
             className="absolute top-0 left-0 w-full h-full z-10"
