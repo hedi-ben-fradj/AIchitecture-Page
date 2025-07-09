@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Entity } from '@/contexts/views-context';
-import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Building, Database } from 'lucide-react';
+import { LayoutGrid, FolderKanban, User, Settings, LogOut, Eye, Building, Database, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { usePathname, useParams, useRouter } from 'next/navigation';
@@ -12,6 +12,7 @@ import { db, auth } from '@/lib/firebase';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { signOut } from 'firebase/auth';
+import { Button } from '../ui/button';
 
 // Minimal type for sidebar display
 interface SidebarView {
@@ -29,32 +30,49 @@ const EntitySidebarNode = ({
   allEntities, 
   projectId, 
   pathname,
-  activePathIds
+  activePathIds,
+  expandedIds,
+  onToggleExpand
 }: { 
   entity: SidebarEntity, 
   allEntities: SidebarEntity[], 
   projectId: string, 
   pathname: string,
-  activePathIds: Set<string>
+  activePathIds: Set<string>,
+  expandedIds: Set<string>,
+  onToggleExpand: (entityId: string) => void,
 }) => {
     const children = useMemo(() => allEntities.filter(e => e.parentId === entity.id), [allEntities, entity.id]);
     const entityHref = `/admin/projects/${projectId}/entities/${entity.id}`;
     const isNodeOnActivePath = activePathIds.has(entity.id);
+    const isExpanded = expandedIds.has(entity.id);
+
+    const handleEntityClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        onToggleExpand(entity.id);
+    };
 
     return (
-        <div>
-            <Link
-                href={entityHref}
+        <div className="group/entity-node">
+            <div
+                onClick={handleEntityClick}
                 className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white",
-                    isNodeOnActivePath && "bg-neutral-600 text-white"
+                    "flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium text-neutral-400 transition-all hover:bg-neutral-700 hover:text-white cursor-pointer relative",
+                    (isNodeOnActivePath || isExpanded) && "bg-neutral-600 text-white"
                 )}
             >
-                <Building className="h-4 w-4" />
-                {entity.name}
-            </Link>
+                <div className="flex items-center gap-3">
+                    <Building className="h-4 w-4" />
+                    {entity.name}
+                </div>
+                <Link href={entityHref} onClick={(e) => e.stopPropagation()} className="opacity-0 group-hover/entity-node:opacity-100 transition-opacity absolute right-2">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-neutral-500">
+                        <ChevronRight className="h-4 w-4" />
+                    </Button>
+                </Link>
+            </div>
             
-            {isNodeOnActivePath && (
+            {isExpanded && (
                  <div className="pl-3 border-l border-neutral-700 ml-4">
                     {/* Views */}
                     {entity.views.length > 0 && (
@@ -89,6 +107,8 @@ const EntitySidebarNode = ({
                                     projectId={projectId}
                                     pathname={pathname}
                                     activePathIds={activePathIds}
+                                    expandedIds={expandedIds}
+                                    onToggleExpand={onToggleExpand}
                                 />
                             ))}
                         </div>
@@ -119,6 +139,7 @@ function FullDashboard({ children }: { children: React.ReactNode }) {
     const router = useRouter();
 
     const [entities, setEntities] = useState<SidebarEntity[]>([]);
+    const [expandedIds, setExpandedIds] = useState(new Set<string>());
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -163,6 +184,23 @@ function FullDashboard({ children }: { children: React.ReactNode }) {
         return ids;
     }, [entityId, entities]);
 
+    const handleToggleExpand = useCallback((idToToggle: string) => {
+        setExpandedIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(idToToggle)) {
+                newSet.delete(idToToggle);
+            } else {
+                newSet.add(idToToggle);
+            }
+            return newSet;
+        });
+    }, []);
+
+    // Auto-expand the active path on navigation
+    useEffect(() => {
+        setExpandedIds(prev => new Set([...prev, ...activePathIds]));
+    }, [activePathIds]);
+
     return (
         <ViewsProvider projectId={projectId}>
           <div className="bg-neutral-900 text-foreground min-h-screen flex">
@@ -204,6 +242,8 @@ function FullDashboard({ children }: { children: React.ReactNode }) {
                                       projectId={projectId}
                                       pathname={pathname}
                                       activePathIds={activePathIds}
+                                      expandedIds={expandedIds}
+                                      onToggleExpand={handleToggleExpand}
                                   />
                                 ))}
                             </div>
