@@ -5,7 +5,7 @@ import { useState, useEffect, type MouseEvent, useRef, useCallback, useMemo, Fra
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Viewer } from '@photo-sphere-viewer/core';
+import { Viewer, TypedEvent } from '@photo-sphere-viewer/core';
 import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
 import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize, Eye, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -368,6 +368,22 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
     useEffect(() => {
         let viewer: Viewer | null = null;
+        let idleTimeout: NodeJS.Timeout | null = null;
+
+        const startIdleTimer = () => {
+            if (idleTimeout) clearTimeout(idleTimeout);
+            idleTimeout = setTimeout(() => {
+                viewer?.autorotate.start();
+            }, 4000); // 4 seconds
+        };
+
+        const stopIdleRotation = () => {
+            if (viewer?.autorotate.isStarted()) {
+                viewer.autorotate.stop();
+            }
+            startIdleTimer();
+        };
+
         if (currentViewType === '360' && currentView?.imageUrl && viewerContainerRef.current) {
             const panoramaUrl = `/api/image-proxy?url=${encodeURIComponent(currentView.imageUrl)}`;
              viewer = new Viewer({
@@ -378,8 +394,16 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 loadingTxt: 'Loading panorama...',
                 touchmoveTwoFingers: true,
                 navbar: ['zoom', 'move', 'caption', 'fullscreen'],
+                autorotateSpeed: '0.5rpm',
+                autorotateIdle: false,
                 plugins: [[MarkersPlugin, {}]],
             });
+
+            viewer.addEventListener('ready', () => {
+                startIdleTimer();
+            }, { once: true });
+
+            viewer.addEventListener('user-activity', stopIdleRotation);
 
             const markersPlugin = viewer.getPlugin(MarkersPlugin);
             if (markersPlugin) {
@@ -418,6 +442,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         }
 
         return () => {
+            if (idleTimeout) clearTimeout(idleTimeout);
             viewer?.destroy();
         };
     }, [currentView, currentViewType, allEntities, handleHotspotNavigate]);
