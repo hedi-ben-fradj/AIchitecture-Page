@@ -563,6 +563,13 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         setTimeout(calculateRect, 0);
     };
 
+    const handleSelectionDoubleClick = (e: MouseEvent, selection: Polygon) => {
+        e.stopPropagation();
+        if (selection.details?.makeAsEntity && selection.details.linkedEntityId) {
+            handleNavigate(selection.details.linkedEntityId);
+        }
+    };
+
     const groupedViews = useMemo(() => {
         if (!entityViews.length || !viewTypes.length) return {};
 
@@ -987,6 +994,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                             <g
                                 key={selection.id}
                                 onClick={(e) => handleSelectionClick(e, selection)}
+                                onDoubleClick={(e) => handleSelectionDoubleClick(e, selection)}
                                 onMouseEnter={() => setHoveredSelectionId(selection.id)}
                                 onMouseLeave={() => setHoveredSelectionId(null)}
                                 className="cursor-pointer"
