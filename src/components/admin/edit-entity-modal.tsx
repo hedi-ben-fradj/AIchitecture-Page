@@ -37,10 +37,13 @@ const formSchema = z.object({
     plotArea: z.coerce.number().optional(),
     houseArea: z.coerce.number().optional(),
     price: z.coerce.number().optional(),
-    status: z.enum(['available', 'sold']).optional(),
+    status: z.enum(['available', 'sold', 'reserved']).optional(),
     availableDate: z.string().optional(),
     floors: z.coerce.number().optional(),
     rooms: z.coerce.number().optional(),
+    bedrooms: z.coerce.number().optional(),
+    bathrooms: z.coerce.number().optional(),
+    orientation: z.string().optional(),
     enterDetailedRoomSpecs: z.boolean().optional(),
     detailedRooms: z.array(roomDetailSchema).optional(),
 });
@@ -82,6 +85,9 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
                 availableDate: entity.availableDate || '',
                 floors: entity.floors ?? 1,
                 rooms: entity.rooms ?? 1,
+                bedrooms: entity.bedrooms ?? 1,
+                bathrooms: entity.bathrooms ?? 1,
+                orientation: entity.orientation ?? '',
                 enterDetailedRoomSpecs: !!(entity.detailedRooms && entity.detailedRooms.length > 0),
                 detailedRooms: entity.detailedRooms || [],
             });
@@ -234,6 +240,7 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
                                                         </SelectTrigger>
                                                         <SelectContent className="bg-[#2a2a2a] border-neutral-700 text-white">
                                                             <SelectItem value="available">Available</SelectItem>
+                                                            <SelectItem value="reserved">Reserved</SelectItem>
                                                             <SelectItem value="sold">Sold</SelectItem>
                                                         </SelectContent>
                                                     </Select>
@@ -261,8 +268,22 @@ export function EditEntityModal({ isOpen, onClose, entity, onUpdate }: EditEntit
                                             <Input id="floors" type="number" {...register('floors')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="1" />
                                         </div>
                                         <div>
-                                            <Label htmlFor="rooms">Rooms</Label>
+                                            <Label htmlFor="rooms">Total Rooms</Label>
                                             <Input id="rooms" type="number" {...register('rooms')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="3" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <Label htmlFor="bedrooms">Bedrooms</Label>
+                                            <Input id="bedrooms" type="number" {...register('bedrooms')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="2" />
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="bathrooms">Bathrooms</Label>
+                                            <Input id="bathrooms" type="number" {...register('bathrooms')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="1" />
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="orientation">Orientation</Label>
+                                            <Input id="orientation" {...register('orientation')} className="mt-2 bg-[#313131] border-neutral-600" placeholder="e.g., South-West" />
                                         </div>
                                     </div>
                                     <Separator className="bg-neutral-600" />

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Viewer, TypedEvent } from '@photo-sphere-viewer/core';
 import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
 import { AutorotatePlugin } from '@photo-sphere-viewer/autorotate-plugin';
-import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize, Eye, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, Crop as CropIcon, Navigation as NavigationIcon, SlidersHorizontal, X, ArrowLeft, Info, Phone, Layers, Volume2, VolumeX, Maximize, Minimize, Eye, Loader2, Bed, Bath, Compass, Ruler, Euro } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import FilterSidebar, { type Filters } from './filter-sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -69,13 +69,17 @@ export interface Entity {
   parentId?: string | null;
   views: View[];
   defaultViewId: string | null;
+  // New property-specific fields
   plotArea?: number;
   houseArea?: number;
   price?: number;
-  status?: 'available' | 'sold';
+  status?: 'available' | 'sold' | 'reserved';
   availableDate?: string;
   floors?: number;
   rooms?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  orientation?: string;
   detailedRooms?: RoomDetail[];
 }
 // Define types for View if not already imported from a central location
@@ -400,7 +404,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     [MarkersPlugin, {}],
                     [AutorotatePlugin, {
                         autostartDelay: null,
-                        autorotateSpeed: '0.5rpm',
+                        autorotateSpeed: '1rpm',
                         autostartOnIdle: false,
                     }]
                 ],
@@ -885,8 +889,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                         const rotation = hotspot.rotation || 0;
                                         const fov = hotspot.fov || 60;
                                         
-                                        const innerRadius = 20 * scaleFactor;
-                                        const outerRadius = 35 * scaleFactor;
+                                        const innerRadius = 15 * scaleFactor;
+                                        const outerRadius = 30 * scaleFactor;
                                         const eyeIconSize = 24 * scaleFactor;
 
                                         const rotationRad = rotation * (Math.PI / 180);
@@ -1015,9 +1019,10 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                             if (isProperty) {
                                 if (entityForSelection.status === 'available') {
                                     return 'stroke-green-400 fill-green-400/50';
-                                }
-                                if (entityForSelection.status === 'sold') {
-                                     return 'stroke-orange-400 fill-orange-400/50';
+                                } else if (entityForSelection.status === 'reserved') {
+                                    return 'stroke-orange-400 fill-orange-400/50';
+                                } else if (entityForSelection.status === 'sold') {
+                                     return 'stroke-red-400 fill-red-400/50';
                                 }
                             }
                             
@@ -1120,59 +1125,53 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
 
             {clickedSelection?.details && (
                 <div style={detailsPosition} className="z-30 pointer-events-none" onClick={(e) => e.stopPropagation()}>
-                    <Card className="pointer-events-auto bg-black/80 backdrop-blur-md text-white border-none w-auto max-w-2xl shadow-2xl animate-in fade-in-50 rounded-2xl">
+                    <Card className="pointer-events-auto bg-black/80 backdrop-blur-md text-white border-none w-auto max-w-sm shadow-2xl animate-in fade-in-50 rounded-2xl">
                         
                         <Button variant="ghost" size="icon" className="absolute top-4 right-4 h-8 w-8 shrink-0 text-neutral-400 hover:text-white z-10" onClick={closeDetails}>
                             <X className="h-5 w-5" />
                         </Button>
                         
                         {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') ? (
-                           <CardContent className="p-4">
-                                <div className="flex items-start justify-between gap-4 p-1">
-                                    <div className="flex-1">
-                                        <h3 className="text-xl font-light text-white leading-none">{clickedEntity.name}</h3>
-                                    </div>
-                                    <div className="flex gap-x-4 text-left">
-                                        {clickedEntity.entityType === 'house' && (
-                                            <div>
-                                                <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Plot, M²</p>
-                                                <p className="text-lg font-light text-white mt-1">{clickedEntity.plotArea ?? '—'}</p>
-                                            </div>
-                                        )}
-                                        <div>
-                                            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">{clickedEntity.entityType === 'house' ? 'House, M²' : 'Area, M²'}</p>
-                                            <p className="text-lg font-light text-white mt-1">{clickedEntity.houseArea ?? '—'}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Price, EUR</p>
-                                                {clickedEntity.status === 'sold' ? (
-                                                <div className="mt-1 text-xs font-semibold uppercase bg-neutral-600 text-neutral-200 px-2 py-1 rounded-md inline-block">SOLD</div>
-                                            ) : (
-                                                <p className="text-lg font-light text-white mt-1">{clickedEntity.price ? `€${clickedEntity.price.toLocaleString()}` : 'N/A'}</p>
-                                            )}
-                                        </div>
-                                    </div>
+                           <CardContent className="p-6">
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                                  <div>
+                                    <p className="text-xl font-semibold text-white leading-tight">{clickedEntity.name}</p>
+                                    <p className="text-sm text-neutral-400 capitalize">{clickedEntity.entityType}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xl font-semibold text-white leading-tight">{clickedEntity.price ? `€${clickedEntity.price.toLocaleString()}` : 'N/A'}</p>
+                                    <p className={cn("text-sm font-medium capitalize", 
+                                      clickedEntity.status === 'available' && 'text-green-400',
+                                      clickedEntity.status === 'reserved' && 'text-orange-400',
+                                      clickedEntity.status === 'sold' && 'text-red-400'
+                                    )}>{clickedEntity.status?.replace('-', ' ') || 'Available'}</p>
+                                  </div>
                                 </div>
                                 
-                                {(clickedEntity.detailedRooms && clickedEntity.detailedRooms.length > 0 || clickedEntity.availableDate) && (
-                                    <>
-                                        <hr className="border-neutral-700 my-3" />
+                                <hr className="border-neutral-700 my-4" />
 
-                                        <div className="grid grid-cols-4 gap-x-4 p-1">
-                                        <div className="text-left">
-                                                <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Date</p>
-                                                <p className="text-lg font-light text-white mt-1">{clickedEntity.availableDate ?? '—'}</p>
-                                            </div>
-
-                                            {clickedEntity.detailedRooms?.map(room => (
-                                                <div key={room.id} className="text-left">
-                                                    <p className="text-[9px] text-neutral-400 uppercase tracking-wider truncate">{room.name}</p>
-                                                    <p className="text-lg font-light text-white mt-1">{room.size} m²</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
+                                <div className="grid grid-cols-3 gap-4 text-center">
+                                  <div className="flex flex-col items-center gap-1">
+                                    <Ruler className="h-5 w-5 text-yellow-500" />
+                                    <p className="font-semibold">{clickedEntity.houseArea ?? '—'} m²</p>
+                                    <p className="text-xs text-neutral-400">Area</p>
+                                  </div>
+                                  <div className="flex flex-col items-center gap-1">
+                                    <Bed className="h-5 w-5 text-yellow-500" />
+                                    <p className="font-semibold">{clickedEntity.bedrooms ?? '—'}</p>
+                                    <p className="text-xs text-neutral-400">Bedrooms</p>
+                                  </div>
+                                   <div className="flex flex-col items-center gap-1">
+                                    <Bath className="h-5 w-5 text-yellow-500" />
+                                    <p className="font-semibold">{clickedEntity.bathrooms ?? '—'}</p>
+                                    <p className="text-xs text-neutral-400">Bathrooms</p>
+                                  </div>
+                                   <div className="flex flex-col items-center gap-1">
+                                    <Compass className="h-5 w-5 text-yellow-500" />
+                                    <p className="font-semibold">{clickedEntity.orientation ?? '—'}</p>
+                                    <p className="text-xs text-neutral-400">Orientation</p>
+                                  </div>
+                                </div>
 
                                 <div className="flex justify-end items-center mt-5 gap-4">
                                     {clickedEntity && (clickedEntity.entityType === 'Apartment' || clickedEntity.entityType === 'house') && (
@@ -1295,9 +1294,12 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                     if (entityForSelection.status === 'available') {
                                         highlightClass = 'border-green-400';
                                         hoverClass = 'hover:border-green-400';
-                                    } else if (entityForSelection.status === 'sold') {
+                                    } else if (entityForSelection.status === 'reserved') {
                                         highlightClass = 'border-orange-400';
                                         hoverClass = 'hover:border-orange-400';
+                                    } else if (entityForSelection.status === 'sold') {
+                                        highlightClass = 'border-red-400';
+                                        hoverClass = 'hover:border-red-400';
                                     }
                                 }
 

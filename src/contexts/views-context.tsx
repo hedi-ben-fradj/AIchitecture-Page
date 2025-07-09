@@ -61,10 +61,13 @@ export interface Entity {
   plotArea?: number;
   houseArea?: number;
   price?: number;
-  status?: 'available' | 'sold';
+  status?: 'available' | 'sold' | 'reserved';
   availableDate?: string;
   floors?: number;
   rooms?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  orientation?: string;
   detailedRooms?: RoomDetail[];
 }
 
@@ -240,6 +243,8 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         newEntityData.status = 'available';
         newEntityData.floors = 1;
         newEntityData.rooms = 1;
+        newEntityData.bedrooms = 1;
+        newEntityData.bathrooms = 1;
     }
     
     // Filter out undefined values

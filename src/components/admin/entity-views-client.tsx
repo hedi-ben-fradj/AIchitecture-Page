@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Eye, Building, Edit, Home, Building2, Calendar, Euro, Ruler, Bed, Bath } from 'lucide-react';
+import { Plus, Trash2, Eye, Building, Edit, Home, Building2, Calendar, Euro, Ruler, Bed, Bath, Compass, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { useProjectData, type View, type Entity } from '@/contexts/views-context';
 import {
   AlertDialog,
@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 
 function ViewCard({ view, onDelete, isDefaultView, onSetDefaultView, projectId, entityId }: { view: View, onDelete: (viewId: string) => void, isDefaultView: boolean, onSetDefaultView: (viewId: string) => void, projectId: string, entityId: string }) {
@@ -159,14 +160,25 @@ function EntityCard({ entity, onDelete, projectId }: { entity: Entity, onDelete:
     )
 }
 
-function DetailItem({ icon: Icon, label, value }: { icon: LucideIcon, label: string, value?: string | number | null }) {
+function DetailItem({ icon: Icon, label, value, status }: { icon: LucideIcon, label: string, value?: string | number | null, status?: Entity['status'] }) {
     if (value === null || value === undefined || value === '') return null;
+    
+    const getStatusIcon = () => {
+        if (!status) return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        switch (status) {
+            case 'available': return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+            case 'reserved': return <Clock className="h-5 w-5 text-orange-500" />;
+            case 'sold': return <XCircle className="h-5 w-5 text-red-500" />;
+            default: return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        }
+    }
+    
     return (
         <div className="flex items-center gap-3">
-            <Icon className="h-5 w-5 text-yellow-500" />
+            {label === 'Status' ? getStatusIcon() : <Icon className="h-5 w-5 text-yellow-500" />}
             <div>
                 <p className="text-sm text-neutral-400">{label}</p>
-                <p className="text-md font-semibold text-white">{value}</p>
+                <p className="text-md font-semibold text-white capitalize">{value}</p>
             </div>
         </div>
     );
@@ -217,19 +229,21 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
                     <CardContent className="pt-0">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
                             <DetailItem icon={Euro} label="Price" value={entity.price ? `€ ${entity.price.toLocaleString()}`: 'N/A'} />
-                            <DetailItem icon={Ruler} label="Status" value={entity.status} />
+                            <DetailItem icon={Ruler} label="Status" value={entity.status} status={entity.status}/>
                             <DetailItem icon={Calendar} label="Available Date" value={entity.availableDate} />
+                             <DetailItem icon={Compass} label="Orientation" value={entity.orientation} />
                             
                             {entity.entityType === 'house' && (
                                 <DetailItem icon={Home} label="Plot Area" value={entity.plotArea ? `${entity.plotArea} m²` : null} />
                             )}
                             <DetailItem 
                                 icon={Building2} 
-                                label={entity.entityType === 'house' ? 'House Area' : 'Area'} 
+                                label={entity.entityType === 'house' ? 'House Area' : 'Total Area'} 
                                 value={entity.houseArea ? `${entity.houseArea} m²` : null} />
                             
                             <DetailItem icon={Building} label="Floors" value={entity.floors} />
-                            <DetailItem icon={Bed} label="Rooms" value={entity.rooms} />
+                            <DetailItem icon={Bed} label="Bedrooms" value={entity.bedrooms} />
+                            <DetailItem icon={Bath} label="Bathrooms" value={entity.bathrooms} />
                         </div>
 
                         {entity.detailedRooms && entity.detailedRooms.length > 0 && (
