@@ -414,32 +414,34 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       />
       
       {!imageToEdit ? (
-        <Card className="max-w-2xl mx-auto bg-[#2a2a2a] border-neutral-700 text-white">
-          <CardContent className="p-6">
-            <Button variant="ghost" onClick={() => router.back()} className="mb-4">
-                <ArrowLeft className="mr-2 h-4 w-4"/>
-                Back to Entity
-            </Button>
-            <h2 className="text-lg font-semibold mb-4 text-center">Upload Source for {viewName}</h2>
-            <div className="flex items-center justify-center w-full">
-              <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-neutral-600 border-dashed rounded-lg cursor-pointer bg-[#313131] hover:bg-neutral-700">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  {isUploading ? (
-                     <Loader2 className="w-8 h-8 mb-4 text-neutral-400 animate-spin" />
-                  ) : (
-                     <Upload className="w-8 h-8 mb-4 text-neutral-400" />
-                  )}
-                  <p className="mb-2 text-sm text-neutral-400">
-                    {isUploading ? "Uploading..." : <><span className="font-semibold">Click to upload</span> or drag and drop</>}
-                  </p>
-                  <p className="text-xs text-neutral-500">
-                    {view.type === 'Gausian Splatting' ? '.SPLAT file' : 'PNG, JPG, or WEBP (MAX. 4MB)'}
-                  </p>
-                </div>
-              </label>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-center h-full">
+            <Card className="max-w-xl w-full bg-[#2a2a2a] border-neutral-700 text-white">
+                <CardContent className="p-6">
+                    <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+                        <ArrowLeft className="mr-2 h-4 w-4"/>
+                        Back to Entity
+                    </Button>
+                    <h2 className="text-lg font-semibold mb-4 text-center">Upload Source for {viewName}</h2>
+                    <div className="flex items-center justify-center w-full">
+                        <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-neutral-600 border-dashed rounded-lg cursor-pointer bg-[#313131] hover:bg-neutral-700">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                {isUploading ? (
+                                    <Loader2 className="w-8 h-8 mb-4 text-neutral-400 animate-spin" />
+                                ) : (
+                                    <Upload className="w-8 h-8 mb-4 text-neutral-400" />
+                                )}
+                                <p className="mb-2 text-sm text-neutral-400">
+                                    {isUploading ? "Uploading..." : <><span className="font-semibold">Click to upload</span> or drag and drop</>}
+                                </p>
+                                <p className="text-xs text-neutral-500">
+                                    {view.type === 'Gausian Splatting' ? '.SPLAT file' : 'PNG, JPG, or WEBP (MAX. 4MB)'}
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
       ) : (
          <div>
            <div className="flex justify-between items-start mb-4">
