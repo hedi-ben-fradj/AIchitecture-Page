@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, Eye, Building, Edit, Home, Building2, Calendar, Euro, Ruler, Bed, Bath, Compass, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Plus, Trash2, Eye, Building, Edit, Home, Building2, Calendar, Euro, Ruler, Bed, Bath, Compass, CheckCircle2, XCircle, Clock, FileCode } from 'lucide-react';
 import { useProjectData, type View, type Entity } from '@/contexts/views-context';
 import {
   AlertDialog,
@@ -63,22 +63,24 @@ function ViewCard({ view, onDelete, isDefaultView, onSetDefaultView, projectId, 
                 <Link href={href}>
                     <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors flex flex-col min-h-[240px] overflow-hidden">
                         <div className="relative flex-grow bg-neutral-800">
-                            {view.imageUrl ? (
+                            {view.imageUrl && view.type !== 'Gausian Splatting' ? (
                                 <>
                                     <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                                 </>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full p-4 text-neutral-500">
-                                    <Eye className="h-12 w-12" />
-                                    <p className="mt-2 text-sm">No image uploaded</p>
+                                    {view.type === 'Gausian Splatting' ? <FileCode className="h-12 w-12" /> : <Eye className="h-12 w-12" />}
+                                    <p className="mt-2 text-sm text-center">
+                                        {view.type === 'Gausian Splatting' ? `Gaussian Splatting View` : 'No image uploaded'}
+                                    </p>
                                 </div>
                             )}
                         </div>
                         <div className="p-4 border-t border-neutral-700 shrink-0">
                             <CardTitle className="text-lg font-medium truncate">{view.name}</CardTitle>
-                            <p className="text-sm text-neutral-400 mt-1">
-                                {`Contains ${view.selections?.length || 0} selections.`}
+                            <p className="text-sm text-neutral-400 mt-1 capitalize">
+                                {view.type}
                             </p>
                         </div>
                     </Card>
@@ -322,3 +324,5 @@ export default function EntityViewsClient({ projectId, entityId }: { projectId: 
         </div>
     );
 }
+
+    
