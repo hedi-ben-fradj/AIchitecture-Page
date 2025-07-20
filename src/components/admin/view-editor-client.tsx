@@ -17,6 +17,7 @@ import { AutorotatePlugin } from '@photo-sphere-viewer/autorotate-plugin';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import * as SPLAT from 'gsplat';
 
 
 interface ViewEditorClientProps {
@@ -67,10 +68,51 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const allEntitiesRef = useRef(allEntities);
   allEntitiesRef.current = allEntities;
   
-  // For Gaussian Splatting URL input
+  // For Gaussian Splatting
+  const splatCanvasRef = useRef<HTMLCanvasElement>(null);
   const [splatUrl, setSplatUrl] = useState('');
   const [splatFile, setSplatFile] = useState<File | null>(null);
 
+  useEffect(() => {
+    if (view?.type === 'Gausian Splatting' && view.imageUrl && splatCanvasRef.current) {
+        const canvas = splatCanvasRef.current;
+        const renderer = new SPLAT.WebGLRenderer(canvas);
+        const scene = new SPLAT.Scene();
+        const camera = new SPLAT.Camera();
+        const controls = new SPLAT.OrbitControls(camera, canvas);
+        let animationFrameId: number;
+
+        const frame = () => {
+            controls.update();
+            renderer.render(scene, camera);
+            animationFrameId = requestAnimationFrame(frame);
+        };
+
+        const loadSplat = async () => {
+            try {
+                setIsUploading(true);
+                await SPLAT.Loader.LoadAsync(view.imageUrl!, scene, () => {});
+            } catch (e) {
+                console.error("Failed to load splat file:", e);
+                toast({
+                    title: "Load Error",
+                    description: "Could not load the Gaussian Splatting file. Please check the URL or file.",
+                    variant: "destructive",
+                });
+            } finally {
+                setIsUploading(false);
+            }
+        };
+        
+        loadSplat();
+        animationFrameId = requestAnimationFrame(frame);
+        
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+            // Consider adding a dispose method if gsplat provides one to clean up resources
+        };
+    }
+}, [view?.type, view?.imageUrl, toast]);
 
   useEffect(() => {
     if (!view) {
@@ -537,21 +579,13 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
            </div>
            {view.type === 'Gausian Splatting' ? (
                 <div className="w-full h-[70vh] relative bg-black rounded-lg border border-neutral-600 flex items-center justify-center text-white">
-                    {isUploading ? (
-                        <div className="flex flex-col items-center gap-2">
-                            <Loader2 className="h-10 w-10 animate-spin" />
-                            <p>Uploading source...</p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center gap-4 text-neutral-300">
-                           <FileCode className="h-20 w-20" />
-                           <h3 className="text-xl font-semibold">Gaussian Splatting View</h3>
-                           <p className="text-sm text-neutral-400 max-w-md text-center">
-                            Source file: <span className="font-mono text-yellow-400 break-all">{view.imageUrl}</span>
-                           </p>
-                           <p className="text-xs text-neutral-500">Preview is not available in the editor.</p>
+                    {isUploading && (
+                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50 rounded-lg">
+                            <Loader2 className="h-10 w-10 text-white animate-spin" />
+                            <p className="mt-2">Loading Splat...</p>
                         </div>
                     )}
+                    <canvas ref={splatCanvasRef} className="w-full h-full" />
                 </div>
            ) : view.type === '360' ? (
               <div>
@@ -610,3 +644,5 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     </>
   );
 }
+
+    
