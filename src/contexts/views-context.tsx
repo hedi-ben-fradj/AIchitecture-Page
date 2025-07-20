@@ -19,7 +19,8 @@ import {
     arrayUnion,
     arrayRemove
 } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL, uploadBytes } from 'firebase/storage';
+import { useToast } from '@/hooks/use-toast';
 
 export type EntityType = string;
 export type ViewType = string;
@@ -86,10 +87,10 @@ interface ProjectContextType {
   setLandingPageEntityId: (entityId: string | null) => void;
 
   // View methods
-  addView: (entityId: string, viewName: string, viewType: ViewType) => Promise<string>;
+  addView: (entityId: string, viewName: string, viewType: ViewType, source?: string | File) => Promise<string>;
   deleteView: (entityId: string, viewId: string) => void;
   getView: (entityId: string, viewId: string) => View | undefined;
-  updateViewImage: (entityId: string, viewId: string, imageUrl: string) => Promise<void>;
+  updateViewImage: (entityId: string, viewId: string, imageSource: string | File) => Promise<void>;
   updateViewSelections: (entityId: string, viewId: string, selections: Polygon[]) => void;
   updateViewHotspots: (entityId: string, viewId: string, hotspots: Hotspot[]) => void;
   setDefaultViewId: (entityId: string, viewId: string) => void;
@@ -138,6 +139,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
   const [landingPageEntityId, setLandingPageEntityIdState] = useState<string | null>(null);
   const [entityTypes, setEntityTypes] = useState<EntityType[]>([]);
   const [viewTypes, setViewTypes] = useState<ViewType[]>([]);
+  const { toast } = useToast();
 
   // Load global types
   useEffect(() => {
@@ -216,7 +218,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
     const slug = entityName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     if (!slug) {
-        alert("Invalid entity name.");
+        toast({ title: 'Invalid Name', description: 'Entity name is invalid.', variant: 'destructive' });
         return null;
     }
 
@@ -226,7 +228,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     const entitySnap = await getDoc(entityRef);
 
     if (entitySnap.exists()) {
-        alert(`An entity with name "${entityName}" already exists under this parent, resulting in a duplicate ID "${newEntityId}". Please use a different name.`);
+        toast({ title: 'Exists', description: `An entity with a similar name already exists, resulting in a duplicate ID.`, variant: 'destructive' });
         return null;
     }
 
@@ -247,14 +249,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         newEntityData.bathrooms = 1;
     }
     
-    // Filter out undefined values
     const finalData = Object.fromEntries(Object.entries(newEntityData).filter(([, v]) => v !== undefined));
 
     await setDoc(entityRef, finalData);
     setEntities(prev => [...prev, { id: newEntityId, ...finalData } as Entity]);
     return newEntityId;
 
-  }, [projectId]);
+  }, [projectId, toast]);
 
   const updateEntity = useCallback(async (entityId: string, data: Partial<Entity>) => {
     const cleanData = Object.fromEntries(
@@ -301,7 +302,6 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     await updateDoc(doc(db, 'projects', projectId), { landingPageEntityId: entityId });
     setLandingPageEntityIdState(entityId);
     
-    // Also set the global landing project ID
     const globalsRef = doc(db, 'globals', 'config');
     if (entityId) {
         await setDoc(globalsRef, { landingProjectId: projectId }, { merge: true });
@@ -313,7 +313,28 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     }
   }, [projectId]);
 
- const addView = useCallback(async (entityId: string, viewName: string, viewType: ViewType) => {
+  const updateViewData = useCallback(async (entityId: string, viewId: string, data: Partial<View>) => {
+    const entityRef = doc(db, 'entities', entityId);
+    const entitySnap = await getDoc(entityRef);
+    if (!entitySnap.exists()) return;
+
+    const entityData = entitySnap.data() as Entity;
+    const views = entityData.views || [];
+    const viewIndex = views.findIndex(v => v.id === viewId);
+    if (viewIndex === -1) return;
+
+    const cleanedData = JSON.parse(JSON.stringify(data));
+
+    const updatedView = { ...views[viewIndex], ...cleanedData };
+    const updatedViews = [...views];
+    updatedViews[viewIndex] = updatedView;
+
+    await updateDoc(entityRef, { views: updatedViews });
+    
+    setEntities(prev => prev.map(e => e.id === entityId ? { ...e, views: updatedViews } : e));
+  }, []);
+
+  const addView = useCallback(async (entityId: string, viewName: string, viewType: ViewType, source?: string | File) => {
     if (!projectId) return '';
     
     const targetEntity = entities.find(e => e.id === entityId);
@@ -324,13 +345,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
     const viewSlug = viewName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     if (!viewSlug) {
-        alert("Invalid view name.");
+        toast({ title: 'Invalid Name', description: 'View name is invalid.', variant: 'destructive' });
         return '';
     }
     
     const newViewId = `${entityId}__${viewSlug}`;
     if (targetEntity.views.some(v => v.id === newViewId)) {
-        alert(`A view with a similar name already exists in this entity.`);
+        toast({ title: 'Exists', description: 'A view with a similar name already exists in this entity.', variant: 'destructive' });
         return '';
     }
 
@@ -341,9 +362,18 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         selections: [],
         hotspots: [],
     };
+
+    if (source) {
+        if (typeof source === 'string') {
+            newView.imageUrl = source;
+        } else if (source instanceof File) {
+            const storageRef = ref(storage, `projects/${projectId}/views/${newViewId}`);
+            const snapshot = await uploadBytes(storageRef, source);
+            newView.imageUrl = await getDownloadURL(snapshot.ref);
+        }
+    }
     
     const entityRef = doc(db, 'entities', entityId);
-    
     const newDefaultViewId = targetEntity.views.length === 0 ? newViewId : targetEntity.defaultViewId;
 
     await updateDoc(entityRef, {
@@ -359,7 +389,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
     return `/admin/projects/${projectId}/entities/${entityId}/views/${encodeURIComponent(newViewId)}`;
 
-  }, [projectId, entities]);
+  }, [projectId, entities, toast]);
 
   const deleteView = useCallback(async (entityId: string, viewId: string) => {
     const entity = getEntity(entityId);
@@ -373,14 +403,12 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         views: arrayRemove(viewToDelete)
     });
 
-    // If deleted view was the default, set a new default
     if (entity.defaultViewId === viewId) {
         const remainingViews = entity.views.filter(v => v.id !== viewId);
         const newDefault = remainingViews.length > 0 ? remainingViews[0].id : null;
         await updateDoc(entityRef, { defaultViewId: newDefault });
     }
 
-    // Refresh local state
     setEntities(prev => prev.map(e => {
         if (e.id === entityId) {
             const updatedViews = e.views.filter(v => v.id !== viewId);
@@ -395,38 +423,25 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
   }, [getEntity]);
 
-  const updateViewData = async (entityId: string, viewId: string, data: Partial<View>) => {
-    const entityRef = doc(db, 'entities', entityId);
-    const entitySnap = await getDoc(entityRef);
-    if (!entitySnap.exists()) return;
-
-    const entityData = entitySnap.data() as Entity;
-    const views = entityData.views || [];
-    const viewIndex = views.findIndex(v => v.id === viewId);
-    if (viewIndex === -1) return;
-
-    // This is a simple way to deep clone and remove any `undefined` values.
-    const cleanedData = JSON.parse(JSON.stringify(data));
-
-    const updatedView = { ...views[viewIndex], ...cleanedData };
-    const updatedViews = [...views];
-    updatedViews[viewIndex] = updatedView;
-
-    await updateDoc(entityRef, { views: updatedViews });
-    
-    setEntities(prev => prev.map(e => e.id === entityId ? { ...e, views: updatedViews } : e));
-  };
-
-  const updateViewImage = async (entityId: string, viewId: string, imageDataUrl: string) => {
+  const updateViewImage = async (entityId: string, viewId: string, imageSource: string | File) => {
     if (!projectId) return;
-    const storageRef = ref(storage, `projects/${projectId}/views/${viewId}.jpg`);
-    try {
-        const snapshot = await uploadString(storageRef, imageDataUrl, 'data_url');
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        await updateViewData(entityId, viewId, { imageUrl: downloadURL });
-    } catch (error) {
-        console.error("Error uploading image:", error);
+
+    let downloadURL: string;
+
+    if (typeof imageSource === 'string') {
+        // Assume it's a data URL
+        const storageRef = ref(storage, `projects/${projectId}/views/${viewId}.jpg`);
+        const snapshot = await uploadString(storageRef, imageSource, 'data_url');
+        downloadURL = await getDownloadURL(snapshot.ref);
+    } else {
+        // It's a file
+        const fileExtension = imageSource.name.split('.').pop();
+        const storageRef = ref(storage, `projects/${projectId}/views/${viewId}.${fileExtension}`);
+        const snapshot = await uploadBytes(storageRef, imageSource);
+        downloadURL = await getDownloadURL(snapshot.ref);
     }
+
+    await updateViewData(entityId, viewId, { imageUrl: downloadURL });
   };
   
   const updateViewSelections = (entityId: string, viewId: string, selections: Polygon[]) => updateViewData(entityId, viewId, { selections });
@@ -440,13 +455,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
   const addEntityType = useCallback(async (typeName: string) => {
     if (entityTypes.map(t => t.toLowerCase()).includes(typeName.toLowerCase())) {
-        alert('This entity type already exists.');
+        toast({ title: 'Exists', description: 'This entity type already exists.', variant: 'destructive' });
         return;
     }
     const updatedTypes = [...entityTypes, typeName];
     await setDoc(doc(db, 'app_config', 'entity_types'), { types: updatedTypes });
     setEntityTypes(updatedTypes);
-  }, [entityTypes]);
+  }, [entityTypes, toast]);
 
   const deleteEntityType = useCallback(async (typeName: string) => {
     const updatedTypes = entityTypes.filter(t => t !== typeName);
@@ -456,13 +471,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
   const addViewType = useCallback(async (typeName: ViewType) => {
      if (viewTypes.map(t => t.toLowerCase()).includes(typeName.toLowerCase())) {
-        alert('This view type already exists.');
+        toast({ title: 'Exists', description: 'This view type already exists.', variant: 'destructive' });
         return;
     }
     const updatedTypes = [...viewTypes, typeName];
     await setDoc(doc(db, 'app_config', 'view_types'), { types: updatedTypes });
     setViewTypes(updatedTypes);
-  }, [viewTypes]);
+  }, [viewTypes, toast]);
 
   const deleteViewType = useCallback(async (typeName: ViewType) => {
     const updatedTypes = viewTypes.filter(t => t !== typeName);

@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Save, ArrowLeft, Eye, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Upload, Save, ArrowLeft, Eye, Edit, Trash2, Loader2, Plus, FileCode } from 'lucide-react';
 import ImageEditor, { type ImageEditorRef, type Hotspot, type Polygon } from '@/components/admin/image-editor';
 import { useProjectData, type EntityType } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
@@ -13,6 +13,7 @@ import HotspotDetailsModal from './hotspot-details-modal';
 import { Viewer, TypedEvent } from '@photo-sphere-viewer/core';
 import type { ClickData } from '@photo-sphere-viewer/core';
 import { MarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
+import { AutorotatePlugin } from '@photo-sphere-viewer/autorotate-plugin';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 
@@ -73,7 +74,9 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     }
     if (view.imageUrl) {
       setImageToEdit(view.imageUrl);
-      setViewerHotspots(view.hotspots || []);
+      if (view.type === '360') {
+        setViewerHotspots(view.hotspots || []);
+      }
     } else {
       setImageToEdit(null);
       setViewerHotspots([]);
@@ -95,8 +98,26 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
   useEffect(() => {
     let viewer: Viewer | null = null;
-    
+    let autorotatePlugin: AutorotatePlugin | null = null;
+    let idleTimeout: NodeJS.Timeout | null = null;
+    let isViewerDestroyed = false;
+
     if (view?.type === '360' && imageToEdit && viewerContainerRef.current) {
+        
+        const startIdleTimer = () => {
+            if (idleTimeout) clearTimeout(idleTimeout);
+            idleTimeout = setTimeout(() => {
+                autorotatePlugin?.start();
+            }, 4000); // 4 seconds
+        };
+
+        const stopIdleRotation = () => {
+            if (autorotatePlugin?.isStarted()) {
+                autorotatePlugin.stop();
+            }
+            startIdleTimer();
+        };
+
         const panoramaUrl = `/api/image-proxy?url=${encodeURIComponent(imageToEdit)}`;
         viewer = new Viewer({
             container: viewerContainerRef.current,
@@ -106,12 +127,22 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             loadingTxt: 'Loading panorama...',
             touchmoveTwoFingers: true,
             navbar: ['zoom', 'move', 'caption', 'fullscreen'],
-            plugins: [[MarkersPlugin, {}]],
+            plugins: [[MarkersPlugin, {}], [AutorotatePlugin, { autostartDelay: null, autorotateSpeed: '1rpm', autostartOnIdle: false }]],
         });
 
         viewerRef.current = viewer;
 
+        viewer.addEventListener('ready', () => {
+          if (!isViewerDestroyed) {
+            setIsUploading(false);
+            startIdleTimer();
+          }
+        }, { once: true });
+        viewer.addEventListener('user-activity', stopIdleRotation);
+
         const currentMarkersPlugin = viewer.getPlugin(MarkersPlugin);
+        autorotatePlugin = viewer.getPlugin(AutorotatePlugin);
+
         if (currentMarkersPlugin) {
           setMarkersPlugin(currentMarkersPlugin);
 
@@ -196,6 +227,8 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     }
     
     return () => {
+      isViewerDestroyed = true;
+      if (idleTimeout) clearTimeout(idleTimeout);
       viewerRef.current?.destroy();
       viewerRef.current = null;
     };
@@ -308,6 +341,12 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (view.type === 'Gausian Splatting' && !file.name.endsWith('.splat')) {
+        toast({ variant: 'destructive', title: 'Invalid File Type', description: "Please upload a .splat file."});
+        if(fileInputRef.current) fileInputRef.current.value = "";
+        return;
+    }
+
     if (file.size > 4 * 1024 * 1024) { 
         toast({ variant: 'destructive', title: 'File too large', description: "File size exceeds 4MB. Please choose a smaller image."});
         if(fileInputRef.current) fileInputRef.current.value = "";
@@ -316,47 +355,11 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     
     setIsUploading(true);
     try {
-        const imageUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target?.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const image = new Image();
-            image.onload = () => resolve(image);
-            image.onerror = reject;
-            image.src = imageUrl;
-        });
-
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = view.type === '360' ? 4096 : 1920;
-        const MAX_HEIGHT = view.type === '360' ? 2048 : 1080;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-        }
-        if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Could not get canvas context');
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        const resizedImageUrl = canvas.toDataURL('image/jpeg', 0.85);
-        await updateViewImage(entityId, viewId, resizedImageUrl);
-        toast({ title: 'Success', description: 'Image updated successfully.' });
+        await updateViewImage(entityId, viewId, file);
+        toast({ title: 'Success', description: 'Source updated successfully.' });
     } catch (error) {
         console.error("Image processing failed:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to process the image file.'});
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to process the file.'});
     } finally {
         setIsUploading(false);
     }
@@ -376,7 +379,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     try {
         if (view.type === '360') {
             await updateViewHotspots(entityId, viewId, viewerHotspots);
-        } else {
+        } else if (view.type !== 'Gausian Splatting') {
             const currentPolygons = editorRef.current?.getRelativePolygons();
             const currentHotspots = editorRef.current?.getRelativeHotspots();
             if (currentPolygons) {
@@ -386,6 +389,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 await updateViewHotspots(entityId, view.id, currentHotspots);
             }
         }
+        // No save action needed for Gaussian Splatting as it's saved on upload
         toast({ title: 'Success', description: 'Your changes have been saved.' });
         router.push(`/admin/projects/${projectId}/entities/${entityId}`);
     } catch (error) {
@@ -400,7 +404,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
   return (
     <>
-      <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} ref={fileInputRef} accept="image/png, image/jpeg, image/webp" />
+      <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} ref={fileInputRef} accept={view.type === 'Gausian Splatting' ? '.splat' : "image/png, image/jpeg, image/webp"} />
       <HotspotDetailsModal 
         isOpen={isHotspotModalOpen}
         onClose={() => { setIsHotspotModalOpen(false); setHotspotToEdit(null); }}
@@ -416,7 +420,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                 <ArrowLeft className="mr-2 h-4 w-4"/>
                 Back to Entity
             </Button>
-            <h2 className="text-lg font-semibold mb-4 text-center">Upload Image for {viewName}</h2>
+            <h2 className="text-lg font-semibold mb-4 text-center">Upload Source for {viewName}</h2>
             <div className="flex items-center justify-center w-full">
               <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-neutral-600 border-dashed rounded-lg cursor-pointer bg-[#313131] hover:bg-neutral-700">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -428,7 +432,9 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                   <p className="mb-2 text-sm text-neutral-400">
                     {isUploading ? "Uploading..." : <><span className="font-semibold">Click to upload</span> or drag and drop</>}
                   </p>
-                  <p className="text-xs text-neutral-500">PNG, JPG, or WEBP (MAX. 4MB)</p>
+                  <p className="text-xs text-neutral-500">
+                    {view.type === 'Gausian Splatting' ? '.SPLAT file' : 'PNG, JPG, or WEBP (MAX. 4MB)'}
+                  </p>
                 </div>
               </label>
             </div>
@@ -439,11 +445,15 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
            <div className="flex justify-between items-start mb-4">
               <div/>
               <h2 className="text-lg font-semibold text-center text-white self-center">
-                {view.type === '360' ? `Editing Hotspots for ${viewName}` : `Define Selections & Hotspots for ${viewName}`}
+                {
+                  view.type === '360' ? `Editing Hotspots for ${viewName}` :
+                  view.type === 'Gausian Splatting' ? `Editing ${viewName}` :
+                  `Define Selections & Hotspots for ${viewName}`
+                }
               </h2>
               <div className="flex justify-end gap-2">
                   <Button onClick={triggerFileInput} variant="outline" loading={isUploading}>
-                      Change Image
+                      Change Source
                   </Button>
                   <Button onClick={handleSaveAndExit} className="bg-yellow-500 hover:bg-yellow-600 text-black" loading={isSaving}>
                       <Save className="mr-2 h-4 w-4" />
@@ -451,7 +461,25 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                   </Button>
               </div>
            </div>
-           {view.type === '360' ? (
+           {view.type === 'Gausian Splatting' ? (
+                <div className="w-full h-[70vh] relative bg-black rounded-lg border border-neutral-600 flex items-center justify-center text-white">
+                    {isUploading ? (
+                        <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-10 w-10 animate-spin" />
+                            <p>Uploading source...</p>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center gap-4 text-neutral-300">
+                           <FileCode className="h-20 w-20" />
+                           <h3 className="text-xl font-semibold">Gaussian Splatting View</h3>
+                           <p className="text-sm text-neutral-400 max-w-md text-center">
+                            Source file: <span className="font-mono text-yellow-400 break-all">{view.name}.splat</span>
+                           </p>
+                           <p className="text-xs text-neutral-500">Preview is not available in the editor.</p>
+                        </div>
+                    )}
+                </div>
+           ) : view.type === '360' ? (
               <div>
                 <div className="flex gap-2 mb-4">
                     <Button onClick={handleAddNewHotspot} className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isPlacingHotspot || !!selectedHotspotId}>
