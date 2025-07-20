@@ -125,10 +125,9 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         
         return () => {
             cancelAnimationFrame(animationFrameId);
-            // Consider adding a dispose method if gsplat provides one to clean up resources
         };
     }
-}, [view?.type, view?.imageUrl, toast]);
+}, [view?.type, view?.imageUrl, toast, splatCanvasRef.current]);
 
   useEffect(() => {
     if (!view) {
@@ -415,8 +414,22 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         if(fileInputRef.current) fileInputRef.current.value = "";
         return;
     }
-    setSplatFile(file);
-    setSplatUrl(''); // Clear URL if a file is selected
+    
+    if (view.type === 'Gausian Splatting') {
+        setSplatFile(file);
+        setSplatUrl(''); // Clear URL if a file is selected
+    } else {
+        setIsUploading(true);
+        updateViewImage(entityId, viewId, file)
+            .catch(error => {
+                console.error("Image processing failed:", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Failed to process the image.' });
+            })
+            .finally(() => {
+                setIsUploading(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            });
+    }
   };
   
   const handleContinueWithSource = async () => {
