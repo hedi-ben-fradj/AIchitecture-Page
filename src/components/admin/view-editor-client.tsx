@@ -72,6 +72,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const splatCanvasRef = useRef<HTMLCanvasElement>(null);
   const [splatUrl, setSplatUrl] = useState('');
   const [splatFile, setSplatFile] = useState<File | null>(null);
+  const [isSplatLoading, setIsSplatLoading] = useState(false);
 
   useEffect(() => {
     if (view?.type === 'Gausian Splatting' && view.imageUrl && splatCanvasRef.current) {
@@ -90,8 +91,12 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
         const loadSplat = async () => {
             try {
-                setIsUploading(true);
-                await SPLAT.Loader.LoadAsync(view.imageUrl!, scene, () => {});
+                setIsSplatLoading(true);
+                await SPLAT.Loader.LoadAsync(view.imageUrl!, scene, (progress) => {
+                    if (progress === 1.0) {
+                        setIsSplatLoading(false);
+                    }
+                });
             } catch (e) {
                 console.error("Failed to load splat file:", e);
                 toast({
@@ -99,8 +104,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                     description: "Could not load the Gaussian Splatting file. Please check the URL or file.",
                     variant: "destructive",
                 });
-            } finally {
-                setIsUploading(false);
+                setIsSplatLoading(false);
             }
         };
         
@@ -562,8 +566,8 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
               <div/>
               <h2 className="text-lg font-semibold text-center text-white self-center">
                 {
-                  view.type === '360' ? `Editing Hotspots for ${viewName}` :
                   view.type === 'Gausian Splatting' ? `Editing ${viewName}` :
+                  view.type === '360' ? `Editing Hotspots for ${viewName}` :
                   `Define Selections & Hotspots for ${viewName}`
                 }
               </h2>
@@ -579,7 +583,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
            </div>
            {view.type === 'Gausian Splatting' ? (
                 <div className="w-full h-[70vh] relative bg-black rounded-lg border border-neutral-600 flex items-center justify-center text-white">
-                    {isUploading && (
+                    {isSplatLoading && (
                         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50 rounded-lg">
                             <Loader2 className="h-10 w-10 text-white animate-spin" />
                             <p className="mt-2">Loading Splat...</p>
@@ -644,5 +648,3 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     </>
   );
 }
-
-    
