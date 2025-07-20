@@ -88,6 +88,7 @@ export interface View {
   id: string;
   name: string;
   imageUrl?: string;
+  thumbnailUrl?: string;
   type: string;
   selections?: Polygon[];
   hotspots?: Hotspot[];
@@ -1316,8 +1317,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                                                 )}
                                             >
                                                 <div className="aspect-video relative">
-                                                    {view.imageUrl ? (
-                                                        <Image src={`/api/image-proxy?url=${encodeURIComponent(view.imageUrl)}`} alt={view.name} layout="fill" objectFit="cover" />
+                                                    {view.thumbnailUrl || view.imageUrl ? (
+                                                        <Image src={`/api/image-proxy?url=${encodeURIComponent(view.thumbnailUrl || view.imageUrl!)}`} alt={view.name} layout="fill" objectFit="cover" />
                                                     ) : (
                                                         <div className="flex items-center justify-center h-full text-xs text-neutral-400 bg-neutral-800">No preview</div>
                                                     )}

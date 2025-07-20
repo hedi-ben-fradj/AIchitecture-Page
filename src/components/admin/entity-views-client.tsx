@@ -63,17 +63,27 @@ function ViewCard({ view, onDelete, isDefaultView, onSetDefaultView, projectId, 
                 <Link href={href}>
                     <Card className="bg-[#2a2a2a] border-neutral-700 text-white rounded-lg h-full cursor-pointer hover:border-yellow-500 transition-colors flex flex-col min-h-[240px] overflow-hidden">
                         <div className="relative flex-grow bg-neutral-800">
-                            {view.imageUrl && view.type !== 'Gausian Splatting' ? (
+                            {view.type === 'Gausian Splatting' ? (
+                                view.thumbnailUrl ? (
+                                    <>
+                                        <Image src={view.thumbnailUrl} alt={view.name} layout="fill" objectFit="cover" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-full p-4 text-neutral-500">
+                                        <FileCode className="h-12 w-12" />
+                                        <p className="mt-2 text-sm text-center">Gaussian Splatting View</p>
+                                    </div>
+                                )
+                            ) : view.imageUrl ? (
                                 <>
                                     <Image src={view.imageUrl} alt={view.name} layout="fill" objectFit="cover" />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                                 </>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full p-4 text-neutral-500">
-                                    {view.type === 'Gausian Splatting' ? <FileCode className="h-12 w-12" /> : <Eye className="h-12 w-12" />}
-                                    <p className="mt-2 text-sm text-center">
-                                        {view.type === 'Gausian Splatting' ? `Gaussian Splatting View` : 'No image uploaded'}
-                                    </p>
+                                    <Eye className="h-12 w-12" />
+                                    <p className="mt-2 text-sm text-center">No image uploaded</p>
                                 </div>
                             )}
                         </div>

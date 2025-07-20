@@ -39,6 +39,7 @@ export interface View {
   id: string;
   name: string;
   imageUrl?: string;
+  thumbnailUrl?: string;
   type: ViewType;
   selections?: Polygon[];
   hotspots?: Hotspot[];
@@ -90,7 +91,7 @@ interface ProjectContextType {
   addView: (entityId: string, viewName: string, viewType: ViewType) => Promise<string>;
   deleteView: (entityId: string, viewId: string) => void;
   getView: (entityId: string, viewId: string) => View | undefined;
-  updateViewImage: (entityId: string, viewId: string, imageSource: string | File) => Promise<void>;
+  updateViewImage: (entityId: string, viewId: string, imageSource: string | File, fieldName?: 'imageUrl' | 'thumbnailUrl') => Promise<void>;
   updateViewSelections: (entityId: string, viewId: string, selections: Polygon[]) => void;
   updateViewHotspots: (entityId: string, viewId: string, hotspots: Hotspot[]) => void;
   setDefaultViewId: (entityId: string, viewId: string) => void;
@@ -414,25 +415,25 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
   }, [getEntity]);
 
-  const updateViewImage = async (entityId: string, viewId: string, imageSource: string | File) => {
+  const updateViewImage = async (entityId: string, viewId: string, imageSource: string | File, fieldName: 'imageUrl' | 'thumbnailUrl' = 'imageUrl') => {
     if (!projectId) return;
 
     let downloadURL: string;
+    
+    // Determine the file path in storage
+    const fileExtension = typeof imageSource === 'string' ? 'jpg' : imageSource.name.split('.').pop();
+    const storageFileName = fieldName === 'thumbnailUrl' ? `${viewId}_thumb.${fileExtension}` : `${viewId}.${fileExtension}`;
+    const storageRef = ref(storage, `projects/${projectId}/views/${storageFileName}`);
 
     if (typeof imageSource === 'string') {
-        // Assume it's a data URL
-        const storageRef = ref(storage, `projects/${projectId}/views/${viewId}.jpg`);
         const snapshot = await uploadString(storageRef, imageSource, 'data_url');
         downloadURL = await getDownloadURL(snapshot.ref);
     } else {
-        // It's a file
-        const fileExtension = imageSource.name.split('.').pop();
-        const storageRef = ref(storage, `projects/${projectId}/views/${viewId}.${fileExtension}`);
         const snapshot = await uploadBytes(storageRef, imageSource);
         downloadURL = await getDownloadURL(snapshot.ref);
     }
 
-    await updateViewData(entityId, viewId, { imageUrl: downloadURL });
+    await updateViewData(entityId, viewId, { [fieldName]: downloadURL });
   };
   
   const updateViewSelections = (entityId: string, viewId: string, selections: Polygon[]) => updateViewData(entityId, viewId, { selections });

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, Save, ArrowLeft, Eye, Edit, Trash2, Loader2, Plus, FileCode, Link as LinkIcon } from 'lucide-react';
@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import * as SPLAT from 'gsplat';
+import Image from 'next/image';
 
 
 interface ViewEditorClientProps {
@@ -40,6 +41,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const { toast } = useToast();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<ImageEditorRef>(null);
   
   const [isHotspotModalOpen, setIsHotspotModalOpen] = useState(false);
@@ -49,6 +51,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const entity = useMemo(() => getEntity(entityId), [getEntity, entityId]);
 
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // State for 360 viewer
@@ -431,6 +434,28 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             });
     }
   };
+
+  const handleThumbnailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB limit for thumbnails
+        toast({ variant: 'destructive', title: 'File too large', description: "Thumbnail size exceeds 2MB." });
+        return;
+    }
+    
+    setIsUploadingThumbnail(true);
+    updateViewImage(entityId, viewId, file, 'thumbnailUrl')
+        .then(() => toast({ title: 'Success', description: 'Thumbnail updated.'}))
+        .catch(error => {
+            console.error("Thumbnail upload failed:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to upload thumbnail.' });
+        })
+        .finally(() => {
+            setIsUploadingThumbnail(false);
+            if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
+        });
+  };
   
   const handleContinueWithSource = async () => {
     setIsUploading(true);
@@ -465,6 +490,10 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     fileInputRef.current?.click();
   };
 
+  const triggerThumbnailInput = () => {
+    thumbnailInputRef.current?.click();
+  };
+
   const handleSaveAndExit = async () => {
     setIsSaving(true);
     try {
@@ -496,6 +525,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   return (
     <>
       <Input id="file-upload" type="file" className="hidden" onChange={handleFileChange} ref={fileInputRef} accept={view.type === 'Gausian Splatting' ? '.splat' : "image/png, image/jpeg, image/webp"} />
+      <Input id="thumbnail-upload" type="file" className="hidden" onChange={handleThumbnailChange} ref={thumbnailInputRef} accept="image/png, image/jpeg, image/webp" />
       <HotspotDetailsModal 
         isOpen={isHotspotModalOpen}
         onClose={() => { setIsHotspotModalOpen(false); setHotspotToEdit(null); }}
@@ -607,14 +637,35 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
               </div>
            </div>
            {view.type === 'Gausian Splatting' ? (
-                <div className="w-full h-[70vh] relative bg-black rounded-lg border border-neutral-600 flex items-center justify-center text-white">
-                    {isSplatLoading && (
-                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50 rounded-lg">
-                            <Loader2 className="h-10 w-10 text-white animate-spin" />
-                            <p className="mt-2">Loading Splat...</p>
-                        </div>
-                    )}
-                    <canvas ref={splatCanvasRef} className="w-full h-full" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                    <div className="md:col-span-2 w-full h-[70vh] relative bg-black rounded-lg border border-neutral-600 flex items-center justify-center text-white">
+                        {isSplatLoading && (
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50 rounded-lg">
+                                <Loader2 className="h-10 w-10 text-white animate-spin" />
+                                <p className="mt-2">Loading Splat...</p>
+                            </div>
+                        )}
+                        <canvas ref={splatCanvasRef} className="w-full h-full" />
+                    </div>
+                     <Card className="bg-[#2a2a2a] border-neutral-700 text-white">
+                        <CardHeader>
+                            <CardTitle className="text-lg">Thumbnail</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="aspect-video w-full flex items-center justify-center bg-muted/50 border-2 border-dashed rounded-lg">
+                                {view.thumbnailUrl ? (
+                                    <Image src={view.thumbnailUrl} alt="Thumbnail preview" width={300} height={168} className="object-contain rounded-md"/>
+                                ) : (
+                                    <div className="text-center text-neutral-400 p-2">
+                                        <p className="text-sm">No thumbnail uploaded</p>
+                                    </div>
+                                )}
+                            </div>
+                             <Button className="w-full" variant="outline" onClick={triggerThumbnailInput} loading={isUploadingThumbnail}>
+                                {isUploadingThumbnail ? 'Uploading...' : 'Upload Thumbnail'}
+                            </Button>
+                        </CardContent>
+                    </Card>
                 </div>
            ) : view.type === '360' ? (
               <div>
