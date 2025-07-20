@@ -92,7 +92,12 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         const loadSplat = async () => {
             try {
                 setIsSplatLoading(true);
-                await SPLAT.Loader.LoadAsync(view.imageUrl!, scene, (progress) => {
+                // Use the proxy for Firebase Storage URLs
+                const urlToLoad = view.imageUrl!.includes('firebasestorage.googleapis.com') 
+                    ? `/api/splat-proxy?url=${encodeURIComponent(view.imageUrl!)}`
+                    : view.imageUrl!;
+
+                await SPLAT.Loader.LoadAsync(urlToLoad, scene, (progress) => {
                     if (progress === 1.0) {
                         setIsSplatLoading(false);
                     }
