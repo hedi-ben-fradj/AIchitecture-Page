@@ -1010,13 +1010,28 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 <div ref={viewerContainerRef} key={currentView.id} className="w-full h-full" />
             ) : currentViewType === 'Gausian Splatting' ? (
                  <div className="w-full h-full relative bg-black flex items-center justify-center text-white">
+                    {(isSplatLoading && currentView.thumbnailUrl) && (
+                        <>
+                            <Image
+                                src={`/api/image-proxy?url=${encodeURIComponent(currentView.thumbnailUrl)}`}
+                                alt={`Loading ${currentView.name}`}
+                                layout="fill"
+                                objectFit="cover"
+                                className="blur-md scale-110"
+                            />
+                            <div className="absolute inset-0 bg-black/30" />
+                        </>
+                    )}
                     {isSplatLoading && (
                         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50">
                             <Loader2 className="h-10 w-10 text-white animate-spin" />
                             <p className="mt-2">Loading View...</p>
                         </div>
                     )}
-                    <canvas ref={splatCanvasRef} className="w-full h-full" />
+                    <canvas 
+                        ref={splatCanvasRef} 
+                        className={cn("w-full h-full transition-opacity duration-300", isSplatLoading ? "opacity-0" : "opacity-100")}
+                    />
                 </div>
             ) : (
                 <>
