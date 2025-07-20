@@ -88,14 +88,21 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             renderer.render(scene, camera);
             animationFrameId = requestAnimationFrame(frame);
         };
-
+       
         const loadSplat = async () => {
             try {
                 setIsSplatLoading(true);
-                // Use the proxy for Firebase Storage URLs
-                const urlToLoad = view.imageUrl!.includes('firebasestorage.googleapis.com') 
-                    ? `/api/splat-proxy?url=${encodeURIComponent(view.imageUrl!)}`
-                    : view.imageUrl!;
+                let urlToLoad = view.imageUrl!;
+
+                // If the URL is from Firebase, use the proxy to get a data URI
+                if (urlToLoad.includes('firebasestorage.googleapis.com')) {
+                    const proxyResponse = await fetch(`/api/splat-proxy?url=${encodeURIComponent(urlToLoad)}`);
+                    if (!proxyResponse.ok) {
+                        throw new Error(`Proxy failed with status: ${proxyResponse.status}`);
+                    }
+                    const { dataUri } = await proxyResponse.json();
+                    urlToLoad = dataUri;
+                }
 
                 await SPLAT.Loader.LoadAsync(urlToLoad, scene, (progress) => {
                     if (progress === 1.0) {

@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -20,30 +21,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(splatUrl, {
-      headers: {
-        // Pass through any necessary headers if needed in the future
-      },
-    });
+    const response = await fetch(splatUrl);
 
     if (!response.ok) {
       return new NextResponse(`Failed to fetch file: ${response.statusText}`, { status: response.status });
     }
-
-    // Get the blob and stream it back
-    const fileBlob = await response.blob();
-    const headers = new Headers();
-    // Set a generic content type for binary data, or be more specific if possible
-    headers.set('Content-Type', response.headers.get('Content-Type') || 'application/octet-stream');
-    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
     
-    // We are proxying, so we can set the CORS header here to satisfy the browser
-    headers.set('Access-Control-Allow-Origin', '*'); 
+    const fileBlob = await response.blob();
+    const buffer = Buffer.from(await fileBlob.arrayBuffer());
+    const base64 = buffer.toString('base64');
+    const dataUri = `data:${fileBlob.type};base64,${base64}`;
 
-    return new Response(fileBlob, {
-      status: 200,
-      headers: headers,
-    });
+    return NextResponse.json({ dataUri });
 
   } catch (error) {
     console.error('Splat proxy error:', error);
