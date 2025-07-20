@@ -16,6 +16,7 @@ import { Slider } from '@/components/ui/slider';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
+import * as SPLAT from 'gsplat';
 
 
 interface RenderedImageRect {
@@ -121,6 +122,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const [hoveredSelectionId, setHoveredSelectionId] = useState<number | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [isImageLoading, setIsImageLoading] = useState(true);
+    const [isSplatLoading, setIsSplatLoading] = useState(false);
     const [renderedImageRect, setRenderedImageRect] = useState<RenderedImageRect | null>(null);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [appliedFilters, setAppliedFilters] = useState<Partial<Filters>>({});
@@ -141,6 +143,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     const prevEntityIdRef = useRef<string | null>(null);
     const planOverlayContainerRef = useRef<HTMLDivElement>(null);
     const viewerContainerRef = useRef<HTMLDivElement>(null);
+    const splatCanvasRef = useRef<HTMLCanvasElement>(null);
     const audioRef = useRef<HTMLAudioElement>(null);
 
     const isFilterApplied = useMemo(() => {
@@ -460,6 +463,55 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         };
     }, [currentView, currentViewType, allEntities, handleHotspotNavigate]);
     
+    useEffect(() => {
+    if (currentView?.type === 'Gausian Splatting' && currentView.imageUrl && splatCanvasRef.current) {
+        const canvas = splatCanvasRef.current;
+        const renderer = new SPLAT.WebGLRenderer(canvas);
+        const scene = new SPLAT.Scene();
+        const camera = new SPLAT.Camera();
+        const controls = new SPLAT.OrbitControls(camera, canvas);
+        let animationFrameId: number;
+
+        const frame = () => {
+            controls.update();
+            renderer.render(scene, camera);
+            animationFrameId = requestAnimationFrame(frame);
+        };
+       
+        const loadSplat = async () => {
+            try {
+                setIsSplatLoading(true);
+                let urlToLoad = currentView.imageUrl!;
+
+                if (urlToLoad.includes('firebasestorage.googleapis.com') || urlToLoad.includes('huggingface.co')) {
+                    const proxyResponse = await fetch(`/api/splat-proxy?url=${encodeURIComponent(urlToLoad)}`);
+                    if (!proxyResponse.ok) {
+                        throw new Error(`Proxy failed with status: ${proxyResponse.status}`);
+                    }
+                    const { dataUri } = await proxyResponse.json();
+                    urlToLoad = dataUri;
+                }
+
+                await SPLAT.Loader.LoadAsync(urlToLoad, scene, (progress) => {
+                    if (progress === 1.0) {
+                        setIsSplatLoading(false);
+                    }
+                });
+            } catch (e) {
+                console.error("Failed to load splat file:", e);
+                setIsSplatLoading(false);
+            }
+        };
+        
+        loadSplat();
+        animationFrameId = requestAnimationFrame(frame);
+        
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+        };
+    }
+}, [currentView?.type, currentView?.imageUrl, splatCanvasRef.current]);
+
     const handleVolumeChange = (value: number[]) => {
         const newVolume = value[0];
         setVolume(newVolume);
@@ -952,10 +1004,19 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     </Card>
                 </div>
             )}
-
-
+            
             {currentViewType === '360' ? (
                 <div ref={viewerContainerRef} key={currentView.id} className="w-full h-full" />
+            ) : currentViewType === 'Gausian Splatting' ? (
+                 <div className="w-full h-full relative bg-black flex items-center justify-center text-white">
+                    {isSplatLoading && (
+                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50">
+                            <Loader2 className="h-10 w-10 text-white animate-spin" />
+                            <p className="mt-2">Loading View...</p>
+                        </div>
+                    )}
+                    <canvas ref={splatCanvasRef} className="w-full h-full" />
+                </div>
             ) : (
                 <>
                     {isImageLoading && (
@@ -979,7 +1040,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                 </>
             )}
             
-            {currentViewType !== '360' && renderedImageRect && (
+            {currentViewType !== '360' && currentViewType !== 'Gausian Splatting' && renderedImageRect && (
                 <svg className="absolute top-0 left-0 w-full h-full z-10" style={{ transform: `translate(${renderedImageRect.x}px, ${renderedImageRect.y}px)`, width: renderedImageRect.width, height: renderedImageRect.height }}>
                     {(isFilterApplied ? filteredSelections.map(f => f.selection) : (currentView.selections || [])).map(selection => {
                          const match = isFilterApplied ? filteredSelections.find(f => f.selection.id === selection.id) : null;
