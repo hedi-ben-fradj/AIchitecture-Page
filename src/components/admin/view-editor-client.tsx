@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, Save, ArrowLeft, Eye, Edit, Trash2, Loader2, Plus, FileCode } from 'lucide-react';
+import { Upload, Save, ArrowLeft, Eye, Edit, Trash2, Loader2, Plus, FileCode, Link as LinkIcon } from 'lucide-react';
 import ImageEditor, { type ImageEditorRef, type Hotspot, type Polygon } from '@/components/admin/image-editor';
 import { useProjectData, type EntityType } from '@/contexts/views-context';
 import { useRouter } from 'next/navigation';
@@ -16,6 +16,7 @@ import { MarkersPlugin } from '@photo-sphere-viewer/markers-plugin';
 import { AutorotatePlugin } from '@photo-sphere-viewer/autorotate-plugin';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 interface ViewEditorClientProps {
@@ -33,7 +34,7 @@ const getHotspotMarkerHtml = (color: string, text: string) => `
 
 
 export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEditorClientProps) {
-  const { getView, updateViewImage, updateViewSelections, updateViewHotspots, addEntity, getEntity, entities: allEntities } = useProjectData();
+  const { getView, updateViewImage, updateViewSelections, updateViewHotspots, addEntity, getEntity, entities: allEntities, updateViewData } = useProjectData();
   const router = useRouter();
   const { toast } = useToast();
   const [imageToEdit, setImageToEdit] = useState<string | null>(null);
@@ -65,6 +66,10 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
 
   const allEntitiesRef = useRef(allEntities);
   allEntitiesRef.current = allEntities;
+  
+  // For Gaussian Splatting URL input
+  const [splatUrl, setSplatUrl] = useState('');
+  const [splatFile, setSplatFile] = useState<File | null>(null);
 
 
   useEffect(() => {
@@ -337,7 +342,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     );
   }
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -347,15 +352,27 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         return;
     }
 
-    if (file.size > 4 * 1024 * 1024) { 
+    if (view.type !== 'Gausian Splatting' && file.size > 4 * 1024 * 1024) { 
         toast({ variant: 'destructive', title: 'File too large', description: "File size exceeds 4MB. Please choose a smaller image."});
         if(fileInputRef.current) fileInputRef.current.value = "";
         return;
     }
-    
+    setSplatFile(file);
+    setSplatUrl(''); // Clear URL if a file is selected
+  };
+  
+  const handleContinueWithSource = async () => {
     setIsUploading(true);
     try {
-        await updateViewImage(entityId, viewId, file);
+        if (splatFile) {
+            await updateViewImage(entityId, viewId, splatFile);
+        } else if (splatUrl) {
+            await updateViewData(entityId, viewId, { imageUrl: splatUrl });
+        } else {
+             toast({ variant: 'destructive', title: 'No Source', description: 'Please upload a file or provide a URL.' });
+             setIsUploading(false);
+             return;
+        }
         toast({ title: 'Success', description: 'Source updated successfully.' });
     } catch (error) {
         console.error("Image processing failed:", error);
@@ -363,8 +380,11 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     } finally {
         setIsUploading(false);
     }
-    if (event.target) event.target.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setSplatFile(null);
+    setSplatUrl('');
   };
+
 
   const handleMakeEntity = async (newEntityName: string, newEntityType: EntityType): Promise<string | null> => {
     return await addEntity(newEntityName, newEntityType, entityId);
@@ -422,23 +442,75 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                         Back to Entity
                     </Button>
                     <h2 className="text-lg font-semibold mb-4 text-center">Upload Source for {viewName}</h2>
-                    <div className="flex items-center justify-center w-full">
-                        <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-neutral-600 border-dashed rounded-lg cursor-pointer bg-[#313131] hover:bg-neutral-700">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                {isUploading ? (
-                                    <Loader2 className="w-8 h-8 mb-4 text-neutral-400 animate-spin" />
-                                ) : (
-                                    <Upload className="w-8 h-8 mb-4 text-neutral-400" />
-                                )}
-                                <p className="mb-2 text-sm text-neutral-400">
-                                    {isUploading ? "Uploading..." : <><span className="font-semibold">Click to upload</span> or drag and drop</>}
-                                </p>
-                                <p className="text-xs text-neutral-500">
-                                    {view.type === 'Gausian Splatting' ? '.SPLAT file' : 'PNG, JPG, or WEBP (MAX. 4MB)'}
-                                </p>
-                            </div>
-                        </label>
-                    </div>
+                    {view.type === 'Gausian Splatting' ? (
+                       <div className="space-y-4">
+                            <Tabs defaultValue="upload" className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="upload">Upload File</TabsTrigger>
+                                    <TabsTrigger value="url">From URL</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="upload" className="mt-4">
+                                     <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-48 border-2 border-neutral-600 border-dashed rounded-lg cursor-pointer bg-[#313131] hover:bg-neutral-700">
+                                        <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
+                                            {splatFile ? (
+                                                <>
+                                                    <FileCode className="w-8 h-8 mb-4 text-green-500" />
+                                                    <p className="mb-2 text-sm text-neutral-300 font-semibold">{splatFile.name}</p>
+                                                    <p className="text-xs text-neutral-400">Click to choose a different file</p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Upload className="w-8 h-8 mb-4 text-neutral-400" />
+                                                    <p className="mb-2 text-sm text-neutral-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                                                    <p className="text-xs text-neutral-500">.SPLAT file</p>
+                                                </>
+                                            )}
+                                        </div>
+                                    </label>
+                                </TabsContent>
+                                <TabsContent value="url" className="mt-4">
+                                    <div className="space-y-2">
+                                        <label htmlFor="splat-url" className="text-sm font-medium">.splat File URL</label>
+                                        <div className="flex items-center gap-2">
+                                            <LinkIcon className="h-5 w-5 text-neutral-400"/>
+                                            <Input 
+                                                id="splat-url"
+                                                type="url"
+                                                placeholder="https://example.com/file.splat"
+                                                className="bg-[#313131] border-neutral-600"
+                                                value={splatUrl}
+                                                onChange={(e) => {
+                                                    setSplatUrl(e.target.value);
+                                                    setSplatFile(null); // Clear file if URL is typed
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
+                            <Button className="w-full mt-4" onClick={handleContinueWithSource} disabled={(!splatFile && !splatUrl) || isUploading} loading={isUploading}>
+                                Continue
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center w-full">
+                            <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-neutral-600 border-dashed rounded-lg cursor-pointer bg-[#313131] hover:bg-neutral-700">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    {isUploading ? (
+                                        <Loader2 className="w-8 h-8 mb-4 text-neutral-400 animate-spin" />
+                                    ) : (
+                                        <Upload className="w-8 h-8 mb-4 text-neutral-400" />
+                                    )}
+                                    <p className="mb-2 text-sm text-neutral-400">
+                                        {isUploading ? "Uploading..." : <><span className="font-semibold">Click to upload</span> or drag and drop</>}
+                                    </p>
+                                    <p className="text-xs text-neutral-500">
+                                        PNG, JPG, or WEBP (MAX. 4MB)
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>
@@ -475,7 +547,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
                            <FileCode className="h-20 w-20" />
                            <h3 className="text-xl font-semibold">Gaussian Splatting View</h3>
                            <p className="text-sm text-neutral-400 max-w-md text-center">
-                            Source file: <span className="font-mono text-yellow-400 break-all">{view.name}.splat</span>
+                            Source file: <span className="font-mono text-yellow-400 break-all">{view.imageUrl}</span>
                            </p>
                            <p className="text-xs text-neutral-500">Preview is not available in the editor.</p>
                         </div>

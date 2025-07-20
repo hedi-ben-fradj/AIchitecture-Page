@@ -87,13 +87,14 @@ interface ProjectContextType {
   setLandingPageEntityId: (entityId: string | null) => void;
 
   // View methods
-  addView: (entityId: string, viewName: string, viewType: ViewType, source?: string | File) => Promise<string>;
+  addView: (entityId: string, viewName: string, viewType: ViewType) => Promise<string>;
   deleteView: (entityId: string, viewId: string) => void;
   getView: (entityId: string, viewId: string) => View | undefined;
   updateViewImage: (entityId: string, viewId: string, imageSource: string | File) => Promise<void>;
   updateViewSelections: (entityId: string, viewId: string, selections: Polygon[]) => void;
   updateViewHotspots: (entityId: string, viewId: string, hotspots: Hotspot[]) => void;
   setDefaultViewId: (entityId: string, viewId: string) => void;
+  updateViewData: (entityId: string, viewId: string, data: Partial<View>) => Promise<void>;
 
   // Entity Type methods
   addEntityType: (typeName: string) => void;
@@ -334,7 +335,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     setEntities(prev => prev.map(e => e.id === entityId ? { ...e, views: updatedViews } : e));
   }, []);
 
-  const addView = useCallback(async (entityId: string, viewName: string, viewType: ViewType, source?: string | File) => {
+  const addView = useCallback(async (entityId: string, viewName: string, viewType: ViewType) => {
     if (!projectId) return '';
     
     const targetEntity = entities.find(e => e.id === entityId);
@@ -362,16 +363,6 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
         selections: [],
         hotspots: [],
     };
-
-    if (source) {
-        if (typeof source === 'string') {
-            newView.imageUrl = source;
-        } else if (source instanceof File) {
-            const storageRef = ref(storage, `projects/${projectId}/views/${newViewId}`);
-            const snapshot = await uploadBytes(storageRef, source);
-            newView.imageUrl = await getDownloadURL(snapshot.ref);
-        }
-    }
     
     const entityRef = doc(db, 'entities', entityId);
     const newDefaultViewId = targetEntity.views.length === 0 ? newViewId : targetEntity.defaultViewId;
@@ -502,6 +493,7 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
     updateViewSelections,
     updateViewHotspots,
     setDefaultViewId,
+    updateViewData,
     addEntityType,
     deleteEntityType,
     addViewType,
