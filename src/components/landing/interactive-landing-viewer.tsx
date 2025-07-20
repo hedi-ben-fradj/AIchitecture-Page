@@ -489,8 +489,8 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
                     if (!proxyResponse.ok) {
                         throw new Error(`Proxy failed with status: ${proxyResponse.status}`);
                     }
-                    const { dataUri } = await proxyResponse.json();
-                    urlToLoad = dataUri;
+                    const base64String = await proxyResponse.text();
+                    urlToLoad = `data:application/octet-stream;base64,${base64String}`;
                 }
 
                 await SPLAT.Loader.LoadAsync(urlToLoad, scene, (progress) => {

@@ -1,4 +1,3 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -30,9 +29,14 @@ export async function GET(request: NextRequest) {
     const fileBlob = await response.blob();
     const buffer = Buffer.from(await fileBlob.arrayBuffer());
     const base64 = buffer.toString('base64');
-    const dataUri = `data:${fileBlob.type};base64,${base64}`;
-
-    return NextResponse.json({ dataUri });
+    
+    // Return the raw base64 string
+    return new NextResponse(base64, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+    });
 
   } catch (error) {
     console.error('Splat proxy error:', error);
