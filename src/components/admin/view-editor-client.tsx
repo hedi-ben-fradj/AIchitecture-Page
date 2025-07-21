@@ -19,6 +19,7 @@ import { Skeleton } from '../ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import * as SPLAT from 'gsplat';
 import Image from 'next/image';
+import { getSplatFile, storeSplatFile } from '@/lib/indexed-db';
 
 
 interface ViewEditorClientProps {
@@ -92,28 +93,49 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             animationFrameId = requestAnimationFrame(frame);
         };
        
-        const loadSplat = async () => {
+        const loadSplat = async (url: string) => {
             try {
                 setIsSplatLoading(true);
-                await SPLAT.Loader.LoadAsync(view.imageUrl!, scene, (progress) => {
+
+                const cachedBlob = await getSplatFile(url);
+                let dataToLoad: string | Blob = url;
+
+                if (cachedBlob) {
+                    console.log("Loading splat from IndexedDB");
+                    dataToLoad = cachedBlob;
+                } else {
+                    console.log("Fetching splat from network");
+                }
+
+                const fileURL = typeof dataToLoad === 'string' ? dataToLoad : URL.createObjectURL(dataToLoad);
+                
+                await SPLAT.Loader.LoadAsync(fileURL, scene, (progress) => {
                     if (progress === 1.0) {
                         setIsSplatLoading(false);
+                        if (typeof dataToLoad !== 'string') {
+                            URL.revokeObjectURL(fileURL); // Clean up object URL
+                        }
                     }
                 });
+
+                if (!cachedBlob && typeof dataToLoad === 'string') {
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    await storeSplatFile(url, blob);
+                    console.log("Splat file stored in IndexedDB");
+                }
             } catch (e) {
                 console.error("Failed to load splat file:", e);
                 toast({
                     title: "Load Error",
-                    description: "Could not load the Gaussian Splatting file. Please check the URL or file.",
+                    description: "Could not load the Gaussian Splatting file.",
                     variant: "destructive",
                 });
                 setIsSplatLoading(false);
             }
         };
         
-        if (view.imageUrl) {
-            loadSplat();
-        }
+        loadSplat(view.imageUrl);
         animationFrameId = requestAnimationFrame(frame);
         
         return () => {
@@ -122,7 +144,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             controls.dispose();
         };
     }
-}, [view?.type, view?.imageUrl, toast]);
+  }, [view?.type, view?.imageUrl, toast]);
 
   useEffect(() => {
     if (!view) {

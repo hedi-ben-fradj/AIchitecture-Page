@@ -17,6 +17,7 @@ import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 import * as SPLAT from 'gsplat';
+import { getSplatFile, storeSplatFile } from '@/lib/indexed-db';
 
 
 interface RenderedImageRect {
@@ -465,43 +466,70 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
     }, [currentView, currentViewType, allEntities, handleHotspotNavigate]);
     
     useEffect(() => {
-    if (currentView?.type === 'Gausian Splatting' && currentView.imageUrl && splatCanvasRef.current) {
-        const canvas = splatCanvasRef.current;
-        const renderer = new SPLAT.WebGLRenderer(canvas);
-        const scene = new SPLAT.Scene();
-        const camera = new SPLAT.Camera();
-        const controls = new SPLAT.OrbitControls(camera, canvas);
-        let animationFrameId: number;
+        if (currentView?.type === 'Gausian Splatting' && currentView.imageUrl && splatCanvasRef.current) {
+            const canvas = splatCanvasRef.current;
+            const renderer = new SPLAT.WebGLRenderer(canvas);
+            const scene = new SPLAT.Scene();
+            const camera = new SPLAT.Camera();
+            const controls = new SPLAT.OrbitControls(camera, canvas);
+            let animationFrameId: number;
 
-        const frame = () => {
-            controls.update();
-            renderer.render(scene, camera);
-            animationFrameId = requestAnimationFrame(frame);
-        };
-       
-        const loadSplat = async () => {
-            try {
-                setIsSplatLoading(true);
-                
-                await SPLAT.Loader.LoadAsync(currentView.imageUrl!, scene, (progress) => {
-                    if (progress === 1.0) {
-                        setIsSplatLoading(false);
+            const frame = () => {
+                controls.update();
+                renderer.render(scene, camera);
+                animationFrameId = requestAnimationFrame(frame);
+            };
+        
+            const loadSplat = async (url: string) => {
+                try {
+                    setIsSplatLoading(true);
+
+                    const cachedBlob = await getSplatFile(url);
+                    let dataToLoad: string | Blob = url;
+
+                    if (cachedBlob) {
+                        console.log("Loading splat from IndexedDB");
+                        dataToLoad = cachedBlob;
+                    } else {
+                        console.log("Fetching splat from network");
                     }
-                });
-            } catch (e) {
-                console.error("Failed to load splat file:", e);
-                setIsSplatLoading(false);
-            }
-        };
-        
-        loadSplat();
-        animationFrameId = requestAnimationFrame(frame);
-        
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-        };
-    }
-}, [currentView?.type, currentView?.imageUrl, splatCanvasRef]);
+                    
+                    const fileURL = typeof dataToLoad === 'string' ? dataToLoad : URL.createObjectURL(dataToLoad);
+                    
+                    await SPLAT.Loader.LoadAsync(fileURL, scene, (progress) => {
+                        if (progress === 1.0) {
+                            setIsSplatLoading(false);
+                            if (typeof dataToLoad !== 'string') {
+                                URL.revokeObjectURL(fileURL); // Clean up object URL
+                            }
+                        }
+                    });
+
+                    // If it wasn't cached, fetch it now and store it.
+                    if (!cachedBlob && typeof dataToLoad === 'string') {
+                        const response = await fetch(url);
+                        const blob = await response.blob();
+                        await storeSplatFile(url, blob);
+                        console.log("Splat file stored in IndexedDB");
+                    }
+
+                } catch (e) {
+                    console.error("Failed to load splat file:", e);
+                    setIsSplatLoading(false);
+                }
+            };
+            
+            loadSplat(currentView.imageUrl);
+            animationFrameId = requestAnimationFrame(frame);
+            
+            return () => {
+                cancelAnimationFrame(animationFrameId);
+                renderer.dispose();
+                controls.dispose();
+            };
+        }
+    }, [currentView?.type, currentView?.imageUrl, splatCanvasRef]);
+
 
     const handleVolumeChange = (value: number[]) => {
         const newVolume = value[0];
