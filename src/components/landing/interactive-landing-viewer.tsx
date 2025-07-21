@@ -484,16 +484,13 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             try {
                 setIsSplatLoading(true);
                 
-                // Assuming imageUrl is a full gs:// or https:// URL.
-                // We need to extract the path for the signed URL flow.
                 let filePath = '';
-                if (currentView.imageUrl?.startsWith('gs://')) {
-                    filePath = currentView.imageUrl.substring(5).split('/').slice(1).join('/');
-                } else if (currentView.imageUrl?.includes('firebasestorage.googleapis.com')) {
-                    const pathWithToken = currentView.imageUrl.split('/o/')[1];
+                try {
+                    const url = new URL(currentView.imageUrl!);
+                    const pathWithToken = url.pathname.split('/o/')[1];
                     filePath = decodeURIComponent(pathWithToken.split('?')[0]);
-                } else {
-                    throw new Error("Unsupported .splat URL format. Please use a Firebase Storage URL.");
+                } catch (e) {
+                     filePath = currentView.imageUrl!;
                 }
                 
                 const signedUrl = await getSplatUrl({ filePath });
@@ -520,7 +517,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             cancelAnimationFrame(animationFrameId);
         };
     }
-}, [currentView?.type, currentView?.imageUrl, splatCanvasRef.current]);
+}, [currentView?.type, currentView?.imageUrl, splatCanvasRef]);
 
     const handleVolumeChange = (value: number[]) => {
         const newVolume = value[0];
