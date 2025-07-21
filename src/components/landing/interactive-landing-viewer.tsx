@@ -17,7 +17,7 @@ import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 import * as SPLAT from 'gsplat';
-import { getSplatUrl } from '@/ai/flows/get-splat-url';
+import { getSignedSplatUrl } from '@/app/actions';
 
 
 interface RenderedImageRect {
@@ -484,16 +484,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             try {
                 setIsSplatLoading(true);
                 
-                let filePath = '';
-                try {
-                    const url = new URL(currentView.imageUrl!);
-                    const pathWithToken = url.pathname.split('/o/')[1];
-                    filePath = decodeURIComponent(pathWithToken.split('?')[0]);
-                } catch (e) {
-                     filePath = currentView.imageUrl!;
-                }
-                
-                const signedUrl = await getSplatUrl({ filePath });
+                const signedUrl = await getSignedSplatUrl(currentView.imageUrl!);
                 
                 if (!signedUrl) {
                     throw new Error("Failed to get a signed URL for the splat file.");
