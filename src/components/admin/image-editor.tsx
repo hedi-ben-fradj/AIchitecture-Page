@@ -262,6 +262,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   const handleConfirmHotspot = () => {
     const spot = hotspots.find(h => h.id === selectedHotspotId);
     if (spot) {
+        // Convert to relative coordinates before passing to the modal
         const relativeHotspot = getRelativeHotspotsFromAbsolute([spot])[0];
         onEditHotspot(relativeHotspot);
     }
