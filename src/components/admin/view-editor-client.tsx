@@ -94,6 +94,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         };
        
         const loadSplat = async (url: string) => {
+            if (!url) return;
             try {
                 setIsSplatLoading(true);
 
