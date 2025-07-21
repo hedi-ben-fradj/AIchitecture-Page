@@ -145,7 +145,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             controls.dispose();
         };
     }
-  }, [view?.type, view?.imageUrl, toast]);
+  }, [view?.imageUrl, view?.type, toast]);
 
   useEffect(() => {
     if (!view) {
@@ -350,15 +350,15 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
   const handleSaveHotspot = (hotspotData: { linkedViewId: string }) => {
     if (!hotspotToEdit) return;
 
-    const updatedHotspot = { ...hotspotToEdit, ...hotspotData };
-
     if (view?.type === '360') {
       if (markersPlugin) {
         setViewerHotspots((prev) =>
-          prev.map((h) => (h.id === updatedHotspot.id ? updatedHotspot : h))
+          prev.map((h) => (h.id === hotspotToEdit.id ? { ...h, ...hotspotData } : h))
         );
       }
     } else {
+      // For 2D views, just update the linkedViewId, preserving existing coordinates
+      const updatedHotspot = { ...hotspotToEdit, ...hotspotData };
       editorRef.current?.updateHotspot(updatedHotspot);
     }
     
