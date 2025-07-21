@@ -94,7 +94,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         };
        
         const loadSplat = async (url: string) => {
-            if (!url) return;
+            if (!url || isSplatLoading) return;
             try {
                 setIsSplatLoading(true);
 
@@ -145,7 +145,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             controls.dispose();
         };
     }
-  }, [view?.imageUrl, view?.type, toast]);
+  }, [view?.imageUrl]);
 
   useEffect(() => {
     if (!view) {
@@ -357,9 +357,14 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         );
       }
     } else {
-      // For 2D views, just update the linkedViewId, preserving existing coordinates
-      const updatedHotspot = { ...hotspotToEdit, ...hotspotData };
-      editorRef.current?.updateHotspot(updatedHotspot);
+      // For 2D views, update the linkedViewId, preserving coordinates.
+      // The `hotspotToEdit` state holds the correct absolute coordinates from the editor.
+      editorRef.current?.updateHotspot({
+        id: hotspotToEdit.id,
+        linkedViewId: hotspotData.linkedViewId,
+        x: hotspotToEdit.x,
+        y: hotspotToEdit.y,
+      });
     }
     
     setSelectedHotspotId(null);

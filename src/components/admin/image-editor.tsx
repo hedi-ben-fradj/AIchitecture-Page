@@ -34,8 +34,8 @@ export interface Polygon {
 
 export interface Hotspot {
   id: number;
-  x: number;
-  y: number;
+  x: number; // Can be relative or absolute depending on context
+  y: number; // Can be relative or absolute depending on context
   linkedViewId: string;
   rotation?: number; // Field of view rotation in degrees
   fov?: number; // Field of view angle in degrees
@@ -67,7 +67,7 @@ interface ImageEditorProps {
 export interface ImageEditorRef {
   getRelativePolygons: () => Polygon[];
   getRelativeHotspots: () => Hotspot[];
-  updateHotspot: (hotspot: Hotspot) => void;
+  updateHotspot: (hotspot: Pick<Hotspot, 'id' | 'linkedViewId'>) => void;
 }
 
 export interface RenderedImageRect {
@@ -197,9 +197,9 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   useImperativeHandle(ref, () => ({
     getRelativePolygons: () => getRelativePolygonsFromAbsolute(polygons),
     getRelativeHotspots: () => getRelativeHotspotsFromAbsolute(hotspots),
-    updateHotspot: (updatedHotspot: Hotspot) => {
+    updateHotspot: (updatedHotspot: Pick<Hotspot, 'id' | 'linkedViewId'>) => {
         setHotspots(prevHotspots => {
-            const newHotspots = prevHotspots.map(h => h.id === updatedHotspot.id ? { ...h, ...updatedHotspot} : h);
+            const newHotspots = prevHotspots.map(h => h.id === updatedHotspot.id ? { ...h, linkedViewId: updatedHotspot.linkedViewId } : h);
             onHotspotsChange?.(getRelativeHotspotsFromAbsolute(newHotspots));
             return newHotspots;
         });
@@ -262,9 +262,7 @@ const ImageEditor = forwardRef<ImageEditorRef, ImageEditorProps>(
   const handleConfirmHotspot = () => {
     const spot = hotspots.find(h => h.id === selectedHotspotId);
     if (spot) {
-        // Convert to relative coordinates before passing to the modal
-        const relativeHotspot = getRelativeHotspotsFromAbsolute([spot])[0];
-        onEditHotspot(relativeHotspot);
+        onEditHotspot(spot);
     }
   };
 
