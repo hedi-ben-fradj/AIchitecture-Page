@@ -95,19 +95,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         const loadSplat = async () => {
             try {
                 setIsSplatLoading(true);
-                let urlToLoad = view.imageUrl!;
-
-                // If the URL is from Firebase, use the proxy to get a data URI
-                if (urlToLoad.includes('firebasestorage.googleapis.com')) {
-                    const proxyResponse = await fetch(`/api/splat-proxy?url=${encodeURIComponent(urlToLoad)}`);
-                    if (!proxyResponse.ok) {
-                        throw new Error(`Proxy failed with status: ${proxyResponse.status}`);
-                    }
-                    const base64String = await proxyResponse.text();
-                    urlToLoad = `data:application/octet-stream;base64,${base64String}`;
-                }
-
-                await SPLAT.Loader.LoadAsync(urlToLoad, scene, (progress) => {
+                await SPLAT.Loader.LoadAsync(view.imageUrl!, scene, (progress) => {
                     if (progress === 1.0) {
                         setIsSplatLoading(false);
                     }
@@ -130,7 +118,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             cancelAnimationFrame(animationFrameId);
         };
     }
-}, [view?.type, view?.imageUrl, toast, splatCanvasRef.current]);
+}, [view?.type, view?.imageUrl, toast]);
 
   useEffect(() => {
     if (!view) {
@@ -418,21 +406,16 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         return;
     }
     
-    if (view.type === 'Gausian Splatting') {
-        setSplatFile(file);
-        setSplatUrl(''); // Clear URL if a file is selected
-    } else {
-        setIsUploading(true);
-        updateViewImage(entityId, viewId, file)
-            .catch(error => {
-                console.error("Image processing failed:", error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Failed to process the image.' });
-            })
-            .finally(() => {
-                setIsUploading(false);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            });
-    }
+    setIsUploading(true);
+    updateViewImage(entityId, viewId, file)
+        .catch(error => {
+            console.error("Image processing failed:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to process the image.' });
+        })
+        .finally(() => {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        });
   };
 
   const handleThumbnailChange = (event: React.ChangeEvent<HTMLInputElement>) => {

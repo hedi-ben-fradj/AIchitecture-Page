@@ -19,7 +19,7 @@ import {
     arrayUnion,
     arrayRemove
 } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL, uploadBytes } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL, uploadBytes, deleteObject } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 
 export type EntityType = string;
@@ -117,7 +117,7 @@ const defaultEntityTypes: EntityType[] = [
     'house',
 ];
 
-const defaultViewTypes: ViewType[] = ['2d', '360', '2d plan'];
+const defaultViewTypes: ViewType[] = ['2d', '360', '2d plan', 'Gausian Splatting'];
 
 // Helper function to recursively get all descendant IDs
 const getDescendantIds = (entityId: string, allEntities: Entity[]): string[] => {
@@ -389,6 +389,13 @@ export function ViewsProvider({ children, projectId }: { children: ReactNode; pr
 
     const viewToDelete = entity.views.find(v => v.id === viewId);
     if (!viewToDelete) return;
+
+    if(viewToDelete.imageUrl) {
+        try { await deleteObject(ref(storage, viewToDelete.imageUrl)); } catch (e) { console.warn("Could not delete image from storage:", e) }
+    }
+    if(viewToDelete.thumbnailUrl) {
+         try { await deleteObject(ref(storage, viewToDelete.thumbnailUrl)); } catch (e) { console.warn("Could not delete thumbnail from storage:", e) }
+    }
 
     const entityRef = doc(db, 'entities', entityId);
     await updateDoc(entityRef, {

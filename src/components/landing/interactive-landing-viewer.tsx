@@ -17,7 +17,6 @@ import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 import * as SPLAT from 'gsplat';
-import { getSignedSplatUrl } from '@/app/actions';
 
 
 interface RenderedImageRect {
@@ -484,13 +483,7 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
             try {
                 setIsSplatLoading(true);
                 
-                const signedUrl = await getSignedSplatUrl(currentView.imageUrl!);
-                
-                if (!signedUrl) {
-                    throw new Error("Failed to get a signed URL for the splat file.");
-                }
-
-                await SPLAT.Loader.LoadAsync(signedUrl, scene, (progress) => {
+                await SPLAT.Loader.LoadAsync(currentView.imageUrl!, scene, (progress) => {
                     if (progress === 1.0) {
                         setIsSplatLoading(false);
                     }
