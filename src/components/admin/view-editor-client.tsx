@@ -111,11 +111,15 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
             }
         };
         
-        loadSplat();
+        if (view.imageUrl) {
+            loadSplat();
+        }
         animationFrameId = requestAnimationFrame(frame);
         
         return () => {
             cancelAnimationFrame(animationFrameId);
+            renderer.dispose();
+            controls.dispose();
         };
     }
 }, [view?.type, view?.imageUrl, toast]);
@@ -285,7 +289,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
       viewerRef.current?.destroy();
       viewerRef.current = null;
     };
-  }, [view?.id, imageToEdit]);
+  }, [view?.id, imageToEdit, toast]);
 
     useEffect(() => {
         if (!markersPlugin) return;
@@ -394,13 +398,18 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (view.type === 'Gausian Splatting' && !file.name.endsWith('.splat')) {
-        toast({ variant: 'destructive', title: 'Invalid File Type', description: "Please upload a .splat file."});
-        if(fileInputRef.current) fileInputRef.current.value = "";
+    if (view.type === 'Gausian Splatting') {
+        if (!file.name.endsWith('.splat')) {
+            toast({ variant: 'destructive', title: 'Invalid File Type', description: "Please upload a .splat file."});
+            if(fileInputRef.current) fileInputRef.current.value = "";
+            return;
+        }
+        setSplatFile(file);
+        setSplatUrl(''); // Clear URL if a file is uploaded
         return;
     }
 
-    if (view.type !== 'Gausian Splatting' && file.size > 4 * 1024 * 1024) { 
+    if (file.size > 4 * 1024 * 1024) { 
         toast({ variant: 'destructive', title: 'File too large', description: "File size exceeds 4MB. Please choose a smaller image."});
         if(fileInputRef.current) fileInputRef.current.value = "";
         return;
@@ -517,7 +526,7 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
         hotspot={hotspotToEdit}
       />
       
-      {!imageToEdit ? (
+      {!view.imageUrl ? (
         <div className="flex items-center justify-center h-full">
             <Card className="max-w-xl w-full bg-[#2a2a2a] border-neutral-700 text-white">
                 <CardContent className="p-6">
@@ -622,6 +631,18 @@ export default function ViewEditorClient({ projectId, entityId, viewId }: ViewEd
            {view.type === 'Gausian Splatting' ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                     <div className="md:col-span-2 w-full h-[70vh] relative bg-black rounded-lg border border-neutral-600 flex items-center justify-center text-white">
+                        {(isSplatLoading && view.thumbnailUrl) && (
+                            <>
+                                <Image
+                                    src={`/api/image-proxy?url=${encodeURIComponent(view.thumbnailUrl)}`}
+                                    alt={`Loading ${view.name}`}
+                                    layout="fill"
+                                    objectFit="cover"
+                                    className="blur-md scale-110"
+                                />
+                                <div className="absolute inset-0 bg-black/30" />
+                            </>
+                        )}
                         {isSplatLoading && (
                             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50 rounded-lg">
                                 <Loader2 className="h-10 w-10 text-white animate-spin" />
