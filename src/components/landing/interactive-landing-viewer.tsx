@@ -17,6 +17,7 @@ import { db } from '@/lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 import * as SPLAT from 'gsplat';
+import { getSplatUrl } from '@/ai/flows/get-splat-url';
 
 
 interface RenderedImageRect {
@@ -482,18 +483,26 @@ export default function InteractiveLandingViewer({ setActiveView }: { setActiveV
         const loadSplat = async () => {
             try {
                 setIsSplatLoading(true);
-                let urlToLoad = currentView.imageUrl!;
-
-                if (urlToLoad.includes('firebasestorage.googleapis.com') || urlToLoad.includes('huggingface.co')) {
-                    const proxyResponse = await fetch(`/api/splat-proxy?url=${encodeURIComponent(urlToLoad)}`);
-                    if (!proxyResponse.ok) {
-                        throw new Error(`Proxy failed with status: ${proxyResponse.status}`);
-                    }
-                    const base64String = await proxyResponse.text();
-                    urlToLoad = `data:application/octet-stream;base64,${base64String}`;
+                
+                // Assuming imageUrl is a full gs:// or https:// URL.
+                // We need to extract the path for the signed URL flow.
+                let filePath = '';
+                if (currentView.imageUrl?.startsWith('gs://')) {
+                    filePath = currentView.imageUrl.substring(5).split('/').slice(1).join('/');
+                } else if (currentView.imageUrl?.includes('firebasestorage.googleapis.com')) {
+                    const pathWithToken = currentView.imageUrl.split('/o/')[1];
+                    filePath = decodeURIComponent(pathWithToken.split('?')[0]);
+                } else {
+                    throw new Error("Unsupported .splat URL format. Please use a Firebase Storage URL.");
+                }
+                
+                const signedUrl = await getSplatUrl({ filePath });
+                
+                if (!signedUrl) {
+                    throw new Error("Failed to get a signed URL for the splat file.");
                 }
 
-                await SPLAT.Loader.LoadAsync(urlToLoad, scene, (progress) => {
+                await SPLAT.Loader.LoadAsync(signedUrl, scene, (progress) => {
                     if (progress === 1.0) {
                         setIsSplatLoading(false);
                     }
